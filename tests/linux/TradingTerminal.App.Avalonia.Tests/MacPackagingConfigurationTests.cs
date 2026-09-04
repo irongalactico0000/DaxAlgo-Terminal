@@ -113,7 +113,7 @@ public sealed class MacPackagingConfigurationTests
                     .Element(av + "TextBlock")?.Attribute("Text")?.Value)
             .Should().Equal(
                 "File", "View", "Tools", "Strategy Studio", "Charts",
-                "Research", "Data", "Settings", "Help");
+                "Research", "Data", "Execution Engine", "Settings", "Help");
 
         shellText.Should().Contain("SIMULATED DATA — not a live feed");
         shellText.Should().Contain("StringFormat='{}{0} STRATEGY ISSUE(S)'");
@@ -131,6 +131,26 @@ public sealed class MacPackagingConfigurationTests
         support.Should().Contain("Write to the developer");
         support.Should().Contain("{Binding DonateMessage}");
         support.Should().Contain("Content=\"Send to developer\"");
+    }
+
+    [Fact]
+    public void Broker_status_describes_market_data_connectivity_not_live_execution()
+    {
+        XNamespace av = "https://github.com/avaloniaui";
+        var shell = XDocument.Load(Fixture("MainWindow.axaml"));
+
+        var connectedBrokerCount = shell.Descendants(av + "TextBlock").Single(element =>
+            (string?)element.Attribute("Text") == "{Binding ConnectedBrokerCount}");
+        var statusParts = connectedBrokerCount.Parent!
+            .Elements(av + "TextBlock")
+            .Select(element => (string?)element.Attribute("Text"))
+            .ToArray();
+
+        statusParts.Should().Equal(
+            "{Binding ConnectedBrokerCount}",
+            " market-data brokers connected");
+        shell.Descendants(av + "TextBlock").Should().NotContain(element =>
+            (string?)element.Attribute("Text") == "LIVE ");
     }
 
     [Fact]

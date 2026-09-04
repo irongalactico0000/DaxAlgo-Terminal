@@ -233,3 +233,154 @@ public readonly record struct RuntimeInstanceId : IExecutionIdentifier<RuntimeIn
     public static RuntimeInstanceId Parse(string value) => new(value);
     public override string ToString() => Value ?? string.Empty;
 }
+
+// Canonical OMS identities. These coexist with the earlier TradeIR/command identifiers while the
+// execution paths converge; each uses the same validated scalar JSON representation.
+
+[JsonConverter(typeof(ExecutionIdentifierJsonConverterFactory))]
+public readonly record struct IntentId : IExecutionIdentifier<IntentId>
+{
+    public IntentId(string value) => Value = ExecutionIdentifier.Validate(value, nameof(value));
+    public string Value { get; }
+    public bool IsEmpty => string.IsNullOrEmpty(Value);
+    public static IntentId Parse(string value) => new(value);
+    public override string ToString() => Value ?? string.Empty;
+}
+
+[JsonConverter(typeof(ExecutionIdentifierJsonConverterFactory))]
+public readonly record struct BucketId : IExecutionIdentifier<BucketId>
+{
+    public BucketId(string value) => Value = ExecutionIdentifier.Validate(value, nameof(value));
+    public string Value { get; }
+    public bool IsEmpty => string.IsNullOrEmpty(Value);
+    public static BucketId Parse(string value) => new(value);
+    public override string ToString() => Value ?? string.Empty;
+}
+
+[JsonConverter(typeof(ExecutionIdentifierJsonConverterFactory))]
+public readonly record struct LegId : IExecutionIdentifier<LegId>
+{
+    public LegId(string value) => Value = ExecutionIdentifier.Validate(value, nameof(value));
+    public string Value { get; }
+    public bool IsEmpty => string.IsNullOrEmpty(Value);
+    public static LegId Parse(string value) => new(value);
+    public override string ToString() => Value ?? string.Empty;
+}
+
+[JsonConverter(typeof(ExecutionIdentifierJsonConverterFactory))]
+public readonly record struct BrokerOrderId : IExecutionIdentifier<BrokerOrderId>
+{
+    public BrokerOrderId(string value) => Value = ExecutionIdentifier.Validate(value, nameof(value));
+    public string Value { get; }
+    public bool IsEmpty => string.IsNullOrEmpty(Value);
+    public static BrokerOrderId Parse(string value) => new(value);
+    public override string ToString() => Value ?? string.Empty;
+}
+
+[JsonConverter(typeof(ExecutionIdentifierJsonConverterFactory))]
+public readonly record struct ExchangeOrderId : IExecutionIdentifier<ExchangeOrderId>
+{
+    public ExchangeOrderId(string value) => Value = ExecutionIdentifier.Validate(value, nameof(value));
+    public string Value { get; }
+    public bool IsEmpty => string.IsNullOrEmpty(Value);
+    public static ExchangeOrderId Parse(string value) => new(value);
+    public override string ToString() => Value ?? string.Empty;
+}
+
+[JsonConverter(typeof(ExecutionIdentifierJsonConverterFactory))]
+public readonly record struct ExecutionLeaseId : IExecutionIdentifier<ExecutionLeaseId>
+{
+    public ExecutionLeaseId(string value) => Value = ExecutionIdentifier.Validate(value, nameof(value));
+    public string Value { get; }
+    public bool IsEmpty => string.IsNullOrEmpty(Value);
+    public static ExecutionLeaseId Parse(string value) => new(value);
+    public override string ToString() => Value ?? string.Empty;
+}
+
+public readonly record struct FencingToken(long Value)
+{
+    public bool IsValid => Value > 0;
+    public bool IsNewerThan(FencingToken older) => IsValid && Value > older.Value;
+}
+
+[JsonConverter(typeof(ExecutionIdentifierJsonConverterFactory))]
+public readonly record struct DeduplicationKey : IExecutionIdentifier<DeduplicationKey>
+{
+    public DeduplicationKey(string value) => Value = ExecutionIdentifier.Validate(value, nameof(value));
+    public string Value { get; }
+    public bool IsEmpty => string.IsNullOrEmpty(Value);
+    public static DeduplicationKey Parse(string value) => new(value);
+    public DeduplicationKey Derive(string suffix) => new($"{Value}:{ExecutionIdentifier.Validate(suffix, nameof(suffix))}");
+    public override string ToString() => Value ?? string.Empty;
+}
+
+[JsonConverter(typeof(ExecutionIdentifierJsonConverterFactory))]
+public readonly record struct ReconciliationCaseId : IExecutionIdentifier<ReconciliationCaseId>
+{
+    public ReconciliationCaseId(string value) => Value = ExecutionIdentifier.Validate(value, nameof(value));
+    public string Value { get; }
+    public bool IsEmpty => string.IsNullOrEmpty(Value);
+    public static ReconciliationCaseId Parse(string value) => new(value);
+    public override string ToString() => Value ?? string.Empty;
+}
+
+/// <summary>All identity and ownership fields frozen into one canonical native order.</summary>
+public sealed record OrderIdentity
+{
+    public OrderIdentity(
+        IntentId intentId,
+        BucketId? bucketId,
+        LegId legId,
+        ClientOrderId clientOrderId,
+        BrokerOrderId? brokerOrderId,
+        ExchangeOrderId? exchangeOrderId,
+        CorrelationId correlationId,
+        CausationId causationId,
+        ExecutionLeaseId executionLeaseId,
+        FencingToken fencingToken)
+    {
+        ExecutionIdentifier.Require(intentId, nameof(intentId));
+        if (bucketId is { } bucket) ExecutionIdentifier.Require(bucket, nameof(bucketId));
+        ExecutionIdentifier.Require(legId, nameof(legId));
+        ExecutionIdentifier.Require(clientOrderId, nameof(clientOrderId));
+        if (brokerOrderId is { } brokerOrder) ExecutionIdentifier.Require(brokerOrder, nameof(brokerOrderId));
+        if (exchangeOrderId is { } exchangeOrder) ExecutionIdentifier.Require(exchangeOrder, nameof(exchangeOrderId));
+        ExecutionIdentifier.Require(correlationId, nameof(correlationId));
+        ExecutionIdentifier.Require(causationId, nameof(causationId));
+        ExecutionIdentifier.Require(executionLeaseId, nameof(executionLeaseId));
+        if (!fencingToken.IsValid) throw new ArgumentOutOfRangeException(nameof(fencingToken));
+
+        IntentId = intentId;
+        BucketId = bucketId;
+        LegId = legId;
+        ClientOrderId = clientOrderId;
+        BrokerOrderId = brokerOrderId;
+        ExchangeOrderId = exchangeOrderId;
+        CorrelationId = correlationId;
+        CausationId = causationId;
+        ExecutionLeaseId = executionLeaseId;
+        FencingToken = fencingToken;
+    }
+
+    public IntentId IntentId { get; }
+    public BucketId? BucketId { get; }
+    public LegId LegId { get; }
+    public ClientOrderId ClientOrderId { get; }
+    public BrokerOrderId? BrokerOrderId { get; }
+    public ExchangeOrderId? ExchangeOrderId { get; }
+    public CorrelationId CorrelationId { get; }
+    public CausationId CausationId { get; }
+    public ExecutionLeaseId ExecutionLeaseId { get; }
+    public FencingToken FencingToken { get; }
+    public bool IsValid =>
+        !IntentId.IsEmpty &&
+        (!BucketId.HasValue || !BucketId.Value.IsEmpty) &&
+        !LegId.IsEmpty &&
+        !ClientOrderId.IsEmpty &&
+        (!BrokerOrderId.HasValue || !BrokerOrderId.Value.IsEmpty) &&
+        (!ExchangeOrderId.HasValue || !ExchangeOrderId.Value.IsEmpty) &&
+        !CorrelationId.IsEmpty &&
+        !CausationId.IsEmpty &&
+        !ExecutionLeaseId.IsEmpty &&
+        FencingToken.IsValid;
+}

@@ -9,6 +9,7 @@ using TradingTerminal.Core.Brokers;
 using TradingTerminal.Core.Configuration;
 using TradingTerminal.Core.MarketData;
 using TradingTerminal.Core.Ml;
+using TradingTerminal.Core.Strategies.Generation;
 using TradingTerminal.Infrastructure.MarketData.Store;
 
 namespace TradingTerminal.Infrastructure.MarketData;
@@ -93,6 +94,7 @@ public static class MarketDataPipelineServiceCollectionExtensions
         });
 
         services.AddSingleton<IMarketDataIngest, MarketDataIngestService>();
+        services.AddSingleton<IChartPatternSearchV1, ChartPatternSearchV1>();
 
         // Backs the manual File → Start QuestDB command (launch Docker Desktop + container, re-arm live).
         // Exposed via IQuestDbLauncher too, so store-agnostic layers (the login screen) can warm it up.

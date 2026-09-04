@@ -236,6 +236,12 @@ public sealed class CandidateAuthoringUxContractTests
         root.Descendants(Avalonia + "TabItem").Should().ContainSingle(element =>
             (string?)element.Attribute("Header") == "{Binding CandidateTabHeader}");
 
+        var runnable = root.Descendants(Avalonia + "Button").Single(element =>
+            (string?)element.Attribute("AutomationProperties.Name") == "Build canonical runnable Paper strategy");
+        runnable.Attribute("Command")!.Value.Should().Be("{Binding GenerateCanonicalPaperStrategyCommand}");
+        runnable.Attribute("IsEnabled")!.Value.Should().Be("{Binding CanGenerateCanonicalPaperStrategy}");
+        runnable.Attribute("IsVisible")!.Value.Should().Be("{Binding ShowStartImplementationAction}");
+
         var start = root.Descendants(Avalonia + "Button").Single(element =>
             (string?)element.Attribute("AutomationProperties.Name") == "Start implementation generation");
         start.Attribute("Command")!.Value.Should().Be("{Binding GenerateFourCandidatesCommand}");

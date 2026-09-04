@@ -20,6 +20,7 @@
     <ProjectReference Include="..\..\..\src\linux\Backtest\TradingTerminal.Backtest.Worker\TradingTerminal.Backtest.Worker.csproj"
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\..\src\linux\Pipeline\TradingTerminal.Infrastructure\TradingTerminal.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\linux\Pipeline\TradingTerminal.Sandbox\TradingTerminal.Sandbox.csproj" />
     <ProjectReference Include="..\..\..\src\linux\Sdk\DaxAlgo.Strategy.Bundle\DaxAlgo.Strategy.Bundle.csproj" />
     <ProjectReference Include="..\..\..\src\linux\AI\TradingTerminal.Ai.Coordinator.Contracts\TradingTerminal.Ai.Coordinator.Contracts.csproj" />
     <ProjectReference Include="..\..\..\src\linux\AI\TradingTerminal.Ai.Coordinator\TradingTerminal.Ai.Coordinator.csproj" />

@@ -96,6 +96,26 @@ public sealed class RiskManagerTests
     }
 
     [Fact]
+    public void Realized_loss_uses_the_matching_instrument_multiplier()
+    {
+        var rm = new RiskManager(new RiskOptions
+        {
+            DefaultContractMultiplier = 1d,
+            ContractMultipliersBySymbol = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["ES"] = 50d,
+                ["SPY"] = 1d,
+            },
+        });
+        var day = new DateTime(2026, 5, 12, 13, 0, 0, DateTimeKind.Utc);
+
+        rm.RecordFill("ES", Fill("es-buy", OrderSide.Buy, 1, 100d, day));
+        rm.RecordFill("ES", Fill("es-sell", OrderSide.Sell, 1, 99d, day.AddMinutes(1)));
+
+        rm.RealisedPnlToday.Should().Be(-50d);
+    }
+
+    [Fact]
     public void Fills_AreIdempotentByClientIdAndFillQty()
     {
         var rm = new RiskManager(new RiskOptions { MaxPositionPerSymbol = 5 });

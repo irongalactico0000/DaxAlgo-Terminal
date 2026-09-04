@@ -152,16 +152,16 @@
                     </Grid>
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,7,0,0">
-                      <Border Classes="chip" Classes.live="{Binding IsLive}" ToolTip.Tip="Top-of-book quotes">
+                      <Border Classes="chip" Classes.live="{Binding SupportsQuotes}" ToolTip.Tip="Top-of-book quotes">
                         <StackPanel Orientation="Horizontal">
-                          <TextBlock Classes="chipLabel" Classes.live="{Binding IsLive}" Text="L1" />
-                          <TextBlock Classes="chipCount" Text="{Binding Quotes, StringFormat={}{0:N0}}" IsVisible="{Binding IsLive}" />
+                          <TextBlock Classes="chipLabel" Classes.live="{Binding SupportsQuotes}" Text="L1" />
+                          <TextBlock Classes="chipCount" Text="{Binding Quotes, StringFormat={}{0:N0}}" IsVisible="{Binding SupportsQuotes}" />
                         </StackPanel>
                       </Border>
-                      <Border Classes="chip" Classes.live="{Binding IsLive}" ToolTip.Tip="1-minute bars">
+                      <Border Classes="chip" Classes.live="{Binding SupportsBars}" ToolTip.Tip="1-minute bars">
                         <StackPanel Orientation="Horizontal">
-                          <TextBlock Classes="chipLabel" Classes.live="{Binding IsLive}" Text="BARS" />
-                          <TextBlock Classes="chipCount" Text="{Binding Bars, StringFormat={}{0:N0}}" IsVisible="{Binding IsLive}" />
+                          <TextBlock Classes="chipLabel" Classes.live="{Binding SupportsBars}" Text="BARS" />
+                          <TextBlock Classes="chipCount" Text="{Binding Bars, StringFormat={}{0:N0}}" IsVisible="{Binding SupportsBars}" />
                         </StackPanel>
                       </Border>
                       <Border Classes="chip" Classes.available="{Binding SupportsDepth}" ToolTip.Tip="L2 depth — order-book levels when available">

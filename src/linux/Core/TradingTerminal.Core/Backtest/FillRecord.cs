@@ -14,4 +14,5 @@ public sealed record FillRecord(
     long Quantity,
     double Price,
     double MidAtFill,
-    LiquidityFlag Liquidity);
+    LiquidityFlag Liquidity,
+    string? Symbol = null);

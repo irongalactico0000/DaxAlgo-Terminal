@@ -6,39 +6,30 @@ namespace TradingTerminal.Core.Strategies;
 /// The broker capability matrix that backs <see cref="ITradingStrategy.SupportedBrokers"/>'s default:
 /// which connected backends can actually serve the informative-extra data feeds. Bars + L1 are the
 /// universal baseline (every broker), so a strategy that needs only those is broker-agnostic and
-/// declares no specific brokers. Mirrors the per-broker capability documented on
-/// <see cref="IBrokerClient"/> / CLAUDE.md rule 10 — keep this in sync if a backend gains a feed.
+/// declares no specific brokers. Informative-extra eligibility is derived from
+/// <see cref="BrokerCapabilityCatalog"/> so broker support has one source of truth.
 /// </summary>
 public static class StrategyBrokerCapability
 {
-    /// <summary>
-    /// Backends that expose a real trade tape (<c>SubscribeTradesAsync</c> returns a stream rather
-    /// than throwing <see cref="NotSupportedException"/>): Interactive Brokers, Binance, Ironbeam.
-    /// NinjaTrader / cTrader / Alpaca have no tape in this build.
-    /// </summary>
-    public static readonly IReadOnlyList<BrokerKind> TapeBrokers = new[]
-    {
-        BrokerKind.InteractiveBrokers,
-        BrokerKind.Binance,
-        BrokerKind.IronBeam,
-    };
+    private const StrategyDataRequirement KnownRequirements =
+        StrategyDataRequirement.L1 |
+        StrategyDataRequirement.Bars |
+        StrategyDataRequirement.Depth |
+        StrategyDataRequirement.TradeTape;
+
+    private static readonly IReadOnlyList<BrokerKind> AllBrokers = Enum.GetValues<BrokerKind>();
 
     /// <summary>
-    /// Backends that serve Level-2 market depth: Interactive Brokers, cTrader, Ironbeam, Upstox,
-    /// and the public crypto exchanges (Binance / Coinbase / Bybit / Kraken / OKX).
+    /// Backends whose source implementation exposes a live trade tape.
     /// </summary>
-    public static readonly IReadOnlyList<BrokerKind> DepthBrokers = new[]
-    {
-        BrokerKind.InteractiveBrokers,
-        BrokerKind.CTrader,
-        BrokerKind.IronBeam,
-        BrokerKind.Upstox,
-        BrokerKind.Binance,
-        BrokerKind.Coinbase,
-        BrokerKind.Bybit,
-        BrokerKind.Kraken,
-        BrokerKind.Okx,
-    };
+    public static readonly IReadOnlyList<BrokerKind> TapeBrokers =
+        Filter(static capabilities => capabilities.SupportsLiveTrades);
+
+    /// <summary>
+    /// Backends whose source implementation exposes Level-2 market depth.
+    /// </summary>
+    public static readonly IReadOnlyList<BrokerKind> DepthBrokers =
+        Filter(static capabilities => capabilities.SupportsLevel2Depth);
 
     /// <summary>
     /// The brokers that can fully drive a strategy with the given data appetite. Tape-requiring
@@ -47,8 +38,21 @@ public static class StrategyBrokerCapability
     /// </summary>
     public static IReadOnlyList<BrokerKind> ForRequirement(StrategyDataRequirement requirement)
     {
-        if (requirement.HasFlag(StrategyDataRequirement.TradeTape)) return TapeBrokers;
-        if (requirement.HasFlag(StrategyDataRequirement.Depth)) return DepthBrokers;
-        return Array.Empty<BrokerKind>();
+        if ((requirement & ~KnownRequirements) != 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(requirement), requirement, "Unknown strategy data requirement flags.");
+
+        var requiresTape = requirement.HasFlag(StrategyDataRequirement.TradeTape);
+        var requiresDepth = requirement.HasFlag(StrategyDataRequirement.Depth);
+        if (!requiresTape && !requiresDepth) return Array.Empty<BrokerKind>();
+
+        return Filter(capabilities =>
+            (!requiresTape || capabilities.SupportsLiveTrades) &&
+            (!requiresDepth || capabilities.SupportsLevel2Depth));
     }
+
+    private static IReadOnlyList<BrokerKind> Filter(Func<MarketDataCapabilities, bool> predicate) =>
+        AllBrokers
+            .Where(broker => predicate(BrokerCapabilityCatalog.MarketDataFor(broker)))
+            .ToArray();
 }

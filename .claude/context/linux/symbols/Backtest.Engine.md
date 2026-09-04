@@ -1,6 +1,6 @@
 # TradingTerminal.Backtest.Engine — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `330db91800ba`. Declaration lines only;
+Generated from source fingerprint `e91d50e75733`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Backtest/TradingTerminal.Backtest.Engine/Accounting/Portfolio.cs
@@ -293,7 +293,7 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
   199: public TradeIrGatewayAdmissionV1 Admit(TradeIrOrderIntentV1 intent)
   287: public IReadOnlyList<TradeIrOrderFeedbackV1> DrainFeedback()
   295: public void Dispose()
-  650: public long RemainingQuantity => Quantity - FilledQuantity;
+  708: public long RemainingQuantity => Quantity - FilledQuantity;
 ```
 
 ## src/linux/Backtest/TradingTerminal.Backtest.Engine/TradeIr/TradeIrSimulatedBacktestRunnerV1.cs

@@ -1,17 +1,18 @@
 # TradingTerminal.Infrastructure / Backtest — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `330db91800ba`. Declaration lines only;
+Generated from source fingerprint `e91d50e75733`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/BacktestOrderRouter.cs
 ```cs
-   21: public sealed class BacktestOrderRouter : IOrderRouter, IStrategySignalSink
-   30: public BacktestOrderRouter(
-   48: public IObservable<OrderEvent> OrderEvents => _book.Events.Merge(_localEvents);
-   50: public IReadOnlyList<StrategySignalEvent> Signals => _signals;
-   52: public Task EmitSignalAsync(StrategySignal signal, CancellationToken ct = default)
-   60: public Task<OrderResult> PlaceOrderAsync(OrderRequest request, CancellationToken ct = default)
-   85: public Task CancelOrderAsync(string clientOrderId, CancellationToken ct = default)
+   22: public sealed class BacktestOrderRouter : IOrderRouter, IStrategySignalSink
+   32: public BacktestOrderRouter(
+   50: public IObservable<OrderEvent> OrderEvents => _book.Events.Merge(_localEvents);
+   52: public IReadOnlyList<StrategySignalEvent> Signals => _signals;
+   55: public bool TryGetContract(string clientOrderId, out Contract? contract)
+   63: public Task EmitSignalAsync(StrategySignal signal, CancellationToken ct = default)
+   71: public Task<OrderResult> PlaceOrderAsync(OrderRequest request, CancellationToken ct = default)
+   97: public Task CancelOrderAsync(string clientOrderId, CancellationToken ct = default)
 ```
 
 ## src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/BacktestSession.cs
@@ -90,9 +91,11 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 
 ## src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Persistence/BacktestTickSource.cs
 ```cs
-   16: public static BacktestEvent FromQuote(Tick q) => new(q.TimestampUtc, q, null);
-   17: public static BacktestEvent FromTrade(TradePrint t) => new(t.EventTimeUtc, null, t);
-   31: public static IAsyncEnumerable<BacktestEvent> Resolve(BacktestConfig config, IMarketDataStore? store, CancellationToken ct)
+   23: public static BacktestEvent FromQuote(InstrumentId instrument, Contract contract, Tick q) =>
+   26: public static BacktestEvent FromTrade(InstrumentId instrument, Contract contract, TradePrint t) =>
+   29: public static BacktestEvent FromBar(
+   37: public BacktestInstrumentEvent ToPublic() => new(
+   52: public static IAsyncEnumerable<BacktestEvent> Resolve(BacktestConfig config, IMarketDataStore? store, CancellationToken ct)
 ```
 
 ## src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Persistence/CsvTickReader.cs
@@ -185,7 +188,8 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
    29: public IObservable<OrderEvent> Events => _events.AsObservable();
    31: public OrderResult Submit(OrderRequest request)
    50: public void Cancel(string clientOrderId)
-   63: public void OnTick(Tick tick)
+   67: public void OnTick(Contract contract, Tick tick)
+  105: public void OnTick(Tick tick)
 ```
 
 ## src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/StatisticsCalculator.cs
@@ -239,13 +243,18 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 
 ## src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/TradeLedger.cs
 ```cs
-   19: public TradeLedger(double multiplier, double startingCash, IFeeModel? feeModel = null)
-   26: public double Cash { get; private set; }
-   27: public long NetPosition { get; private set; }
-   28: public double TotalFees { get; private set; }
-   29: public IReadOnlyList<Trade> Trades => _trades;
-   31: public void OnFill(DateTime utc, OrderSide side, long qty, double price, LiquidityFlag liquidity = LiquidityFlag.Taker)
-   68: public double Equity(double mid) => Cash + NetPosition * mid * _multiplier;
+   18: public TradeLedger(double multiplier, double startingCash, IFeeModel? feeModel = null)
+   27: public double Cash { get; private set; }
+   28: public long NetPosition => _states.Values.Sum(state => state.NetPosition);
+   29: public double TotalFees { get; private set; }
+   30: public IReadOnlyList<Trade> Trades => _trades;
+   31: public IReadOnlyDictionary<string, long> Positions => _states
+   35: public void OnFill(
+  112: public double Equity(IReadOnlyDictionary<Contract, double> marks)
+  125: public double Equity(double mid)
+  135: public double Multiplier { get; } = multiplier;
+  136: public long NetPosition { get; set; }
+  137: public Queue<Lot> OpenLots { get; } = new();
 ```
 
 ## src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/WalkForwardGridBuilders.cs

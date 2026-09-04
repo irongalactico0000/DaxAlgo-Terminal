@@ -50,7 +50,7 @@
                         <ComboBox ItemsSource="{Binding Instruments}"
                                   SelectedItem="{Binding SelectedInstrument}"
                                   DisplayMemberPath="DisplayName"
-                                  IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}}"
+                                  IsEnabled="{Binding CanSelectInstrument}"
                                   Margin="0,2,0,0" />
                     </StackPanel>
 
@@ -131,7 +131,7 @@
                         <TextBlock Text="Bar size" FontSize="11" Foreground="{DynamicResource Text.Secondary}" />
                         <ComboBox ItemsSource="{Binding BarSizes}"
                                   SelectedItem="{Binding SelectedBarSize}"
-                                  IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}}"
+                                  IsEnabled="{Binding CanSelectBarSize}"
                                   Margin="0,2,0,0" />
                     </StackPanel>
                 </Grid>

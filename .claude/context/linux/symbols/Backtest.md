@@ -1,6 +1,6 @@
 # TradingTerminal.Backtest — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `330db91800ba`. Declaration lines only;
+Generated from source fingerprint `e91d50e75733`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Tools/TradingTerminal.Backtest/AvaloniaUi/BacktestAvaloniaWindow.axaml.cs
@@ -49,23 +49,31 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 
 ## src/linux/Tools/TradingTerminal.Backtest/QuickBacktestViewModel.cs
 ```cs
-   22: public enum QuickBacktestDataMode
-   45: public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
-   55: public QuickBacktestViewModel(
-   98: public ObservableCollection<SignalInstrument> Instruments { get; }
-   99: public ObservableCollection<BarSize> BarSizes { get; }
-  100: public ObservableCollection<LookbackOption> Lookbacks { get; }
-  101: public ObservableCollection<QuickBacktestDataMode> DataModes { get; }
-  102: public ObservableCollection<BrokerKind> Brokers { get; }
-  103: public ObservableCollection<Trade> Trades { get; }
-  104: public ObservableCollection<EquityPoint> EquityCurve { get; }
-  131: public bool IsFullTape => SelectedDataMode == QuickBacktestDataMode.FullTapeRealTrades;
-  132: public bool IsBarSynthetic => SelectedDataMode == QuickBacktestDataMode.BarSynthetic;
-  143: public event EventHandler? EquityCurveUpdated;
-  151: public bool Initialize(string? backtestStrategyId, string displayName, bool preferFullTape)
-  214: public async Task RunAsync()
-  342: public void Cancel() => _runCts?.Cancel();
-  345: public void Dispose()
-  423: public sealed record LookbackOption(string Label, TimeSpan Duration)
-  425: public override string ToString() => Label;
+   27: public enum QuickBacktestDataMode
+   50: public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
+   64: public QuickBacktestViewModel(
+  112: public ObservableCollection<SignalInstrument> Instruments { get; }
+  113: public ObservableCollection<BarSize> BarSizes { get; }
+  114: public ObservableCollection<LookbackOption> Lookbacks { get; }
+  115: public ObservableCollection<QuickBacktestDataMode> DataModes { get; }
+  116: public ObservableCollection<BrokerKind> Brokers { get; }
+  117: public ObservableCollection<Trade> Trades { get; }
+  118: public ObservableCollection<EquityPoint> EquityCurve { get; }
+  152: public bool IsFullTape => SelectedDataMode == QuickBacktestDataMode.FullTapeRealTrades;
+  153: public bool IsBarSynthetic => SelectedDataMode == QuickBacktestDataMode.BarSynthetic;
+  154: public bool IsAuthoredStrategy => _kernelOption is not null;
+  155: public bool CanSelectInstrument => !IsAuthoredStrategy && !IsRunning;
+  156: public bool CanSelectBarSize => !IsAuthoredStrategy && !IsRunning;
+  157: public IReadOnlyList<ParameterEditorItem> EditableParameters => Parameters?.Items
+  160: public bool HasStrategyParameters => EditableParameters.Count != 0;
+  161: public bool CanEditParameters => HasStrategyParameters && !IsRunning;
+  162: public string ReviewedInstrumentSummary => _canonicalSelections.Count == 0
+  191: public event EventHandler? EquityCurveUpdated;
+  199: public bool Initialize(string? backtestStrategyId, string displayName, bool preferFullTape)
+  238: public bool Initialize(StrategyKernelRegistration registration)
+  395: public async Task RunAsync()
+  605: public void Cancel() => _runCts?.Cancel();
+  608: public void Dispose()
+  677: public sealed record LookbackOption(string Label, TimeSpan Duration)
+  679: public override string ToString() => Label;
 ```

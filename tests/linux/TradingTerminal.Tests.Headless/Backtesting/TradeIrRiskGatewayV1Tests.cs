@@ -40,7 +40,7 @@ public sealed class TradeIrRiskGatewayV1Tests
         admission.Decision.PolicyEvidence!.PolicyVersion.Should().Be(RiskPolicy.PolicyVersion);
         admission.Command!.Metadata.InstrumentId.Should().Be(fixture.Instrument.Id);
         admission.Command.Metadata.TradingAccountId.Should().Be(fixture.Policy.AccountId);
-        admission.Command.Terms.Quantity.Should().Be(5m);
+        admission.Command.Terms.Quantity.Should().Be(ScaledQuantity.FromWhole(5));
         fixture.Gateway.SubmittedOrderCount.Should().Be(1);
         decisionsVisibleAtEffect.Should().ContainSingle().Which.Should().Be(1,
             "the append-only policy observation must exist before the book sees the order");
@@ -182,8 +182,8 @@ public sealed class TradeIrRiskGatewayV1Tests
 
         second.IsAdmitted.Should().BeFalse();
         second.Decision.RiskDecision!.Code.Should().Be(RiskDecisionCode.RateLimitExceeded);
-        second.Decision.PolicyEvidence!.Context.CurrentBuyReservedQuantity.Should().Be(5m);
-        second.Decision.PolicyEvidence.Context.CurrentGrossReservedNotional.Should().Be(505m);
+        second.Decision.PolicyEvidence!.Context.CurrentBuyReservedQuantity.Should().Be(ScaledQuantity.FromWhole(5));
+        second.Decision.PolicyEvidence.Context.CurrentGrossReservedNotional.Should().Be(new ScaledMoney(505, 0));
         fixture.Gateway.SubmittedOrderCount.Should().Be(1);
     }
 
@@ -287,8 +287,8 @@ public sealed class TradeIrRiskGatewayV1Tests
             reduceOnly: false,
             afterCancelTime));
         afterCancellation.IsAdmitted.Should().BeTrue();
-        afterCancellation.Decision.PolicyEvidence!.Context.CurrentSellReservedQuantity.Should().Be(0m);
-        afterCancellation.Decision.PolicyEvidence.Context.CurrentGrossReservedNotional.Should().Be(0m);
+        afterCancellation.Decision.PolicyEvidence!.Context.CurrentSellReservedQuantity.Should().Be(ScaledQuantity.Zero);
+        afterCancellation.Decision.PolicyEvidence.Context.CurrentGrossReservedNotional.Should().Be(ScaledMoney.Zero);
 
         var expectedStates = new[]
         {
@@ -441,7 +441,7 @@ public sealed class TradeIrRiskGatewayV1Tests
         var admission = admit.Should().NotThrow().Which;
         admission.IsAdmitted.Should().BeFalse();
         admission.Decision.RiskDecision!.Code.Should().Be(RiskDecisionCode.MaximumOrderQuantityExceeded);
-        admission.Decision.RiskDecision.ProjectedGrossNotional.Should().Be(decimal.MaxValue);
+        admission.Decision.RiskDecision.ProjectedGrossNotional.Should().Be(new ScaledMoney(long.MaxValue, 0));
         admission.Submission.Should().BeNull();
         fixture.Gateway.SubmittedOrderCount.Should().Be(0);
     }
@@ -577,12 +577,12 @@ public sealed class TradeIrRiskGatewayV1Tests
         decimal maximumOrderQuantity = 100m,
         int maximumExposureCommandsPerWindow = 100,
         TimeSpan? rateLimitWindow = null) => new(
-        maximumOrderQuantity,
-        maximumAbsolutePosition: 100m,
-        maximumGrossNotional: 1_000_000m,
-        minimumBuyingPower: 0m,
-        maximumDailyLoss: 10_000m,
-        maximumDrawdown: 10_000m,
+        ExecutionNumericBoundary.QuantityFromDecimal(maximumOrderQuantity),
+        maximumAbsolutePosition: ScaledQuantity.FromWhole(100),
+        maximumGrossNotional: new ScaledMoney(1_000_000, 0),
+        minimumBuyingPower: ScaledMoney.Zero,
+        maximumDailyLoss: new ScaledMoney(10_000, 0),
+        maximumDrawdown: new ScaledMoney(10_000, 0),
         maximumExposureCommandsPerWindow,
         rateLimitWindow: rateLimitWindow ?? TimeSpan.FromMinutes(1));
 

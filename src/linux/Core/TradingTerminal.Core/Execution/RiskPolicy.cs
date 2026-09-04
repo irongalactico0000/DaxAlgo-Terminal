@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using TradingTerminal.Core.Trading;
 
 namespace TradingTerminal.Core.Execution;
@@ -26,48 +27,49 @@ public enum RiskDecisionCode
     RateLimitExceeded = 13,
     InvalidMarketPrice = 14,
     ReplacementQuantityBelowFilled = 15,
+    CanonicalInstructionMismatch = 16,
 }
 
 public sealed record RiskDecision(
     bool IsAllowed,
     RiskDecisionCode Code,
     string Reason,
-    decimal ProjectedNetQuantity,
-    decimal ProjectedGrossNotional)
+    ScaledQuantity ProjectedNetQuantity,
+    ScaledMoney ProjectedGrossNotional)
 {
     public static RiskDecision Allow(
         RiskDecisionCode code,
         string reason,
-        decimal projectedNetQuantity,
-        decimal projectedGrossNotional) =>
+        ScaledQuantity projectedNetQuantity,
+        ScaledMoney projectedGrossNotional) =>
         new(true, code, reason, projectedNetQuantity, projectedGrossNotional);
 
     public static RiskDecision Deny(
         RiskDecisionCode code,
         string reason,
-        decimal projectedNetQuantity,
-        decimal projectedGrossNotional) =>
+        ScaledQuantity projectedNetQuantity,
+        ScaledMoney projectedGrossNotional) =>
         new(false, code, reason, projectedNetQuantity, projectedGrossNotional);
 }
 
 public sealed record RiskLimits
 {
     public RiskLimits(
-        decimal maximumOrderQuantity,
-        decimal maximumAbsolutePosition,
-        decimal maximumGrossNotional,
-        decimal minimumBuyingPower,
-        decimal maximumDailyLoss,
-        decimal maximumDrawdown,
+        ScaledQuantity maximumOrderQuantity,
+        ScaledQuantity maximumAbsolutePosition,
+        ScaledMoney maximumGrossNotional,
+        ScaledMoney minimumBuyingPower,
+        ScaledMoney maximumDailyLoss,
+        ScaledMoney maximumDrawdown,
         int maximumExposureCommandsPerWindow,
         TimeSpan rateLimitWindow)
     {
-        if (maximumOrderQuantity <= 0m) throw new ArgumentOutOfRangeException(nameof(maximumOrderQuantity));
-        if (maximumAbsolutePosition <= 0m) throw new ArgumentOutOfRangeException(nameof(maximumAbsolutePosition));
-        if (maximumGrossNotional <= 0m) throw new ArgumentOutOfRangeException(nameof(maximumGrossNotional));
-        if (minimumBuyingPower < 0m) throw new ArgumentOutOfRangeException(nameof(minimumBuyingPower));
-        if (maximumDailyLoss <= 0m) throw new ArgumentOutOfRangeException(nameof(maximumDailyLoss));
-        if (maximumDrawdown <= 0m) throw new ArgumentOutOfRangeException(nameof(maximumDrawdown));
+        if (!maximumOrderQuantity.IsValid || maximumOrderQuantity.Coefficient <= 0) throw new ArgumentOutOfRangeException(nameof(maximumOrderQuantity));
+        if (!maximumAbsolutePosition.IsValid || maximumAbsolutePosition.Coefficient <= 0) throw new ArgumentOutOfRangeException(nameof(maximumAbsolutePosition));
+        if (!maximumGrossNotional.IsValid || maximumGrossNotional.Coefficient <= 0) throw new ArgumentOutOfRangeException(nameof(maximumGrossNotional));
+        if (!minimumBuyingPower.IsValid || minimumBuyingPower.Coefficient < 0) throw new ArgumentOutOfRangeException(nameof(minimumBuyingPower));
+        if (!maximumDailyLoss.IsValid || maximumDailyLoss.Coefficient <= 0) throw new ArgumentOutOfRangeException(nameof(maximumDailyLoss));
+        if (!maximumDrawdown.IsValid || maximumDrawdown.Coefficient <= 0) throw new ArgumentOutOfRangeException(nameof(maximumDrawdown));
         if (maximumExposureCommandsPerWindow <= 0) throw new ArgumentOutOfRangeException(nameof(maximumExposureCommandsPerWindow));
         if (rateLimitWindow <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(rateLimitWindow));
         MaximumOrderQuantity = maximumOrderQuantity;
@@ -80,12 +82,12 @@ public sealed record RiskLimits
         RateLimitWindow = rateLimitWindow;
     }
 
-    public decimal MaximumOrderQuantity { get; }
-    public decimal MaximumAbsolutePosition { get; }
-    public decimal MaximumGrossNotional { get; }
-    public decimal MinimumBuyingPower { get; }
-    public decimal MaximumDailyLoss { get; }
-    public decimal MaximumDrawdown { get; }
+    public ScaledQuantity MaximumOrderQuantity { get; }
+    public ScaledQuantity MaximumAbsolutePosition { get; }
+    public ScaledMoney MaximumGrossNotional { get; }
+    public ScaledMoney MinimumBuyingPower { get; }
+    public ScaledMoney MaximumDailyLoss { get; }
+    public ScaledMoney MaximumDrawdown { get; }
     public int MaximumExposureCommandsPerWindow { get; }
     public TimeSpan RateLimitWindow { get; }
 }
@@ -96,33 +98,88 @@ public sealed record RiskEvaluationContext
         RiskLimits limits,
         RiskControlMode controlMode,
         bool killSwitchActive,
-        decimal currentPositionQuantity,
-        decimal currentBuyReservedQuantity,
-        decimal currentSellReservedQuantity,
-        decimal currentGrossReservedNotional,
-        decimal existingOrderSignedReservation,
-        decimal existingOrderGrossReservation,
-        decimal existingOrderFilledQuantity,
-        decimal availableBuyingPower,
-        decimal dailyNetRealizedPnl,
-        decimal currentEquity,
-        decimal peakEquity,
-        decimal marketPrice,
+        ScaledQuantity currentPositionQuantity,
+        ScaledQuantity currentBuyReservedQuantity,
+        ScaledQuantity currentSellReservedQuantity,
+        ScaledMoney currentGrossReservedNotional,
+        ScaledQuantity existingOrderSignedReservation,
+        ScaledMoney existingOrderGrossReservation,
+        ScaledQuantity existingOrderFilledQuantity,
+        ScaledMoney availableBuyingPower,
+        ScaledMoney dailyNetRealizedPnl,
+        ScaledMoney currentEquity,
+        ScaledMoney peakEquity,
+        ScaledPrice marketPrice,
         int exposureCommandsInWindow,
         DateTimeOffset evaluatedAtUtc,
-        decimal contractMultiplier = 1m,
-        string accountCurrency = "USD")
+        ScaledRatio? contractMultiplier = null,
+        string accountCurrency = "USD",
+        bool hasUnrepresentableMarketEconomics = false)
+        : this(
+            limits,
+            controlMode,
+            killSwitchActive,
+            currentPositionQuantity,
+            currentBuyReservedQuantity,
+            currentSellReservedQuantity,
+            currentGrossReservedNotional,
+            existingOrderSignedReservation,
+            existingOrderGrossReservation,
+            existingOrderFilledQuantity,
+            availableBuyingPower,
+            dailyNetRealizedPnl,
+            currentEquity,
+            peakEquity,
+            marketPrice,
+            exposureCommandsInWindow,
+            evaluatedAtUtc,
+            contractMultiplier ?? new ScaledRatio(1, 0),
+            accountCurrency,
+            hasUnrepresentableMarketEconomics)
+    {
+    }
+
+    [JsonConstructor]
+    public RiskEvaluationContext(
+        RiskLimits limits,
+        RiskControlMode controlMode,
+        bool killSwitchActive,
+        ScaledQuantity currentPositionQuantity,
+        ScaledQuantity currentBuyReservedQuantity,
+        ScaledQuantity currentSellReservedQuantity,
+        ScaledMoney currentGrossReservedNotional,
+        ScaledQuantity existingOrderSignedReservation,
+        ScaledMoney existingOrderGrossReservation,
+        ScaledQuantity existingOrderFilledQuantity,
+        ScaledMoney availableBuyingPower,
+        ScaledMoney dailyNetRealizedPnl,
+        ScaledMoney currentEquity,
+        ScaledMoney peakEquity,
+        ScaledPrice marketPrice,
+        int exposureCommandsInWindow,
+        DateTimeOffset evaluatedAtUtc,
+        ScaledRatio contractMultiplier,
+        string accountCurrency,
+        bool hasUnrepresentableMarketEconomics)
     {
         ArgumentNullException.ThrowIfNull(limits);
         if (!Enum.IsDefined(controlMode)) throw new ArgumentOutOfRangeException(nameof(controlMode));
-        if (currentBuyReservedQuantity < 0m) throw new ArgumentOutOfRangeException(nameof(currentBuyReservedQuantity));
-        if (currentSellReservedQuantity < 0m) throw new ArgumentOutOfRangeException(nameof(currentSellReservedQuantity));
-        if (currentGrossReservedNotional < 0m) throw new ArgumentOutOfRangeException(nameof(currentGrossReservedNotional));
-        if (existingOrderGrossReservation < 0m) throw new ArgumentOutOfRangeException(nameof(existingOrderGrossReservation));
-        if (existingOrderFilledQuantity < 0m) throw new ArgumentOutOfRangeException(nameof(existingOrderFilledQuantity));
-        if (contractMultiplier <= 0m) throw new ArgumentOutOfRangeException(nameof(contractMultiplier));
-        if (availableBuyingPower < 0m) throw new ArgumentOutOfRangeException(nameof(availableBuyingPower));
-        if (peakEquity < currentEquity) throw new ArgumentOutOfRangeException(nameof(peakEquity), "Peak equity cannot be less than current equity.");
+        var multiplier = contractMultiplier;
+        RequireValid(currentPositionQuantity, nameof(currentPositionQuantity));
+        RequireNonNegative(currentBuyReservedQuantity, nameof(currentBuyReservedQuantity));
+        RequireNonNegative(currentSellReservedQuantity, nameof(currentSellReservedQuantity));
+        RequireNonNegative(currentGrossReservedNotional, nameof(currentGrossReservedNotional));
+        RequireValid(existingOrderSignedReservation, nameof(existingOrderSignedReservation));
+        RequireNonNegative(existingOrderGrossReservation, nameof(existingOrderGrossReservation));
+        RequireNonNegative(existingOrderFilledQuantity, nameof(existingOrderFilledQuantity));
+        if (!multiplier.IsValid || multiplier.Coefficient <= 0) throw new ArgumentOutOfRangeException(nameof(contractMultiplier));
+        RequireNonNegative(availableBuyingPower, nameof(availableBuyingPower));
+        RequireValid(dailyNetRealizedPnl, nameof(dailyNetRealizedPnl));
+        RequireValid(currentEquity, nameof(currentEquity));
+        RequireValid(peakEquity, nameof(peakEquity));
+        if (!marketPrice.IsValid) throw new ArgumentOutOfRangeException(nameof(marketPrice));
+        if (!TryCompareMoney(peakEquity, currentEquity, out var equityComparison) || equityComparison < 0)
+            throw new ArgumentOutOfRangeException(nameof(peakEquity), "Peak equity cannot be less than current equity.");
         if (exposureCommandsInWindow < 0) throw new ArgumentOutOfRangeException(nameof(exposureCommandsInWindow));
         Limits = limits;
         ControlMode = controlMode;
@@ -149,31 +206,63 @@ public sealed record RiskEvaluationContext
             0,
             0,
             TimeSpan.Zero);
-        ContractMultiplier = contractMultiplier;
+        ContractMultiplier = multiplier;
         AccountCurrency = ExecutionValidation.RequireText(accountCurrency.ToUpperInvariant(), nameof(accountCurrency), 16);
+        HasUnrepresentableMarketEconomics = hasUnrepresentableMarketEconomics;
     }
 
     public RiskLimits Limits { get; }
     public RiskControlMode ControlMode { get; }
     public bool KillSwitchActive { get; }
-    public decimal CurrentPositionQuantity { get; }
-    public decimal CurrentBuyReservedQuantity { get; }
-    public decimal CurrentSellReservedQuantity { get; }
-    public decimal CurrentNetReservedQuantity => CurrentBuyReservedQuantity - CurrentSellReservedQuantity;
-    public decimal CurrentGrossReservedNotional { get; }
-    public decimal ExistingOrderSignedReservation { get; }
-    public decimal ExistingOrderGrossReservation { get; }
-    public decimal ExistingOrderFilledQuantity { get; }
-    public decimal AvailableBuyingPower { get; }
-    public decimal DailyNetRealizedPnl { get; }
-    public decimal CurrentEquity { get; }
-    public decimal PeakEquity { get; }
-    public decimal MarketPrice { get; }
+    public ScaledQuantity CurrentPositionQuantity { get; }
+    public ScaledQuantity CurrentBuyReservedQuantity { get; }
+    public ScaledQuantity CurrentSellReservedQuantity { get; }
+    public ScaledQuantity CurrentNetReservedQuantity =>
+        ScaledValueMath.TrySubtractQuantity(CurrentBuyReservedQuantity, CurrentSellReservedQuantity, out var value)
+            ? value
+            : throw new OverflowException("Reserved quantity cannot be represented exactly.");
+    public ScaledMoney CurrentGrossReservedNotional { get; }
+    public ScaledQuantity ExistingOrderSignedReservation { get; }
+    public ScaledMoney ExistingOrderGrossReservation { get; }
+    public ScaledQuantity ExistingOrderFilledQuantity { get; }
+    public ScaledMoney AvailableBuyingPower { get; }
+    public ScaledMoney DailyNetRealizedPnl { get; }
+    public ScaledMoney CurrentEquity { get; }
+    public ScaledMoney PeakEquity { get; }
+    public ScaledPrice MarketPrice { get; }
     public int ExposureCommandsInWindow { get; }
     public DateTimeOffset EvaluatedAtUtc { get; }
     public DateTimeOffset TradingDayStartedAtUtc { get; }
-    public decimal ContractMultiplier { get; }
+    public ScaledRatio ContractMultiplier { get; }
     public string AccountCurrency { get; }
+    /// <summary>
+    /// A legacy market-data/accounting boundary supplied a finite value outside the canonical
+    /// coefficient/scale range. The placeholder values in this context must never be admitted.
+    /// </summary>
+    public bool HasUnrepresentableMarketEconomics { get; }
+
+    private static void RequireValid(ScaledQuantity value, string name)
+    {
+        if (!value.IsValid) throw new ArgumentOutOfRangeException(name);
+    }
+
+    private static void RequireValid(ScaledMoney value, string name)
+    {
+        if (!value.IsValid) throw new ArgumentOutOfRangeException(name);
+    }
+
+    private static void RequireNonNegative(ScaledQuantity value, string name)
+    {
+        if (!value.IsValid || value.Coefficient < 0) throw new ArgumentOutOfRangeException(name);
+    }
+
+    private static void RequireNonNegative(ScaledMoney value, string name)
+    {
+        if (!value.IsValid || value.Coefficient < 0) throw new ArgumentOutOfRangeException(name);
+    }
+
+    private static bool TryCompareMoney(ScaledMoney left, ScaledMoney right, out int comparison) =>
+        ScaledValueMath.TryCompare(left.Coefficient, left.Scale, right.Coefficient, right.Scale, out comparison);
 }
 
 public sealed record RiskPolicyEvidence
@@ -199,22 +288,29 @@ public sealed record RiskPolicyEvidence
 /// <summary>Stateless policy; callers persist a RiskObservation before applying the decision.</summary>
 public static class RiskPolicy
 {
-    public const string PolicyVersion = "daxalgo-risk-policy-v2";
+    public const string PolicyVersion = "daxalgo-risk-policy-v3-scaled";
+
+    private static readonly ScaledQuantity InvalidQuantity = new(long.MaxValue, 0);
+    private static readonly ScaledMoney InvalidMoney = new(long.MaxValue, 0);
 
     public static RiskDecision Evaluate(ExecutionCommand command, RiskEvaluationContext context)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
 
-        var positionProjectionInvalid = false;
-        var currentNetReserved = SaturatingSubtract(
-            context.CurrentBuyReservedQuantity,
-            context.CurrentSellReservedQuantity,
-            ref positionProjectionInvalid);
-        var currentProjected = SaturatingAdd(
-            context.CurrentPositionQuantity,
-            currentNetReserved,
-            ref positionProjectionInvalid);
+        var currentNetReserved = ScaledQuantity.Zero;
+        var currentProjected = ScaledQuantity.Zero;
+        var positionProjectionInvalid =
+            !ScaledValueMath.TrySubtractQuantity(
+                context.CurrentBuyReservedQuantity,
+                context.CurrentSellReservedQuantity,
+                out currentNetReserved) ||
+            !ScaledValueMath.TryAddQuantity(
+                context.CurrentPositionQuantity,
+                currentNetReserved,
+                out currentProjected);
+        if (positionProjectionInvalid)
+            currentProjected = InvalidQuantity;
         var currentGross = context.CurrentGrossReservedNotional;
         if (command is CancelOrderCommand or QueryOrderCommand)
             return RiskDecision.Allow(RiskDecisionCode.CancelOrQueryAlwaysAllowed, "Cancel and query remain admitted during recovery.", currentProjected, currentGross);
@@ -225,84 +321,81 @@ public static class RiskPolicy
             ReplaceOrderCommand replace => replace.ReplacementTerms,
             _ => throw new NotSupportedException($"Unsupported risk command {command.GetType().Name}.")
         };
-        var price = terms.LimitPrice ?? terms.StopPrice ?? context.MarketPrice;
-        if (price <= 0m)
-            return RiskDecision.Deny(RiskDecisionCode.InvalidMarketPrice, "A positive reservation price is required.", currentProjected, currentGross);
-
-        var reservationQuantity = command is ReplaceOrderCommand
-            ? terms.Quantity - context.ExistingOrderFilledQuantity
-            : terms.Quantity;
-        if (reservationQuantity < 0m)
+        if (command is SubmitOrderCommand submitCommand &&
+            !CanonicalOrderInstructionMapper.SignedEconomicsAgree(
+                submitCommand.CanonicalInstruction,
+                context.CurrentPositionQuantity))
         {
             return RiskDecision.Deny(
-                RiskDecisionCode.ReplacementQuantityBelowFilled,
-                "Replacement total quantity cannot be less than accepted fills.",
+                RiskDecisionCode.CanonicalInstructionMismatch,
+                "Canonical intent does not produce the submitted side and quantity from the current position.",
                 currentProjected,
                 currentGross);
         }
-        var existingBuy = Math.Max(0m, context.ExistingOrderSignedReservation);
-        var existingSell = context.ExistingOrderSignedReservation < 0m
-            ? SaturatingNegate(context.ExistingOrderSignedReservation, ref positionProjectionInvalid)
-            : 0m;
-        var projectedBuy = SaturatingSubtract(
-            context.CurrentBuyReservedQuantity,
-            existingBuy,
-            ref positionProjectionInvalid);
-        projectedBuy = SaturatingAdd(
-            projectedBuy,
-            terms.Side == OrderSide.Buy ? reservationQuantity : 0m,
-            ref positionProjectionInvalid);
-        var projectedSell = SaturatingSubtract(
-            context.CurrentSellReservedQuantity,
-            existingSell,
-            ref positionProjectionInvalid);
-        projectedSell = SaturatingAdd(
-            projectedSell,
-            terms.Side == OrderSide.Sell ? reservationQuantity : 0m,
-            ref positionProjectionInvalid);
-        var projectedNet = SaturatingAdd(
-            context.CurrentPositionQuantity,
-            projectedBuy,
-            ref positionProjectionInvalid);
-        projectedNet = SaturatingSubtract(projectedNet, projectedSell, ref positionProjectionInvalid);
-        var worstCaseLong = SaturatingAdd(
-            context.CurrentPositionQuantity,
-            projectedBuy,
-            ref positionProjectionInvalid);
-        var worstCaseShort = SaturatingSubtract(
-            context.CurrentPositionQuantity,
-            projectedSell,
-            ref positionProjectionInvalid);
-        var worstCaseAbsolutePosition = Math.Max(
-            SaturatingAbs(worstCaseLong, ref positionProjectionInvalid),
-            SaturatingAbs(worstCaseShort, ref positionProjectionInvalid));
-        positionProjectionInvalid |= projectedBuy < 0m || projectedSell < 0m;
+        var price = terms.LimitPrice ?? terms.StopPrice ?? context.MarketPrice;
+        if (!price.IsValid || price.Coefficient <= 0)
+            return RiskDecision.Deny(RiskDecisionCode.InvalidMarketPrice, "A positive reservation price is required.", currentProjected, currentGross);
 
-        var grossProjectionInvalid = false;
-        decimal orderNotional;
-        decimal projectedGross;
-        try
+        var reservationQuantity = terms.Quantity;
+        if (command is ReplaceOrderCommand)
         {
-            orderNotional = checked(checked(reservationQuantity * price) * context.ContractMultiplier);
-            projectedGross = checked(
-                context.CurrentGrossReservedNotional -
-                context.ExistingOrderGrossReservation +
-                orderNotional);
+            if (!TryCompareQuantity(terms.Quantity, context.ExistingOrderFilledQuantity, out var replacementComparison) ||
+                replacementComparison < 0 ||
+                !ScaledValueMath.TrySubtractQuantity(
+                    terms.Quantity,
+                    context.ExistingOrderFilledQuantity,
+                    out reservationQuantity))
+            {
+                return RiskDecision.Deny(
+                    RiskDecisionCode.ReplacementQuantityBelowFilled,
+                    "Replacement total quantity cannot be less than accepted fills.",
+                    currentProjected,
+                    currentGross);
+            }
         }
-        catch (OverflowException)
+
+        var existingBuy = context.ExistingOrderSignedReservation.Coefficient > 0
+            ? context.ExistingOrderSignedReservation
+            : ScaledQuantity.Zero;
+        var existingSell = ScaledQuantity.Zero;
+        if (context.ExistingOrderSignedReservation.Coefficient < 0 &&
+            !TryNegateQuantity(context.ExistingOrderSignedReservation, out existingSell))
+            positionProjectionInvalid = true;
+
+        if (!TryProjectReservations(
+                context,
+                terms.Side,
+                reservationQuantity,
+                existingBuy,
+                existingSell,
+                out var projectedBuy,
+                out var projectedSell,
+                out var projectedNet,
+                out var worstCaseAbsolutePosition))
         {
-            // The policy must return a stable denial, never let valid numeric input escape as an
-            // arithmetic exception after an execution intent has been consumed.
-            grossProjectionInvalid = true;
-            projectedGross = decimal.MaxValue;
+            positionProjectionInvalid = true;
+            projectedNet = InvalidQuantity;
+            worstCaseAbsolutePosition = InvalidQuantity;
         }
-        grossProjectionInvalid |= projectedGross < 0m;
-        var isNonCrossingReduceOnly = !positionProjectionInvalid &&
-            terms.ReduceOnly && IsNonCrossingReduction(
-            context.CurrentPositionQuantity,
-            terms.Side,
-            projectedBuy,
-            projectedSell);
+
+        var orderNotional = ScaledMoney.Zero;
+        var grossWithoutExisting = ScaledMoney.Zero;
+        var projectedGross = ScaledMoney.Zero;
+        var grossProjectionInvalid =
+            context.HasUnrepresentableMarketEconomics ||
+            !TryOrderNotional(reservationQuantity, price, context.ContractMultiplier, out orderNotional) ||
+            !TrySubtractMoney(currentGross, context.ExistingOrderGrossReservation, out grossWithoutExisting) ||
+            !ScaledValueMath.TryAddMoney(grossWithoutExisting, orderNotional, out projectedGross) ||
+            projectedGross.Coefficient < 0;
+        if (grossProjectionInvalid)
+            projectedGross = InvalidMoney;
+
+        var isNonCrossingReduceOnly = !positionProjectionInvalid && terms.ReduceOnly &&
+            IsNonCrossingReduction(
+                context.CurrentPositionQuantity,
+                terms.Side,
+                projectedBuy,
+                projectedSell);
 
         if (command.Metadata.ExpiresAtUtc is { } expiresAt && expiresAt <= context.EvaluatedAtUtc)
             return RiskDecision.Deny(RiskDecisionCode.ExpiredCommand, "Command has expired.", projectedNet, projectedGross);
@@ -313,37 +406,45 @@ public static class RiskPolicy
         if (context.ControlMode == RiskControlMode.Reducing && !terms.ReduceOnly)
             return RiskDecision.Deny(RiskDecisionCode.NewExposureHalted, "Reducing mode admits only explicitly reduce-only exposure commands.", projectedNet, projectedGross);
         if (positionProjectionInvalid)
-            return RiskDecision.Deny(RiskDecisionCode.MaximumPositionExceeded, "Position projection exceeded the supported decimal range.", projectedNet, projectedGross);
+            return RiskDecision.Deny(RiskDecisionCode.MaximumPositionExceeded, "Position projection exceeded the supported exact range.", projectedNet, projectedGross);
         if ((context.ControlMode == RiskControlMode.Reducing || terms.ReduceOnly) &&
             !isNonCrossingReduceOnly)
             return RiskDecision.Deny(RiskDecisionCode.ReduceOnlyWouldIncreaseExposure, "Reduce-only reservations must reduce without crossing through flat.", projectedNet, projectedGross);
-        if (terms.Quantity > context.Limits.MaximumOrderQuantity)
+        if (!TryCompareQuantity(terms.Quantity, context.Limits.MaximumOrderQuantity, out var orderQuantityComparison) ||
+            orderQuantityComparison > 0)
             return RiskDecision.Deny(RiskDecisionCode.MaximumOrderQuantityExceeded, "Order quantity exceeds the configured maximum.", projectedNet, projectedGross);
         if (!isNonCrossingReduceOnly &&
-            worstCaseAbsolutePosition > context.Limits.MaximumAbsolutePosition)
+            (!TryCompareQuantity(worstCaseAbsolutePosition, context.Limits.MaximumAbsolutePosition, out var positionComparison) ||
+             positionComparison > 0))
             return RiskDecision.Deny(RiskDecisionCode.MaximumPositionExceeded, "Worst-case directional fills exceed the configured position maximum.", projectedNet, projectedGross);
         if (grossProjectionInvalid)
-            return RiskDecision.Deny(RiskDecisionCode.MaximumGrossNotionalExceeded, "Gross-notional projection exceeded the supported decimal range.", projectedNet, projectedGross);
+            return RiskDecision.Deny(RiskDecisionCode.MaximumGrossNotionalExceeded, "Gross-notional projection exceeded the supported exact range.", projectedNet, projectedGross);
         if (!isNonCrossingReduceOnly &&
-            projectedGross > context.Limits.MaximumGrossNotional)
+            (!TryCompareMoney(projectedGross, context.Limits.MaximumGrossNotional, out var grossComparison) ||
+             grossComparison > 0))
             return RiskDecision.Deny(RiskDecisionCode.MaximumGrossNotionalExceeded, "Projected working-order notional exceeds the configured maximum.", projectedNet, projectedGross);
-        var incrementalGrossInvalid = false;
-        var incrementalGrossNotional = Math.Max(
-            0m,
-            SaturatingSubtract(projectedGross, currentGross, ref incrementalGrossInvalid));
-        if (incrementalGrossInvalid)
-            return RiskDecision.Deny(RiskDecisionCode.MaximumGrossNotionalExceeded, "Incremental gross-notional projection exceeded the supported decimal range.", projectedNet, projectedGross);
+        if (!TrySubtractMoney(projectedGross, currentGross, out var incrementalGrossNotional))
+            return RiskDecision.Deny(RiskDecisionCode.MaximumGrossNotionalExceeded, "Incremental gross-notional projection exceeded the supported exact range.", projectedNet, projectedGross);
+        if (incrementalGrossNotional.Coefficient < 0)
+            incrementalGrossNotional = ScaledMoney.Zero;
+        if (!TrySubtractMoney(context.AvailableBuyingPower, context.Limits.MinimumBuyingPower, out var usableBuyingPower))
+            return RiskDecision.Deny(RiskDecisionCode.InsufficientBuyingPower, "Protected buying power cannot be represented exactly.", projectedNet, projectedGross);
+        if (usableBuyingPower.Coefficient < 0)
+            usableBuyingPower = ScaledMoney.Zero;
         if (!isNonCrossingReduceOnly &&
-            incrementalGrossNotional > 0m &&
-            incrementalGrossNotional > Math.Max(0m, context.AvailableBuyingPower - context.Limits.MinimumBuyingPower))
+            incrementalGrossNotional.Coefficient > 0 &&
+            (!TryCompareMoney(incrementalGrossNotional, usableBuyingPower, out var buyingPowerComparison) ||
+             buyingPowerComparison > 0))
             return RiskDecision.Deny(RiskDecisionCode.InsufficientBuyingPower, "Order would consume protected buying power.", projectedNet, projectedGross);
+        if (!TryNegateMoney(context.Limits.MaximumDailyLoss, out var negativeDailyLossLimit))
+            return RiskDecision.Deny(RiskDecisionCode.DailyLossLimitExceeded, "Daily-loss limit cannot be represented exactly.", projectedNet, projectedGross);
         if (!isNonCrossingReduceOnly &&
-            context.DailyNetRealizedPnl <= -context.Limits.MaximumDailyLoss)
+            (!TryCompareMoney(context.DailyNetRealizedPnl, negativeDailyLossLimit, out var lossComparison) ||
+             lossComparison <= 0))
             return RiskDecision.Deny(RiskDecisionCode.DailyLossLimitExceeded, "Daily net realized-loss limit is active.", projectedNet, projectedGross);
-        var drawdownInvalid = false;
-        var drawdown = SaturatingSubtract(context.PeakEquity, context.CurrentEquity, ref drawdownInvalid);
-        if (drawdownInvalid ||
-            (!isNonCrossingReduceOnly && drawdown >= context.Limits.MaximumDrawdown))
+        if (!TrySubtractMoney(context.PeakEquity, context.CurrentEquity, out var drawdown) ||
+            !TryCompareMoney(drawdown, context.Limits.MaximumDrawdown, out var drawdownComparison) ||
+            !isNonCrossingReduceOnly && drawdownComparison >= 0)
             return RiskDecision.Deny(RiskDecisionCode.DrawdownLimitExceeded, "Drawdown limit is active.", projectedNet, projectedGross);
         if (context.ExposureCommandsInWindow >= context.Limits.MaximumExposureCommandsPerWindow)
             return RiskDecision.Deny(RiskDecisionCode.RateLimitExceeded, "Exposure command rate limit is active.", projectedNet, projectedGross);
@@ -352,56 +453,129 @@ public static class RiskPolicy
     }
 
     private static bool IsNonCrossingReduction(
-        decimal currentPosition,
+        ScaledQuantity currentPosition,
         OrderSide side,
-        decimal projectedBuy,
-        decimal projectedSell) =>
-        currentPosition switch
-        {
-            > 0m => side == OrderSide.Sell && projectedSell <= currentPosition,
-            < 0m => side == OrderSide.Buy && projectedBuy <= Math.Abs(currentPosition),
-            _ => false,
-        };
-
-    private static decimal SaturatingAdd(decimal left, decimal right, ref bool invalid)
+        ScaledQuantity projectedBuy,
+        ScaledQuantity projectedSell)
     {
-        try
+        if (currentPosition.Coefficient > 0)
+            return side == OrderSide.Sell &&
+                   TryCompareQuantity(projectedSell, currentPosition, out var sellComparison) &&
+                   sellComparison <= 0;
+        if (currentPosition.Coefficient < 0)
         {
-            return checked(left + right);
+            return TryNegateQuantity(currentPosition, out var absolutePosition) &&
+                   side == OrderSide.Buy &&
+                   TryCompareQuantity(projectedBuy, absolutePosition, out var buyComparison) &&
+                   buyComparison <= 0;
         }
-        catch (OverflowException)
-        {
-            invalid = true;
-            return left >= 0m ? decimal.MaxValue : decimal.MinValue;
-        }
+        return false;
     }
 
-    private static decimal SaturatingSubtract(decimal left, decimal right, ref bool invalid)
+    private static bool TryProjectReservations(
+        RiskEvaluationContext context,
+        OrderSide side,
+        ScaledQuantity reservationQuantity,
+        ScaledQuantity existingBuy,
+        ScaledQuantity existingSell,
+        out ScaledQuantity projectedBuy,
+        out ScaledQuantity projectedSell,
+        out ScaledQuantity projectedNet,
+        out ScaledQuantity worstCaseAbsolutePosition)
     {
-        try
-        {
-            return checked(left - right);
-        }
-        catch (OverflowException)
-        {
-            invalid = true;
-            return left >= 0m ? decimal.MaxValue : decimal.MinValue;
-        }
+        projectedBuy = projectedSell = projectedNet = worstCaseAbsolutePosition = default;
+        if (!ScaledValueMath.TrySubtractQuantity(context.CurrentBuyReservedQuantity, existingBuy, out var buyWithoutExisting) ||
+            !ScaledValueMath.TryAddQuantity(
+                buyWithoutExisting,
+                side == OrderSide.Buy ? reservationQuantity : ScaledQuantity.Zero,
+                out projectedBuy) ||
+            !ScaledValueMath.TrySubtractQuantity(context.CurrentSellReservedQuantity, existingSell, out var sellWithoutExisting) ||
+            !ScaledValueMath.TryAddQuantity(
+                sellWithoutExisting,
+                side == OrderSide.Sell ? reservationQuantity : ScaledQuantity.Zero,
+                out projectedSell) ||
+            projectedBuy.Coefficient < 0 ||
+            projectedSell.Coefficient < 0 ||
+            !ScaledValueMath.TryAddQuantity(context.CurrentPositionQuantity, projectedBuy, out var positionPlusBuys) ||
+            !ScaledValueMath.TrySubtractQuantity(positionPlusBuys, projectedSell, out projectedNet) ||
+            !ScaledValueMath.TryAddQuantity(context.CurrentPositionQuantity, projectedBuy, out var worstLong) ||
+            !ScaledValueMath.TrySubtractQuantity(context.CurrentPositionQuantity, projectedSell, out var worstShort) ||
+            !TryAbsQuantity(worstLong, out worstLong) ||
+            !TryAbsQuantity(worstShort, out worstShort) ||
+            !TryCompareQuantity(worstLong, worstShort, out var worstComparison))
+            return false;
+        worstCaseAbsolutePosition = worstComparison >= 0 ? worstLong : worstShort;
+        return true;
     }
 
-    private static decimal SaturatingNegate(decimal value, ref bool invalid)
+    private static bool TryOrderNotional(
+        ScaledQuantity quantity,
+        ScaledPrice price,
+        ScaledRatio multiplier,
+        out ScaledMoney notional)
     {
-        try
-        {
-            return checked(-value);
-        }
-        catch (OverflowException)
-        {
-            invalid = true;
-            return value < 0m ? decimal.MaxValue : decimal.MinValue;
-        }
+        notional = default;
+        if (!quantity.IsValid || quantity.Coefficient < 0 ||
+            !price.IsValid || price.Coefficient <= 0 ||
+            !multiplier.IsValid || multiplier.Coefficient <= 0 ||
+            !ScaledValueMath.TryMultiply(quantity.Coefficient, price.Coefficient, out var quantityPrice) ||
+            !ScaledValueMath.TryMultiply(quantityPrice, multiplier.Coefficient, out var wide) ||
+            !ScaledValueMath.TryNarrow(
+                wide,
+                quantity.Scale + price.Scale + multiplier.Scale,
+                out var coefficient,
+                out var scale))
+            return false;
+        notional = new ScaledMoney(coefficient, scale);
+        return true;
     }
 
-    private static decimal SaturatingAbs(decimal value, ref bool invalid) =>
-        value < 0m ? SaturatingNegate(value, ref invalid) : value;
+    private static bool TrySubtractMoney(ScaledMoney left, ScaledMoney right, out ScaledMoney difference)
+    {
+        difference = default;
+        if (!ScaledValueMath.TryAdd(
+                left.Coefficient,
+                left.Scale,
+                -(Int128)right.Coefficient,
+                right.Scale,
+                out var wide,
+                out var wideScale) ||
+            !ScaledValueMath.TryNarrow(wide, wideScale, out var coefficient, out var scale))
+            return false;
+        difference = new ScaledMoney(coefficient, scale);
+        return true;
+    }
+
+    private static bool TryNegateQuantity(ScaledQuantity value, out ScaledQuantity negated)
+    {
+        negated = default;
+        if (!ScaledValueMath.TryNarrow(-(Int128)value.Coefficient, value.Scale, out var coefficient, out var scale))
+            return false;
+        negated = new ScaledQuantity(coefficient, scale);
+        return true;
+    }
+
+    private static bool TryAbsQuantity(ScaledQuantity value, out ScaledQuantity absolute) =>
+        value.Coefficient < 0 ? TryNegateQuantity(value, out absolute) : Return(value, out absolute);
+
+    private static bool TryNegateMoney(ScaledMoney value, out ScaledMoney negated)
+    {
+        negated = default;
+        if (!ScaledValueMath.TryNarrow(-(Int128)value.Coefficient, value.Scale, out var coefficient, out var scale))
+            return false;
+        negated = new ScaledMoney(coefficient, scale);
+        return true;
+    }
+
+    private static bool TryCompareQuantity(ScaledQuantity left, ScaledQuantity right, out int comparison) =>
+        ScaledValueMath.TryCompare(left.Coefficient, left.Scale, right.Coefficient, right.Scale, out comparison);
+
+    private static bool TryCompareMoney(ScaledMoney left, ScaledMoney right, out int comparison) =>
+        ScaledValueMath.TryCompare(left.Coefficient, left.Scale, right.Coefficient, right.Scale, out comparison);
+
+    private static bool Return<T>(T value, out T result)
+    {
+        result = value;
+        return true;
+    }
 }

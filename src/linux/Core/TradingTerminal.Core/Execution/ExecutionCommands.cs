@@ -80,9 +80,9 @@ public sealed record OrderTerms
     public OrderTerms(
         OrderSide side,
         OrderType type,
-        decimal quantity,
-        decimal? limitPrice = null,
-        decimal? stopPrice = null,
+        ScaledQuantity quantity,
+        ScaledPrice? limitPrice = null,
+        ScaledPrice? stopPrice = null,
         TimeInForce timeInForce = TimeInForce.Day,
         bool reduceOnly = false)
     {
@@ -92,11 +92,11 @@ public sealed record OrderTerms
             throw new ArgumentOutOfRangeException(nameof(type));
         if (!Enum.IsDefined(timeInForce))
             throw new ArgumentOutOfRangeException(nameof(timeInForce));
-        if (quantity <= 0m)
+        if (!quantity.IsValid || quantity.Coefficient <= 0)
             throw new ArgumentOutOfRangeException(nameof(quantity));
-        if (limitPrice is <= 0m)
+        if (limitPrice is { } limit && (!limit.IsValid || limit.Coefficient <= 0))
             throw new ArgumentOutOfRangeException(nameof(limitPrice));
-        if (stopPrice is <= 0m)
+        if (stopPrice is { } stop && (!stop.IsValid || stop.Coefficient <= 0))
             throw new ArgumentOutOfRangeException(nameof(stopPrice));
 
         var requiresLimit = type is OrderType.Limit or OrderType.StopLimit;
@@ -117,9 +117,9 @@ public sealed record OrderTerms
 
     public OrderSide Side { get; }
     public OrderType Type { get; }
-    public decimal Quantity { get; }
-    public decimal? LimitPrice { get; }
-    public decimal? StopPrice { get; }
+    public ScaledQuantity Quantity { get; }
+    public ScaledPrice? LimitPrice { get; }
+    public ScaledPrice? StopPrice { get; }
     public TimeInForce TimeInForce { get; }
     public bool ReduceOnly { get; }
 }
@@ -171,19 +171,25 @@ public sealed record SubmitOrderCommand : ExecutionCommand
         ExecutionCommandMetadata metadata,
         OrderId orderId,
         ClientOrderId clientOrderId,
-        OrderTerms terms)
+        OrderTerms terms,
+        CanonicalOrderInstruction canonicalInstruction)
         : base(metadata, orderId)
     {
         if (metadata.ExpectedOrderSequence != 0)
             throw new ArgumentException("Submit expects an uninitialized order sequence of zero.", nameof(metadata));
         ExecutionIdentifier.Require(clientOrderId, nameof(clientOrderId));
         ArgumentNullException.ThrowIfNull(terms);
+        ArgumentNullException.ThrowIfNull(canonicalInstruction);
+        if (!CanonicalOrderInstructionMapper.MatchesCommand(canonicalInstruction, metadata, clientOrderId, terms))
+            throw new ArgumentException("Canonical instruction does not match the submit command economics or provenance.", nameof(canonicalInstruction));
         ClientOrderId = clientOrderId;
         Terms = terms;
+        CanonicalInstruction = canonicalInstruction;
     }
 
     public ClientOrderId ClientOrderId { get; }
     public OrderTerms Terms { get; }
+    public CanonicalOrderInstruction CanonicalInstruction { get; }
     public override ExecutionCommandKind Kind => ExecutionCommandKind.Submit;
     public override ExecutionSafetyClassification Safety =>
         Terms.ReduceOnly ? ExecutionSafetyClassification.ExposureReducingOrNeutral : ExecutionSafetyClassification.ExposureIncreasing;

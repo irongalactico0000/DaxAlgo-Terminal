@@ -194,17 +194,24 @@ public sealed class AnthropicCodegenClient : IStrategyCodegenClient
         var messages = request.Messages
             .Select(m => new WireMessage(
                 m.Role == CodegenRole.Assistant ? "assistant" : "user",
-                [new WireText(m.Content)]))
+                BuildContent(m)))
             .ToList();
 
         if (messages.Count > 0)
         {
             // Each message is one text block (built just above), so the breakpoint goes on that block.
             var last = messages[^1];
-            messages[^1] = last with
+            if (last.Content[0] is WireText lastText)
             {
-                Content = [last.Content[0] with { CacheControl = WireCacheControl.Ephemeral }],
-            };
+                messages[^1] = last with
+                {
+                    Content =
+                    [
+                        lastText with { CacheControl = WireCacheControl.Ephemeral },
+                        .. last.Content.Skip(1),
+                    ],
+                };
+            }
         }
 
         // Effort + adaptive thinking are sent ONLY when the user asked for an effort level. They are
@@ -228,6 +235,13 @@ public sealed class AnthropicCodegenClient : IStrategyCodegenClient
         return httpReq;
     }
 
+    private static IReadOnlyList<object> BuildContent(CodegenMessage message) =>
+    [
+        new WireText(message.Content),
+        .. (message.Images ?? []).Select(static image => (object)new WireImage(
+            new WireImageSource(image.MediaType, image.Base64Data))),
+    ];
+
     /// <summary>The commonest 400 here is an effort/thinking parameter on a model that doesn't take one.
     /// Say so, rather than making the user decode the raw API error.</summary>
     private string HttpFailure(HttpResponseMessage resp, string payload)
@@ -247,7 +261,7 @@ public sealed class AnthropicCodegenClient : IStrategyCodegenClient
 
     private sealed record WireMessage(
         [property: JsonPropertyName("role")] string Role,
-        [property: JsonPropertyName("content")] IReadOnlyList<WireText> Content);
+        [property: JsonPropertyName("content")] IReadOnlyList<object> Content);
 
     /// <summary>A text content block, optionally a cache breakpoint.</summary>
     private sealed record WireText([property: JsonPropertyName("text")] string Text)
@@ -256,6 +270,18 @@ public sealed class AnthropicCodegenClient : IStrategyCodegenClient
 
         [JsonPropertyName("cache_control"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public WireCacheControl? CacheControl { get; init; }
+    }
+
+    private sealed record WireImage([property: JsonPropertyName("source")] WireImageSource Source)
+    {
+        [JsonPropertyName("type")] public string Type => "image";
+    }
+
+    private sealed record WireImageSource(
+        [property: JsonPropertyName("media_type")] string MediaType,
+        [property: JsonPropertyName("data")] string Data)
+    {
+        [JsonPropertyName("type")] public string Type => "base64";
     }
 
     private sealed record WireCacheControl([property: JsonPropertyName("type")] string Type)

@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using TradingTerminal.Core.Strategies.Authoring;
+using TradingTerminal.Core.Strategies.Generation;
 
 namespace TradingTerminal.App.Authoring;
 
@@ -62,7 +63,12 @@ public sealed record AuthoringSessionSnapshot(
     bool HasDetachedImplementationSource = false,
     bool EditorOriginatedFromCombinedTradeIr = false,
     int AuthoringUxVersion = 0,
-    DateTime UpdatedUtc = default)
+    DateTime UpdatedUtc = default,
+    IReadOnlyList<AuthoringChartReferenceSnapshot>? ChartReferences = null,
+    string? AuthoredUnitSpecificationJson = null,
+    IReadOnlyList<AuthoredChartReferenceInspectionV1>? ChartReferenceInspections = null,
+    ChartPatternSearchResultV1? ChartPatternSearchResult = null,
+    IReadOnlyList<ChartPatternSelectionV1>? ChartPatternSelections = null)
 {
     public const int CurrentAuthoringUxVersion = 2;
 

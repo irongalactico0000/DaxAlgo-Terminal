@@ -1,0 +1,434 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="TradingTerminal.App.Avalonia.Execution.PaperExecutionConsoleWindow"
+        Title="DaxAlgo Paper Execution Console"
+        Width="1440" Height="900" MinWidth="1120" MinHeight="700"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Background.Primary}"
+        Foreground="{DynamicResource Text.Primary}"
+        FontFamily="{DynamicResource Font.Base}"
+        FontSize="12">
+  <Window.Styles>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource Background.Surface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border.Brush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="TextBlock.eyebrow">
+      <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.value">
+      <Setter Property="Foreground" Value="{DynamicResource Text.Header}" />
+      <Setter Property="FontFamily" Value="{DynamicResource Font.Data}" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Foreground" Value="{DynamicResource Bearish.Brush}" />
+      <Setter Property="Background" Value="{DynamicResource Bearish.Soft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Bearish.Brush}" />
+    </Style>
+    <Style Selector="Button.warning">
+      <Setter Property="Foreground" Value="{DynamicResource Warning.Brush}" />
+      <Setter Property="Background" Value="{DynamicResource Warning.Soft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Warning.Brush}" />
+    </Style>
+    <Style Selector="ListBox.table">
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.table ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*">
+    <Border Grid.Row="0" Background="{DynamicResource Gradient.Chrome}"
+            BorderBrush="{DynamicResource Border.Brush}" BorderThickness="0,0,0,1" Padding="18,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Spacing="4">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="EXECUTION CONSOLE" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource Text.Header}" />
+            <Border Background="{DynamicResource Warning.Soft}" BorderBrush="{DynamicResource Warning.Brush}"
+                    BorderThickness="1" CornerRadius="10" Padding="9,2">
+              <TextBlock Text="{Binding ModeText}" Foreground="{DynamicResource Warning.Brush}" FontSize="10" FontWeight="Bold" />
+            </Border>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="16">
+            <TextBlock Text="{Binding WriterStatus}" Foreground="{DynamicResource Text.Secondary}" />
+            <TextBlock Text="{Binding IntakeStatus}" Foreground="{DynamicResource Text.Secondary}" />
+            <TextBlock Text="{Binding AccountStatus}" Foreground="{DynamicResource Text.Secondary}" />
+            <TextBlock Text="{Binding ReconciliationStatus}" Foreground="{DynamicResource Warning.Brush}" />
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Content="Refresh" Command="{Binding RefreshCommand}" />
+          <Button Content="Reconcile" Command="{Binding ReconcileCommand}" />
+          <Button Content="{Binding IntakeActionText}" Command="{Binding ToggleIntakeCommand}" Classes="warning" />
+          <Button Content="{Binding KillActionText}" Command="{Binding KillCommand}" Classes="danger" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Border Grid.Row="1" Background="{DynamicResource Background.Surface}"
+            BorderBrush="{DynamicResource Border.Brush}" BorderThickness="0,0,0,1" Padding="16,9">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding LastMessage}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+        <TextBlock Grid.Column="1" Text="Immutable Paper ledger · no broker order adapter loaded"
+                   Foreground="{DynamicResource Text.Muted}" Margin="18,0,0,0" />
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="2" ColumnDefinitions="350,*" Margin="14">
+      <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="12">
+          <Border Classes="card">
+            <StackPanel Spacing="10">
+              <TextBlock Text="MANUAL PAPER ORDER" Classes="eyebrow" />
+              <TextBlock Text="Every submission is recorded, risk-admitted, fenced, and dispatched through the Paper OMS."
+                         Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" />
+
+              <TextBlock Text="INSTRUMENT" Classes="eyebrow" />
+              <ComboBox ItemsSource="{Binding Instruments}" SelectedItem="{Binding SelectedInstrument}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate><TextBlock Text="{Binding DisplayName}" /></DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+
+              <Grid ColumnDefinitions="*,*">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="SIDE" Classes="eyebrow" />
+                  <ComboBox ItemsSource="{Binding Sides}" SelectedItem="{Binding SelectedSide}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="4" Margin="8,0,0,0">
+                  <TextBlock Text="ORDER TYPE" Classes="eyebrow" />
+                  <ComboBox ItemsSource="{Binding OrderTypes}" SelectedItem="{Binding SelectedOrderType}" />
+                </StackPanel>
+              </Grid>
+
+              <Grid ColumnDefinitions="*,*">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="QUANTITY" Classes="eyebrow" />
+                  <TextBox Text="{Binding Quantity}" Watermark="Exact quantity" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="4" Margin="8,0,0,0">
+                  <TextBlock Text="MARK PRICE" Classes="eyebrow" />
+                  <TextBox Text="{Binding MarkPrice}" Watermark="Paper reference price" />
+                </StackPanel>
+              </Grid>
+
+              <Grid ColumnDefinitions="*,*">
+                <StackPanel Spacing="4" IsVisible="{Binding NeedsLimitPrice}">
+                  <TextBlock Text="LIMIT PRICE" Classes="eyebrow" />
+                  <TextBox Text="{Binding LimitPrice}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="4" Margin="8,0,0,0" IsVisible="{Binding NeedsStopPrice}">
+                  <TextBlock Text="STOP PRICE" Classes="eyebrow" />
+                  <TextBox Text="{Binding StopPrice}" />
+                </StackPanel>
+              </Grid>
+
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="TIME IN FORCE" Classes="eyebrow" />
+                  <ComboBox ItemsSource="{Binding TimeInForces}" SelectedItem="{Binding SelectedTimeInForce}" />
+                </StackPanel>
+                <CheckBox Grid.Column="1" Content="Reduce only" IsChecked="{Binding ReduceOnly}" Margin="8,0,0,7"
+                          VerticalAlignment="Bottom" />
+              </Grid>
+
+              <Button Content="Submit to Paper OMS" Command="{Binding SubmitCommand}" Classes="accent" HorizontalAlignment="Stretch" />
+              <Grid ColumnDefinitions="*,*">
+                <Button Content="Replace selected" Command="{Binding ReplaceSelectedCommand}" />
+                <Button Grid.Column="1" Content="Cancel selected" Command="{Binding CancelSelectedCommand}" Classes="warning" Margin="8,0,0,0" />
+              </Grid>
+              <TextBlock Text="Replace uses the ticket’s side, type, quantity, prices, TIF, and a fresh risk decision."
+                         Foreground="{DynamicResource Text.Muted}" FontSize="10" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+
+          <Border Classes="card">
+            <StackPanel Spacing="8">
+              <TextBlock Text="SAFETY STATE" Classes="eyebrow" />
+              <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto">
+                <TextBlock Text="Writer lease" Foreground="{DynamicResource Text.Secondary}" />
+                <TextBlock Grid.Column="1" Text="{Binding LeaseHeld}" FontFamily="{DynamicResource Font.Data}" />
+                <TextBlock Grid.Row="1" Text="Intake paused" Foreground="{DynamicResource Text.Secondary}" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding IntakePaused}" FontFamily="{DynamicResource Font.Data}" />
+                <TextBlock Grid.Row="2" Text="Ledger cursor" Foreground="{DynamicResource Text.Secondary}" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding LastLedgerSequence}" FontFamily="{DynamicResource Font.Data}" />
+                <TextBlock Grid.Row="3" Text="Reconciliation blocked" Foreground="{DynamicResource Text.Secondary}" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding ReconciliationAdmissionBlocked}" FontFamily="{DynamicResource Font.Data}" />
+              </Grid>
+              <TextBlock Text="Kill is intentionally two-step. Its confirmation pauses intake before any cancel or flatten command."
+                         Foreground="{DynamicResource Warning.Brush}" TextWrapping="Wrap" FontSize="10.5" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+
+      <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="14,0,0,0">
+        <UniformGrid Grid.Row="0" Columns="9">
+          <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="ORDERS" Classes="eyebrow" /><TextBlock Text="{Binding OrderCount}" Classes="value" /></StackPanel></Border>
+          <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="OPEN" Classes="eyebrow" /><TextBlock Text="{Binding OpenOrderCount}" Classes="value" /></StackPanel></Border>
+          <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="FILLS" Classes="eyebrow" /><TextBlock Text="{Binding FillCount}" Classes="value" /></StackPanel></Border>
+          <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="NON-FLAT" Classes="eyebrow" /><TextBlock Text="{Binding PositionCount}" Classes="value" /></StackPanel></Border>
+          <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="CASH" Classes="eyebrow" /><TextBlock Text="{Binding CashTotal}" Classes="value" /></StackPanel></Border>
+          <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="EQUITY" Classes="eyebrow" /><TextBlock Text="{Binding MarkedEquity}" Classes="value" /></StackPanel></Border>
+          <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="RISK DECISIONS" Classes="eyebrow" /><TextBlock Text="{Binding RiskDecisionCount}" Classes="value" /></StackPanel></Border>
+          <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="RECON CASES" Classes="eyebrow" /><TextBlock Text="{Binding ReconciliationCaseCount}" Classes="value" /></StackPanel></Border>
+          <Border Classes="card"><StackPanel><TextBlock Text="EVENTS" Classes="eyebrow" /><TextBlock Text="{Binding LastLedgerSequence}" Classes="value" /></StackPanel></Border>
+        </UniformGrid>
+
+        <Border Grid.Row="1" Classes="card" Padding="0" Margin="0,12,0,0">
+          <TabControl>
+            <TabItem Header="Orders">
+              <Grid RowDefinitions="Auto,*">
+                <Grid ColumnDefinitions="1.5*,.7*,.7*,.7*,.7*,.7*,.7*,.9*,.5*" Margin="10,8">
+                  <TextBlock Text="CLIENT ID" Classes="eyebrow" /><TextBlock Grid.Column="1" Text="ASSET" Classes="eyebrow" />
+                  <TextBlock Grid.Column="2" Text="SIDE" Classes="eyebrow" /><TextBlock Grid.Column="3" Text="TYPE" Classes="eyebrow" />
+                  <TextBlock Grid.Column="4" Text="QTY" Classes="eyebrow" /><TextBlock Grid.Column="5" Text="FILLED" Classes="eyebrow" />
+                  <TextBlock Grid.Column="6" Text="LIMIT" Classes="eyebrow" /><TextBlock Grid.Column="7" Text="STATE" Classes="eyebrow" />
+                  <TextBlock Grid.Column="8" Text="SEQ" Classes="eyebrow" />
+                </Grid>
+                <ListBox Grid.Row="1" ItemsSource="{Binding Orders}" SelectedItem="{Binding SelectedOrder}" Classes="table">
+                  <ListBox.ItemTemplate><DataTemplate>
+                    <Grid ColumnDefinitions="1.5*,.7*,.7*,.7*,.7*,.7*,.7*,.9*,.5*" Margin="10,8">
+                      <TextBlock Text="{Binding ClientId}" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="1" Text="{Binding Instrument}" FontFamily="{DynamicResource Font.Data}" />
+                      <TextBlock Grid.Column="2" Text="{Binding Side}" /><TextBlock Grid.Column="3" Text="{Binding Type}" />
+                      <TextBlock Grid.Column="4" Text="{Binding Quantity}" FontFamily="{DynamicResource Font.Data}" />
+                      <TextBlock Grid.Column="5" Text="{Binding Filled}" FontFamily="{DynamicResource Font.Data}" />
+                      <TextBlock Grid.Column="6" Text="{Binding Limit}" FontFamily="{DynamicResource Font.Data}" />
+                      <TextBlock Grid.Column="7" Text="{Binding State}" /><TextBlock Grid.Column="8" Text="{Binding LastSequence}" />
+                    </Grid>
+                  </DataTemplate></ListBox.ItemTemplate>
+                </ListBox>
+              </Grid>
+            </TabItem>
+            <TabItem Header="Portfolio analytics">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="18" Spacing="14">
+                  <TextBlock Text="PAPER ACCOUNT ANALYTICS" Classes="eyebrow" />
+                  <UniformGrid Columns="4">
+                    <Border Classes="card" Margin="0,0,8,8"><StackPanel><TextBlock Text="OPENING CAPITAL" Classes="eyebrow" /><TextBlock Text="{Binding Portfolio.OpeningBalance}" Classes="value" /><TextBlock Text="{Binding Portfolio.Currency}" Foreground="{DynamicResource Text.Secondary}" /></StackPanel></Border>
+                    <Border Classes="card" Margin="0,0,8,8"><StackPanel><TextBlock Text="CURRENT CASH" Classes="eyebrow" /><TextBlock Text="{Binding Portfolio.CurrentCash}" Classes="value" /><TextBlock Text="{Binding Portfolio.Currency}" Foreground="{DynamicResource Text.Secondary}" /></StackPanel></Border>
+                    <Border Classes="card" Margin="0,0,8,8"><StackPanel><TextBlock Text="MARKED EQUITY" Classes="eyebrow" /><TextBlock Text="{Binding Portfolio.MarkedEquity}" Classes="value" /><TextBlock Text="{Binding Portfolio.Currency}" Foreground="{DynamicResource Text.Secondary}" /></StackPanel></Border>
+                    <Border Classes="card" Margin="0,0,0,8"><StackPanel><TextBlock Text="OPEN POSITIONS" Classes="eyebrow" /><TextBlock Text="{Binding Portfolio.OpenPositions}" Classes="value" /></StackPanel></Border>
+                    <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="REALIZED P&amp;L" Classes="eyebrow" /><TextBlock Text="{Binding Portfolio.RealizedProfitAndLoss}" Classes="value" /></StackPanel></Border>
+                    <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="UNREALIZED P&amp;L" Classes="eyebrow" /><TextBlock Text="{Binding Portfolio.UnrealizedProfitAndLoss}" Classes="value" /></StackPanel></Border>
+                    <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="GROSS EXPOSURE" Classes="eyebrow" /><TextBlock Text="{Binding Portfolio.GrossExposure}" Classes="value" /></StackPanel></Border>
+                    <Border Classes="card"><StackPanel><TextBlock Text="NET EXPOSURE" Classes="eyebrow" /><TextBlock Text="{Binding Portfolio.NetExposure}" Classes="value" /></StackPanel></Border>
+                  </UniformGrid>
+
+                  <TextBlock Text="PERFORMANCE BY RANGE · CLOSED FIFO LOTS" Classes="eyebrow" />
+                  <Grid ColumnDefinitions=".6*,1*,1*,.8*,.7*,.9*,.8*,.6*" Margin="8,0">
+                    <TextBlock Text="RANGE" Classes="eyebrow" /><TextBlock Grid.Column="1" Text="REALIZED EQUITY" Classes="eyebrow" />
+                    <TextBlock Grid.Column="2" Text="P&amp;L" Classes="eyebrow" /><TextBlock Grid.Column="3" Text="RETURN" Classes="eyebrow" />
+                    <TextBlock Grid.Column="4" Text="SHARPE" Classes="eyebrow" /><TextBlock Grid.Column="5" Text="MAX DD" Classes="eyebrow" />
+                    <TextBlock Grid.Column="6" Text="WIN RATE" Classes="eyebrow" /><TextBlock Grid.Column="7" Text="TRADES" Classes="eyebrow" />
+                  </Grid>
+                  <ItemsControl ItemsSource="{Binding PerformancePeriods}">
+                    <ItemsControl.ItemTemplate><DataTemplate>
+                      <Grid ColumnDefinitions=".6*,1*,1*,.8*,.7*,.9*,.8*,.6*" Margin="8,5">
+                        <TextBlock Text="{Binding Range}" FontWeight="Bold" /><TextBlock Grid.Column="1" Text="{Binding Equity}" FontFamily="{DynamicResource Font.Data}" />
+                        <TextBlock Grid.Column="2" Text="{Binding ProfitAndLoss}" FontFamily="{DynamicResource Font.Data}" /><TextBlock Grid.Column="3" Text="{Binding Return}" />
+                        <TextBlock Grid.Column="4" Text="{Binding Sharpe}" /><TextBlock Grid.Column="5" Text="{Binding MaximumDrawdown}" />
+                        <TextBlock Grid.Column="6" Text="{Binding WinRate}" /><TextBlock Grid.Column="7" Text="{Binding Trades}" />
+                      </Grid>
+                    </DataTemplate></ItemsControl.ItemTemplate>
+                  </ItemsControl>
+
+                  <TextBlock Text="OPEN EXPOSURE" Classes="eyebrow" />
+                  <ItemsControl ItemsSource="{Binding PortfolioExposures}">
+                    <ItemsControl.ItemTemplate><DataTemplate>
+                      <Grid ColumnDefinitions=".8*,.7*,.8*,.8*,1*,1*,1.2*" Margin="8,5">
+                        <TextBlock Text="{Binding Instrument}" FontWeight="Bold" /><TextBlock Grid.Column="1" Text="{Binding Quantity}" />
+                        <TextBlock Grid.Column="2" Text="{Binding AverageEntry}" /><TextBlock Grid.Column="3" Text="{Binding Mark}" />
+                        <TextBlock Grid.Column="4" Text="{Binding MarketValue}" /><TextBlock Grid.Column="5" Text="{Binding UnrealizedProfitAndLoss}" />
+                        <TextBlock Grid.Column="6" Text="{Binding MarkBasis}" Foreground="{DynamicResource Text.Secondary}" />
+                      </Grid>
+                    </DataTemplate></ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="{Binding Portfolio.ValuationBasis}" Foreground="{DynamicResource Warning.Brush}" TextWrapping="Wrap" FontSize="10.5" />
+                  <TextBlock Text="Mark basis is shown per position: Current Paper mark or Latest ledger fill."
+                             Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" FontSize="10.5" />
+                  <TextBlock Text="Realized metrics use FIFO closed lots from immutable fills. Marked equity includes open positions; the period equity series is realized-only."
+                             Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" FontSize="10.5" />
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Positions">
+              <ListBox ItemsSource="{Binding Positions}" Classes="table">
+                <ListBox.ItemTemplate><DataTemplate><Grid ColumnDefinitions="*,*,*,*" Margin="12,9">
+                  <TextBlock Text="{Binding Instrument}" /><TextBlock Grid.Column="1" Text="{Binding Direction}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Quantity}" FontFamily="{DynamicResource Font.Data}" />
+                  <TextBlock Grid.Column="3" Text="{Binding ObservedUtc}" Foreground="{DynamicResource Text.Secondary}" />
+                </Grid></DataTemplate></ListBox.ItemTemplate>
+              </ListBox>
+            </TabItem>
+            <TabItem Header="Fills">
+              <ListBox ItemsSource="{Binding Fills}" Classes="table">
+                <ListBox.ItemTemplate><DataTemplate><Grid ColumnDefinitions="1.4*,.6*,.6*,.7*,.7*,.6*,1.1*" Margin="12,9">
+                  <TextBlock Text="{Binding TradeId}" TextTrimming="CharacterEllipsis" /><TextBlock Grid.Column="1" Text="{Binding Instrument}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Side}" /><TextBlock Grid.Column="3" Text="{Binding Quantity}" />
+                  <TextBlock Grid.Column="4" Text="{Binding Price}" /><TextBlock Grid.Column="5" Text="{Binding Fee}" />
+                  <TextBlock Grid.Column="6" Text="{Binding OccurredUtc}" Foreground="{DynamicResource Text.Secondary}" />
+                </Grid></DataTemplate></ListBox.ItemTemplate>
+              </ListBox>
+            </TabItem>
+            <TabItem Header="Cash">
+              <ListBox ItemsSource="{Binding Cash}" Classes="table">
+                <ListBox.ItemTemplate><DataTemplate><Grid ColumnDefinitions="*,*,*,1.4*" Margin="12,9">
+                  <TextBlock Text="{Binding Currency}" /><TextBlock Grid.Column="1" Text="{Binding Total}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Available}" /><TextBlock Grid.Column="3" Text="{Binding ObservedUtc}" Foreground="{DynamicResource Text.Secondary}" />
+                </Grid></DataTemplate></ListBox.ItemTemplate>
+              </ListBox>
+            </TabItem>
+            <TabItem Header="Execution quality">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="18" Spacing="14">
+                  <TextBlock Text="EXECUTION QUALITY" Classes="eyebrow" />
+                  <UniformGrid Columns="4">
+                    <Border Classes="card" Margin="0,0,8,8"><StackPanel><TextBlock Text="FILL RATE" Classes="eyebrow" /><TextBlock Text="{Binding ExecutionQuality.FillRate}" Classes="value" /></StackPanel></Border>
+                    <Border Classes="card" Margin="0,0,8,8"><StackPanel><TextBlock Text="AVG SLIPPAGE" Classes="eyebrow" /><TextBlock Text="{Binding ExecutionQuality.AverageSlippage}" Classes="value" /></StackPanel></Border>
+                    <Border Classes="card" Margin="0,0,8,8"><StackPanel><TextBlock Text="REJECT RATE" Classes="eyebrow" /><TextBlock Text="{Binding ExecutionQuality.RejectRate}" Classes="value" /></StackPanel></Border>
+                    <Border Classes="card" Margin="0,0,0,8"><StackPanel><TextBlock Text="AVG ACK" Classes="eyebrow" /><TextBlock Text="{Binding ExecutionQuality.AverageAcknowledgement}" Classes="value" /></StackPanel></Border>
+                    <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="ORDERS" Classes="eyebrow" /><TextBlock Text="{Binding ExecutionQuality.Orders}" Classes="value" /></StackPanel></Border>
+                    <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="CANCELS" Classes="eyebrow" /><TextBlock Text="{Binding ExecutionQuality.Cancels}" Classes="value" /></StackPanel></Border>
+                    <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="RECON CASES" Classes="eyebrow" /><TextBlock Text="{Binding ExecutionQuality.ReconciliationCases}" Classes="value" /></StackPanel></Border>
+                    <Border Classes="card"><StackPanel><TextBlock Text="UNKNOWN" Classes="eyebrow" /><TextBlock Text="{Binding ExecutionQuality.UnknownOutcomes}" Classes="value" /></StackPanel></Border>
+                  </UniformGrid>
+                  <Grid ColumnDefinitions="*,*,*">
+                    <StackPanel><TextBlock Text="FILLED ORDERS" Classes="eyebrow" /><TextBlock Text="{Binding ExecutionQuality.FilledOrders}" FontFamily="{DynamicResource Font.Data}" FontSize="16" /></StackPanel>
+                    <StackPanel Grid.Column="1"><TextBlock Text="REJECTED ORDERS" Classes="eyebrow" /><TextBlock Text="{Binding ExecutionQuality.Rejects}" FontFamily="{DynamicResource Font.Data}" FontSize="16" /></StackPanel>
+                    <StackPanel Grid.Column="2"><TextBlock Text="PROVENANCE" Classes="eyebrow" /><TextBlock Text="{Binding ExecutionQuality.Provenance}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" /></StackPanel>
+                  </Grid>
+                  <TextBlock Text="Slippage is reported as n/a until the ledger records an immutable arrival/reference-price benchmark. Fill prices are never relabelled as slippage evidence."
+                             Foreground="{DynamicResource Warning.Brush}" TextWrapping="Wrap" FontSize="10.5" />
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Risk decisions">
+              <Grid ColumnDefinitions="1.05*,.95*">
+                <Grid RowDefinitions="Auto,*" Margin="0,0,8,0">
+                  <Grid ColumnDefinitions="1.35*,.55*,.55*,1.15*,1*" Margin="12,9">
+                    <TextBlock Text="ORDER" Classes="eyebrow" />
+                    <TextBlock Grid.Column="1" Text="PHASE" Classes="eyebrow" />
+                    <TextBlock Grid.Column="2" Text="DECISION" Classes="eyebrow" />
+                    <TextBlock Grid.Column="3" Text="CODE" Classes="eyebrow" />
+                    <TextBlock Grid.Column="4" Text="EVALUATED" Classes="eyebrow" />
+                  </Grid>
+                  <ListBox Grid.Row="1" ItemsSource="{Binding RiskDecisions}"
+                           SelectedItem="{Binding SelectedRiskDecision}" Classes="table">
+                    <ListBox.ItemTemplate><DataTemplate>
+                      <Grid ColumnDefinitions="1.35*,.55*,.55*,1.15*,1*" Margin="12,9">
+                        <TextBlock Text="{Binding ClientId}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Text="{Binding Phase}" />
+                        <TextBlock Grid.Column="2" Text="{Binding Decision}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="3" Text="{Binding Code}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="4" Text="{Binding EvaluatedUtc}" Foreground="{DynamicResource Text.Secondary}" />
+                      </Grid>
+                    </DataTemplate></ListBox.ItemTemplate>
+                  </ListBox>
+                </Grid>
+                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                  <StackPanel Spacing="8" Margin="12">
+                    <TextBlock Text="COMMITTED RISK EVIDENCE" Classes="eyebrow" />
+                    <TextBlock Text="{Binding SelectedRiskDecision.Reason, FallbackValue=Select a risk decision}"
+                               FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
+                      <StackPanel><TextBlock Text="PROJECTED NET" Classes="eyebrow" /><TextBlock Text="{Binding SelectedRiskDecision.ProjectedNetQuantity, FallbackValue=—}" FontFamily="{DynamicResource Font.Data}" /></StackPanel>
+                      <StackPanel Grid.Column="1"><TextBlock Text="PROJECTED GROSS" Classes="eyebrow" /><TextBlock Text="{Binding SelectedRiskDecision.ProjectedGrossNotional, FallbackValue=—}" FontFamily="{DynamicResource Font.Data}" /></StackPanel>
+                      <StackPanel Grid.Row="1" Margin="0,8,0,0"><TextBlock Text="POLICY VERSION" Classes="eyebrow" /><TextBlock Text="{Binding SelectedRiskDecision.PolicyVersion, FallbackValue=—}" FontFamily="{DynamicResource Font.Data}" TextWrapping="Wrap" /></StackPanel>
+                      <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,8,0,0"><TextBlock Text="EVENT / RECORDED" Classes="eyebrow" /><TextBlock Text="{Binding SelectedRiskDecision.RecordedUtc, FallbackValue=—}" FontFamily="{DynamicResource Font.Data}" /></StackPanel>
+                    </Grid>
+                    <TextBlock Text="LIMITS HASH" Classes="eyebrow" />
+                    <TextBlock Text="{Binding SelectedRiskDecision.LimitsHash, FallbackValue=—}" FontFamily="{DynamicResource Font.Data}" TextWrapping="Wrap" />
+                    <TextBlock Text="COMMAND PAYLOAD HASH" Classes="eyebrow" />
+                    <TextBlock Text="{Binding SelectedRiskDecision.CommandPayloadHash, FallbackValue=—}" FontFamily="{DynamicResource Font.Data}" TextWrapping="Wrap" />
+                    <TextBlock Text="CONTROL STATE" Classes="eyebrow" />
+                    <TextBlock Text="{Binding SelectedRiskDecision.ControlState, FallbackValue=—}" TextWrapping="Wrap" />
+                    <TextBlock Text="POSITION EVIDENCE" Classes="eyebrow" />
+                    <TextBlock Text="{Binding SelectedRiskDecision.PositionEvidence, FallbackValue=—}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBlock Text="RESERVATION EVIDENCE" Classes="eyebrow" />
+                    <TextBlock Text="{Binding SelectedRiskDecision.ReservationEvidence, FallbackValue=—}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBlock Text="ACCOUNT / EQUITY EVIDENCE" Classes="eyebrow" />
+                    <TextBlock Text="{Binding SelectedRiskDecision.AccountEvidence, FallbackValue=—}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBlock Text="MARKET / RATE EVIDENCE" Classes="eyebrow" />
+                    <TextBlock Text="{Binding SelectedRiskDecision.MarketEvidence, FallbackValue=—}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBlock Text="LIMITS APPLIED" Classes="eyebrow" />
+                    <TextBlock Text="{Binding SelectedRiskDecision.LimitsEvidence, FallbackValue=—}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBlock Text="Historical evidence is immutable and is not recalculated using current settings."
+                               Foreground="{DynamicResource Warning.Brush}" FontSize="10" TextWrapping="Wrap" />
+                  </StackPanel>
+                </ScrollViewer>
+              </Grid>
+            </TabItem>
+            <TabItem Header="Reconciliation">
+              <Grid ColumnDefinitions="1.15*,.85*">
+                <Grid RowDefinitions="Auto,*" Margin="0,0,8,0">
+                  <Grid ColumnDefinitions="1.3*,.8*,.8*,1*" Margin="12,9">
+                    <TextBlock Text="SUBJECT" Classes="eyebrow" />
+                    <TextBlock Grid.Column="1" Text="KIND" Classes="eyebrow" />
+                    <TextBlock Grid.Column="2" Text="STATUS" Classes="eyebrow" />
+                    <TextBlock Grid.Column="3" Text="OPENED" Classes="eyebrow" />
+                  </Grid>
+                  <ListBox Grid.Row="1" ItemsSource="{Binding ReconciliationCases}"
+                           SelectedItem="{Binding SelectedReconciliationCase}" Classes="table">
+                    <ListBox.ItemTemplate><DataTemplate>
+                      <Grid ColumnDefinitions="1.3*,.8*,.8*,1*" Margin="12,9">
+                        <TextBlock Text="{Binding Subject}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Text="{Binding Kind}" />
+                        <TextBlock Grid.Column="2" Text="{Binding Status}" />
+                        <TextBlock Grid.Column="3" Text="{Binding OpenedUtc}" Foreground="{DynamicResource Text.Secondary}" />
+                      </Grid>
+                    </DataTemplate></ListBox.ItemTemplate>
+                  </ListBox>
+                </Grid>
+                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                  <StackPanel Spacing="9" Margin="12">
+                    <TextBlock Text="CASE EVIDENCE" Classes="eyebrow" />
+                    <TextBlock Text="{Binding SelectedReconciliationCase.CaseIdText, FallbackValue=Select a reconciliation case}"
+                               FontFamily="{DynamicResource Font.Data}" TextWrapping="Wrap" />
+                    <TextBlock Text="LOCAL LEDGER" Classes="eyebrow" />
+                    <TextBlock Text="{Binding SelectedReconciliationCase.LocalEvidence, FallbackValue=—}"
+                               TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBlock Text="VENUE SNAPSHOT" Classes="eyebrow" />
+                    <TextBlock Text="{Binding SelectedReconciliationCase.VenueEvidence, FallbackValue=—}"
+                               TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBlock Text="RESOLUTION HISTORY" Classes="eyebrow" />
+                    <TextBlock Text="{Binding SelectedReconciliationCase.Resolution, FallbackValue=—}"
+                               TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBlock Text="OPERATOR" Classes="eyebrow" />
+                    <TextBox Text="{Binding ResolutionOperator}" Watermark="Operator identity" />
+                    <TextBlock Text="RESOLUTION EVIDENCE" Classes="eyebrow" />
+                    <TextBox Text="{Binding ResolutionEvidence}" Watermark="Explain the independent evidence that resolves this mismatch" />
+                    <Button Content="Append durable resolution" Command="{Binding ResolveSelectedReconciliationCaseCommand}"
+                            Classes="warning" HorizontalAlignment="Stretch" />
+                    <TextBlock Text="Resolution appends a new immutable fact. It never deletes or rewrites the original mismatch."
+                               Foreground="{DynamicResource Warning.Brush}" FontSize="10" TextWrapping="Wrap" />
+                  </StackPanel>
+                </ScrollViewer>
+              </Grid>
+            </TabItem>
+            <TabItem Header="Immutable history">
+              <ListBox ItemsSource="{Binding Events}" Classes="table">
+                <ListBox.ItemTemplate><DataTemplate><Grid ColumnDefinitions=".4*,1.4*,1.1*,1.1*,.8*,1.2*" Margin="12,8">
+                  <TextBlock Text="{Binding Sequence}" /><TextBlock Grid.Column="1" Text="{Binding ClientId}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="2" Text="{Binding Kind}" /><TextBlock Grid.Column="3" Text="{Binding State}" />
+                  <TextBlock Grid.Column="4" Text="{Binding Source}" /><TextBlock Grid.Column="5" Text="{Binding RecordedUtc}" Foreground="{DynamicResource Text.Secondary}" />
+                </Grid></DataTemplate></ListBox.ItemTemplate>
+              </ListBox>
+            </TabItem>
+          </TabControl>
+        </Border>
+      </Grid>
+    </Grid>
+  </Grid>
+</Window>

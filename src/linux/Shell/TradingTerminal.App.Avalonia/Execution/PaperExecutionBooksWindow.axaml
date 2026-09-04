@@ -1,0 +1,116 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="TradingTerminal.App.Avalonia.Execution.PaperExecutionBooksWindow"
+        Title="Paper Execution Books"
+        Width="1120" Height="720" MinWidth="920" MinHeight="600"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Background.Primary}">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="18">
+    <Border Grid.Row="0" Background="{DynamicResource Warning.Soft}"
+            BorderBrush="{DynamicResource Warning.Brush}" BorderThickness="1"
+            CornerRadius="4" Padding="14" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel>
+          <TextBlock Text="PAPER EXECUTION BOOKS" FontSize="18" FontWeight="Bold"
+                     Foreground="{DynamicResource Warning.Brush}" />
+          <TextBlock Text="Each book owns one simulated account, isolated SQLite ledger, writer lease, intake state, and strategy binding."
+                     Margin="0,5,0,0" Foreground="{DynamicResource Text.Secondary}" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+          <TextBlock Text="{Binding Summary}" FontWeight="Bold" HorizontalAlignment="Right" />
+          <TextBlock Text="No live broker order adapter is loaded" FontSize="11"
+                     Foreground="{DynamicResource Text.Secondary}" HorizontalAlignment="Right" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="1.25*,0.75*">
+      <Border Grid.Column="0" Background="{DynamicResource Background.Surface}"
+              BorderBrush="{DynamicResource Border.Brush}" BorderThickness="1" Padding="12">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+          <TextBlock Text="BOOK CATALOG" FontWeight="Bold" FontSize="12"
+                     Foreground="{DynamicResource Accent.Brush}" Margin="0,0,0,9" />
+          <Grid Grid.Row="1" ColumnDefinitions="1.25*,1.2*,1*,1.15*,1.1*,0.7*" Margin="8,0,8,5">
+            <TextBlock Grid.Column="0" Text="Name" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource Text.Secondary}" />
+            <TextBlock Grid.Column="1" Text="Account" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource Text.Secondary}" />
+            <TextBlock Grid.Column="2" Text="Primary asset" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource Text.Secondary}" />
+            <TextBlock Grid.Column="3" Text="Opening capital" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource Text.Secondary}" />
+            <TextBlock Grid.Column="4" Text="Strategies" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource Text.Secondary}" />
+            <TextBlock Grid.Column="5" Text="Intake" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource Text.Secondary}" />
+          </Grid>
+          <ListBox Grid.Row="2" ItemsSource="{Binding Books}" SelectedItem="{Binding SelectedBook, Mode=TwoWay}">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Grid ColumnDefinitions="1.25*,1.2*,1*,1.15*,1.1*,0.7*" MinHeight="38" Margin="5,2">
+                  <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                  <TextBlock Grid.Column="1" Text="{Binding AccountId}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="2" Text="{Binding InstrumentSummary}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="3" Text="{Binding OpeningBalanceDisplay}" VerticalAlignment="Center" FontFamily="{DynamicResource Font.Data}" />
+                  <TextBlock Grid.Column="4" Text="{Binding StrategySummary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="5" Text="{Binding StateText}" VerticalAlignment="Center" FontWeight="Bold" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
+            <Button Content="Select for new windows" Command="{Binding SelectCommand}" />
+            <Button Content="Run / stop selected" Command="{Binding ToggleCommand}" />
+            <Button Content="Remove definition" Command="{Binding DeleteCommand}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*" Margin="14,0,0,0">
+        <Border Grid.Row="0" Background="{DynamicResource Background.Surface}"
+                BorderBrush="{DynamicResource Border.Brush}" BorderThickness="1" Padding="12">
+          <StackPanel Spacing="7">
+            <TextBlock Text="CREATE PAPER BOOK" FontWeight="Bold" FontSize="12"
+                       Foreground="{DynamicResource Accent.Brush}" />
+            <TextBlock Text="Book name" Foreground="{DynamicResource Text.Secondary}" FontSize="11" />
+            <TextBox Text="{Binding NewBookName, Mode=TwoWay}" MaxLength="48" />
+            <TextBlock Text="Simulated account ID" Foreground="{DynamicResource Text.Secondary}" FontSize="11" />
+            <TextBox Text="{Binding NewAccountId, Mode=TwoWay}" MaxLength="128"
+                     Watermark="paper-account-2" />
+            <TextBlock Text="Opening capital (SIM)" Foreground="{DynamicResource Text.Secondary}" FontSize="11" />
+            <TextBox Text="{Binding NewOpeningBalance, Mode=TwoWay}" Watermark="100000" />
+            <TextBlock Text="Primary canonical asset (optional)" Foreground="{DynamicResource Text.Secondary}" FontSize="11" />
+            <ComboBox ItemsSource="{Binding Instruments}" SelectedItem="{Binding NewPrimaryInstrument, Mode=TwoWay}"
+                      DisplayMemberBinding="{Binding DisplayName}" PlaceholderText="Any catalog instrument" />
+            <TextBlock Text="Bound strategy (optional)" Foreground="{DynamicResource Text.Secondary}" FontSize="11" />
+            <ComboBox ItemsSource="{Binding Strategies}" SelectedItem="{Binding NewStrategyId, Mode=TwoWay}"
+                      PlaceholderText="No strategy bound" />
+            <Button Content="Create and select book" Command="{Binding CreateCommand}"
+                    HorizontalAlignment="Left" Margin="0,4,0,0" />
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1" Background="{DynamicResource Background.Surface}" Margin="0,12,0,0"
+                BorderBrush="{DynamicResource Border.Brush}" BorderThickness="1" Padding="12">
+          <StackPanel Spacing="7">
+            <TextBlock Text="SELECTED BOOK" FontWeight="Bold" FontSize="12"
+                       Foreground="{DynamicResource Accent.Brush}" />
+            <TextBlock Text="{Binding SelectedStatus}" FontWeight="SemiBold" />
+            <TextBlock Text="Display name" Foreground="{DynamicResource Text.Secondary}" FontSize="11" />
+            <TextBox Text="{Binding RenameText, Mode=TwoWay}" MaxLength="48" />
+            <Button Content="Rename selected" Command="{Binding RenameCommand}" HorizontalAlignment="Left" />
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Background="{DynamicResource Background.Elevated}" Margin="0,12,0,0"
+                BorderBrush="{DynamicResource Border.Brush}" BorderThickness="1" Padding="12">
+          <StackPanel>
+            <TextBlock Text="OPERATION RESULT" FontWeight="Bold" FontSize="11"
+                       Foreground="{DynamicResource Text.Secondary}" />
+            <TextBlock Text="{Binding LastMessage}" TextWrapping="Wrap" Margin="0,6,0,0" />
+            <TextBlock Text="Removing a definition never deletes its ledger. A book with open windows, working orders, or a non-flat position cannot be removed."
+                       TextWrapping="Wrap" Margin="0,10,0,0" FontSize="11"
+                       Foreground="{DynamicResource Text.Secondary}" />
+          </StackPanel>
+        </Border>
+      </Grid>
+    </Grid>
+
+    <TextBlock Grid.Row="2" Text="Selecting a book affects newly opened Console and Strategy Runner windows. Existing windows stay bound to the book named in their header."
+               Margin="0,12,0,0" Foreground="{DynamicResource Text.Secondary}" FontSize="11" />
+  </Grid>
+</Window>

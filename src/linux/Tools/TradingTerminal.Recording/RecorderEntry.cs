@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using TradingTerminal.Core.Brokers;
 using TradingTerminal.Core.Domain;
-using TradingTerminal.Core.Strategies;
 using TradingTerminal.UI;
 
 namespace TradingTerminal.Recording;
@@ -53,26 +52,42 @@ public sealed partial class RecorderEntry : ObservableObject
 
     [ObservableProperty] private bool _isLive;
 
+    private MarketDataCapabilities? _activeCapabilities;
+
     public long Quotes => Interlocked.Read(ref QuotesRaw);
     public long Trades => Interlocked.Read(ref TradesRaw);
     public long Bars => Interlocked.Read(ref BarsRaw);
     public long Depth => Interlocked.Read(ref DepthRaw);
 
-    /// <summary>True when the serving broker publishes a trade tape (IB / Binance / Ironbeam).
-    /// Mirrors <see cref="StrategyBrokerCapability.TapeBrokers"/> — the others throw
-    /// <see cref="NotSupportedException"/> rather than stream.</summary>
-    public bool SupportsTape => ActiveBroker is { } b && StrategyBrokerCapability.TapeBrokers.Contains(b);
+    /// <summary>True while the selected client declares a live L1 quote channel.</summary>
+    public bool SupportsQuotes => _activeCapabilities?.SupportsLevel1Quotes == true;
 
-    /// <summary>True when the serving broker publishes L2 depth.</summary>
-    public bool SupportsDepth => ActiveBroker is { } b && StrategyBrokerCapability.DepthBrokers.Contains(b);
+    /// <summary>True while the selected client declares a live bar channel.</summary>
+    public bool SupportsBars => _activeCapabilities?.SupportsLiveBars == true;
+
+    /// <summary>True while the selected client declares a live trade-tape channel.</summary>
+    public bool SupportsTape => _activeCapabilities?.SupportsLiveTrades == true;
+
+    /// <summary>True while the selected client declares a live L2 depth channel.</summary>
+    public bool SupportsDepth => _activeCapabilities?.SupportsLevel2Depth == true;
 
     /// <summary>L3 / market-by-order is not available from ANY backend in this build: there is no
     /// <c>IBrokerClient</c> method for it, no store stream, and no broker feed. The panel shows the L3
     /// chip permanently dimmed rather than pretending. Wiring it up is a broker-seam project.</summary>
     public static bool SupportsL3 => false;
 
-    partial void OnActiveBrokerChanged(BrokerKind? value)
+    internal void SetActiveSource(BrokerKind broker, MarketDataCapabilities capabilities)
     {
+        ArgumentNullException.ThrowIfNull(capabilities);
+        _activeCapabilities = capabilities;
+        ActiveBroker = broker;
+        RaiseCapabilities();
+    }
+
+    private void RaiseCapabilities()
+    {
+        OnPropertyChanged(nameof(SupportsQuotes));
+        OnPropertyChanged(nameof(SupportsBars));
         OnPropertyChanged(nameof(SupportsTape));
         OnPropertyChanged(nameof(SupportsDepth));
     }
@@ -105,7 +120,9 @@ public sealed partial class RecorderEntry : ObservableObject
         }
         Subscriptions.Clear();
         IsLive = false;
+        _activeCapabilities = null;
         ActiveBroker = null;
+        RaiseCapabilities();
     }
 
     public RecorderWatchlistItem ToWatchlistItem() => RecorderWatchlistItem.From(Instrument, PinnedBroker);

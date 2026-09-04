@@ -1,6 +1,6 @@
 # macOS index / Shell
 
-Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
+Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 
 | File | LOC | Tree | Project | Role | Public surface | Purpose |
 |---|---:|---|---|---|---|---|
@@ -24,10 +24,22 @@ Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
 | `src/linux/Shell/TradingTerminal.App.Avalonia/AvaloniaUiDispatcher.cs` | 19 | linux | TradingTerminal.App.Avalonia | product | Y | backed by Avalonia's UI-thread dispatcher. Registered in the Avalonia |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Charts/LineChartControl.cs` | 89 | linux | TradingTerminal.App.Avalonia | product | Y | Optional overlay series (cyan), e.g. a filtered/forecast trace over the raw series. |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Composition/ObservableCollectionLogSink.cs` | 21 | linux | TradingTerminal.App.Avalonia | product | Y | Forwards Serilog events into the app-wide Activity Log. |
-| `src/linux/Shell/TradingTerminal.App.Avalonia/Composition/ServiceConfiguration.cs` | 302 | linux | TradingTerminal.App.Avalonia | product | Y | Composition root for the Avalonia shell. Mirrors the Windows Professional Generic Host |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Composition/ServiceConfiguration.cs` | 319 | linux | TradingTerminal.App.Avalonia | product | Y | Composition root for the Avalonia shell. Mirrors the Windows Professional Generic Host |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Diagnostics/CrashGuard.cs` | 160 | linux | TradingTerminal.App.Avalonia | product | Y | Last-line crash reporting shared by the macOS shell's UI and background work. |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Diagnostics/PluginFaultWatchdog.cs` | 101 | linux | TradingTerminal.App.Avalonia | product | Y | Attributes repeated unhandled faults to their collectible plugin load context. |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Diagnostics/StrategyWindowSmoke.cs` | 118 | linux | TradingTerminal.App.Avalonia | product | Y | Dev/CI sweep that constructs, renders, and closes every plugin strategy view. |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Execution/AuthenticatedPaperExecutionBookTargetIntake.cs` | 238 | linux | TradingTerminal.App.Avalonia | product | Y | Constructs a canonical strategy-target request without dispatching it. The desktop session owns |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperExecutionBooks.cs` | 756 | linux | TradingTerminal.App.Avalonia | product | Y | Atomic, versioned per-user persistence for Paper execution-book configuration. |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperExecutionBooksWindow.axaml.cs` | 8 | linux | TradingTerminal.App.Avalonia | product | Y |  |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperExecutionBooksWindow.axaml` | 116 | linux | TradingTerminal.App.Avalonia | product | N | UI |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperExecutionConsoleWindow.axaml.cs` | 22 | linux | TradingTerminal.App.Avalonia | product | Y |  |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperExecutionConsoleWindow.axaml` | 434 | linux | TradingTerminal.App.Avalonia | product | N | UI |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperExecutionDesktopSession.cs` | 768 | linux | TradingTerminal.App.Avalonia | product | Y | Creates the same Paper-only desktop composition at an explicitly isolated ledger. |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperExecutionUnavailableWindow.axaml.cs` | 22 | linux | TradingTerminal.App.Avalonia | product | Y |  |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperExecutionUnavailableWindow.axaml` | 34 | linux | TradingTerminal.App.Avalonia | product | N | UI |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperStrategyRunnerViewModel.cs` | 699 | linux | TradingTerminal.App.Avalonia | product | Y | Native desktop owner for one canonical SDK kernel, its bounded per-instrument model |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperStrategyRunnerWindow.axaml.cs` | 50 | linux | TradingTerminal.App.Avalonia | product | Y |  |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperStrategyRunnerWindow.axaml` | 220 | linux | TradingTerminal.App.Avalonia | product | N | UI |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/MachineLearning/ArimaGarchViewModel.cs` | 63 | linux | TradingTerminal.App.Avalonia | product | Y | Avalonia "ARIMA &amp; GARCH" window VM. Fits the broker-neutral Core |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/MachineLearning/ArimaGarchWindow.axaml.cs` | 8 | linux | TradingTerminal.App.Avalonia | product | Y |  |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/MachineLearning/ArimaGarchWindow.axaml` | 48 | linux | TradingTerminal.App.Avalonia | product | N | UI |
@@ -41,7 +53,7 @@ Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Plugins/PluginConsentDialog.axaml` | 52 | linux | TradingTerminal.App.Avalonia | product | N | UI |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Plugins/PluginManagerView.axaml.cs` | 11 | linux | TradingTerminal.App.Avalonia | product | Y |  |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Plugins/PluginManagerView.axaml` | 202 | linux | TradingTerminal.App.Avalonia | product | N | UI |
-| `src/linux/Shell/TradingTerminal.App.Avalonia/Plugins/PluginManagerViewModel.cs` | 443 | linux | TradingTerminal.App.Avalonia | product | Y | One row in the plugins list — a loaded plugin OR one |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Plugins/PluginManagerViewModel.cs` | 442 | linux | TradingTerminal.App.Avalonia | product | Y | One row in the plugins list — a loaded plugin OR one |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Program.cs` | 16 | linux | TradingTerminal.App.Avalonia | product | Y |  |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Settings/AiProvidersSettingsWindow.axaml.cs` | 8 | linux | TradingTerminal.App.Avalonia | product | Y |  |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Settings/AiProvidersSettingsWindow.axaml` | 54 | linux | TradingTerminal.App.Avalonia | product | N | UI |
@@ -54,14 +66,14 @@ Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Settings/ResearchSettingsWindow.axaml.cs` | 8 | linux | TradingTerminal.App.Avalonia | product | Y |  |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Settings/ResearchSettingsWindow.axaml` | 24 | linux | TradingTerminal.App.Avalonia | product | N | UI |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Settings/StrategyAuthoringWindow.axaml.cs` | 117 | linux | TradingTerminal.App.Avalonia | product | Y | Lets the Avalonia parameter workbench select the correct editor without UI-specific VM |
-| `src/linux/Shell/TradingTerminal.App.Avalonia/Settings/StrategyAuthoringWindow.axaml` | 2213 | linux | TradingTerminal.App.Avalonia | product | N | UI |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Settings/StrategyAuthoringWindow.axaml` | 2346 | linux | TradingTerminal.App.Avalonia | product | N | UI |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Settings/SupportWindow.axaml.cs` | 18 | linux | TradingTerminal.App.Avalonia | product | Y |  |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Settings/SupportWindow.axaml` | 55 | linux | TradingTerminal.App.Avalonia | product | N | UI |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Shell/BrokerApiChipViewModel.cs` | 84 | linux | TradingTerminal.App.Avalonia | product | Y | Drives the chip's background colour bucket. |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Shell/BrokerApiMeterViewModel.cs` | 72 | linux | TradingTerminal.App.Avalonia | product | Y | Header-strip API meter — one chip per broker being talked to. Avalonia |
-| `src/linux/Shell/TradingTerminal.App.Avalonia/Shell/MainWindow.axaml.cs` | 562 | linux | TradingTerminal.App.Avalonia | product | Y | Shows a tool/strategy window and — matching the WPF shell — disposes |
-| `src/linux/Shell/TradingTerminal.App.Avalonia/Shell/MainWindow.axaml` | 591 | linux | TradingTerminal.App.Avalonia | product | N | UI |
-| `src/linux/Shell/TradingTerminal.App.Avalonia/Shell/MainWindowViewModel.cs` | 334 | linux | TradingTerminal.App.Avalonia | product | Y | Design-time ctor — empty graph so the previewer has something to render. |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Shell/MainWindow.axaml.cs` | 750 | linux | TradingTerminal.App.Avalonia | product | Y | Shows a tool/strategy window and — matching the WPF shell — disposes |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Shell/MainWindow.axaml` | 628 | linux | TradingTerminal.App.Avalonia | product | N | UI |
+| `src/linux/Shell/TradingTerminal.App.Avalonia/Shell/MainWindowViewModel.cs` | 392 | linux | TradingTerminal.App.Avalonia | product | Y | Design-time ctor — empty graph so the previewer has something to render. |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Shell/ShellConverters.cs` | 115 | linux | TradingTerminal.App.Avalonia | product | Y | Shell colour converters — Avalonia has no WPF-style DataTriggers, so the status |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Shell/StrategyPillConverters.cs` | 142 | linux | TradingTerminal.App.Avalonia | product | Y | One coloured catalog pill: label + background/foreground brushes. Avalonia mirror of the |
 | `src/linux/Shell/TradingTerminal.App.Avalonia/Strategies/StrategyImageTile.axaml.cs` | 90 | linux | TradingTerminal.App.Avalonia | product | Y | Displays a strategy screenshot without retaining a file handle, falling back to |

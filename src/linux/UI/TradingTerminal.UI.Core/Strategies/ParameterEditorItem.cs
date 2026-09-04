@@ -36,6 +36,11 @@ public sealed class ParameterEditorItem : ObservableObject
     public double Max => Parameter.Max ?? double.MaxValue;
     public double Step => Parameter.Step ?? (Kind == ParameterKind.Integer ? 1 : 0.1);
     public bool IsInteger => Kind == ParameterKind.Integer;
+    public bool IsNumeric => Kind is ParameterKind.Integer or ParameterKind.Number;
+    public bool IsBoolean => Kind == ParameterKind.Boolean;
+    public bool IsChoice => Kind == ParameterKind.Choice;
+    public bool IsText => Kind == ParameterKind.Text;
+    public bool IsInstrument => Kind == ParameterKind.Instrument;
     public IReadOnlyList<string> Choices => Parameter.Choices ?? Array.Empty<string>();
 
     /// <summary>Numeric value for both <see cref="ParameterKind.Integer"/> and <see cref="ParameterKind.Number"/>.</summary>

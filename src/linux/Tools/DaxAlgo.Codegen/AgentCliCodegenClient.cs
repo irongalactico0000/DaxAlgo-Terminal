@@ -140,6 +140,14 @@ public sealed class AgentCliCodegenClient : IStrategyCodegenClient
         StrategyCodegenRequest request,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
+        if (HasImageInput(request))
+        {
+            yield return new CodegenEvent.Completed(StrategyCodegenResponse.Fail(
+                $"{DisplayName} is connected through a text-only CLI and cannot inspect reference charts. " +
+                "Choose a vision-capable API provider for chart analysis."));
+            yield break;
+        }
+
         var exe = _resolveOnPath(_adapter.Executable);
         if (exe is null || _adapter.StreamFlags is null)
         {
@@ -278,6 +286,11 @@ public sealed class AgentCliCodegenClient : IStrategyCodegenClient
 
     public async Task<StrategyCodegenResponse> GenerateAsync(StrategyCodegenRequest request, CancellationToken ct = default)
     {
+        if (HasImageInput(request))
+            return StrategyCodegenResponse.Fail(
+                $"{DisplayName} is connected through a text-only CLI and cannot inspect reference charts. " +
+                "Choose a vision-capable API provider for chart analysis.");
+
         var exe = _resolveOnPath(_adapter.Executable);
         if (exe is null)
             return StrategyCodegenResponse.Fail($"{_adapter.Executable} is not on PATH — install it, or pick a keyed provider.");
@@ -357,6 +370,9 @@ public sealed class AgentCliCodegenClient : IStrategyCodegenClient
         }
         return sb.ToString();
     }
+
+    private static bool HasImageInput(StrategyCodegenRequest request) =>
+        request.Messages.Any(static message => message.Images is { Count: > 0 });
 
     private static string Trim(string s) => s.Length <= 300 ? s : s[..300] + "…";
 

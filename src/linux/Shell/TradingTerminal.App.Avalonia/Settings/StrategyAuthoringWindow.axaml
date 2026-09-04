@@ -6,7 +6,7 @@
         MinWidth="1000" MinHeight="680"
         Background="{DynamicResource Background.Primary}"
         Foreground="{DynamicResource Text.Primary}"
-        Title="Vibe Quant — AI strategy builder"
+        Title="Vibe Quant — AI chart &amp; strategy builder"
         WindowStartupLocation="CenterOwner">
 
   <Window.Resources>
@@ -162,7 +162,7 @@
               </Border>
               <StackPanel Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Center">
                 <TextBlock Text="Vibe Quant" Classes="header" FontSize="13" />
-                <TextBlock Text="AI strategy builder" Classes="caption" />
+                <TextBlock Text="AI chart &amp; strategy builder" Classes="caption" />
               </StackPanel>
               <Button Grid.Column="2" Classes="ghost" Content="‹" FontSize="18"
                       Command="{Binding ToggleRailCommand}" ToolTip.Tip="Collapse session rail" />
@@ -451,18 +451,141 @@
         </StackPanel>
 
         <Border Grid.Row="3" Classes="composer" Padding="11,9" Margin="0,10,0,0">
-          <Grid RowDefinitions="Auto,Auto">
+          <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto">
             <TextBox x:Name="ComposerBox" Grid.Row="0" MinHeight="58" MaxHeight="190"
                      AcceptsReturn="True" TextWrapping="Wrap"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                      Background="Transparent" BorderThickness="0" Padding="2"
-                     FontSize="12.5" Watermark="Describe the strategy — or refine what's there. ⌘/Ctrl+Enter sends."
+                     FontSize="12.5" Watermark="Describe a chart or strategy — optionally attach a reference. ⌘/Ctrl+Enter sends."
                      Text="{Binding Composer, Mode=TwoWay}"
                      KeyDown="OnComposerKeyDown" />
 
-            <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+            <ItemsControl Grid.Row="1" ItemsSource="{Binding ChartReferences}"
+                          IsVisible="{Binding HasChartReferences}" Margin="0,7,0,0">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Classes="chip" Margin="0,0,6,4"
+                          AutomationProperties.Name="Attached reference chart">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="▧" Foreground="{StaticResource Ai.Text.Brush}" />
+                      <TextBlock Text="{Binding OriginalFileName}" FontSize="10.5" />
+                      <TextBlock Text="{Binding Reference.Similarity}" Classes="caption" />
+                      <Button Classes="ghost" Content="×" Padding="4,0"
+                              Command="{Binding DataContext.RemoveChartReferenceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                              CommandParameter="{Binding}"
+                              AutomationProperties.Name="Remove reference chart" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <ItemsControl Grid.Row="2" ItemsSource="{Binding ChartReferenceInspections}"
+                          IsVisible="{Binding HasChartReferenceInspections}" Margin="0,3,0,0">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding Summary, StringFormat='Inspected: {0}'}"
+                             Classes="caption" TextWrapping="Wrap" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border Grid.Row="3" Background="{StaticResource Warning.Soft}"
+                    BorderBrush="{StaticResource Warning.Brush}" BorderThickness="1"
+                    CornerRadius="4" Padding="7,4" Margin="0,3,0,0"
+                    IsVisible="{Binding HasUnresolvedChartReferences}"
+                    AutomationProperties.Name="Reference chart analysis required">
+              <StackPanel Spacing="6">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="{Binding ChartReferenceReadinessText}" Classes="caption"
+                             TextWrapping="Wrap" Margin="0,0,8,0" />
+                  <Button Grid.Column="1" Classes="ghost" Content="Analyze chart"
+                          Command="{Binding InspectChartReferencesCommand}"
+                          IsVisible="{Binding HasUninspectedChartReferences}"
+                          AutomationProperties.Name="Analyze attached reference charts" />
+                </Grid>
+
+                <StackPanel IsVisible="{Binding HasSearchableChartReference}" Spacing="5">
+                  <TextBlock Text="COMPARE WITH LOCAL OR CONNECTED-BROKER HISTORY" Classes="eyebrow" />
+                  <WrapPanel Orientation="Horizontal">
+                    <ComboBox Width="82"
+                              ItemsSource="{Binding ChartPatternTimeframeOptions}"
+                              SelectedItem="{Binding SelectedChartPatternTimeframe, Mode=TwoWay}"
+                              AutomationProperties.Name="Chart pattern timeframe" Margin="0,0,6,4" />
+                    <Button Classes="ghost" Content="Find similar instruments"
+                            Command="{Binding SearchSimilarChartsCommand}"
+                            CommandParameter="AllKnownInstruments"
+                            IsEnabled="{Binding !IsSearchingChartPatterns}" Margin="0,0,6,4" />
+                    <Button Classes="ghost" Content="Find similar indexes"
+                            Command="{Binding SearchSimilarChartsCommand}"
+                            CommandParameter="IndexesOnly"
+                            IsEnabled="{Binding !IsSearchingChartPatterns}" Margin="0,0,6,4" />
+                  </WrapPanel>
+                  <TextBlock Text="Searching local history and safely hydrating gaps from connected brokers…"
+                             Classes="caption" IsVisible="{Binding IsSearchingChartPatterns}" />
+                  <TextBlock Text="{Binding ChartPatternSearchResult.Explanation}"
+                             Classes="caption" TextWrapping="Wrap"
+                             IsVisible="{Binding HasChartPatternSearchResult}" />
+                  <ItemsControl ItemsSource="{Binding ChartPatternSearchResult.Matches}"
+                                IsVisible="{Binding HasChartPatternMatches}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" Margin="0,2">
+                          <TextBlock Grid.Column="0" Text="{Binding CanonicalSymbol}"
+                                     FontWeight="SemiBold" Margin="0,0,8,0" />
+                          <TextBlock Grid.Column="1" Text="{Binding AssetClass}"
+                                     Classes="caption" Margin="0,0,8,0" />
+                          <TextBlock Grid.Column="2" Classes="caption" Margin="0,0,8,0">
+                            <Run Text="score " /><Run Text="{Binding Score}" />
+                          </TextBlock>
+                          <TextBlock Grid.Column="3" Classes="caption">
+                            <Run Text="{Binding Source}" /><Run Text=" · " />
+                            <Run Text="{Binding BarCount}" /><Run Text=" bars" />
+                          </TextBlock>
+                          <Button Grid.Column="4" Classes="ghost" Content="Use"
+                                  Command="{Binding DataContext.UseChartPatternMatchCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                  CommandParameter="{Binding}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="{Binding SelectedChartPatternText}" Classes="caption"
+                             IsVisible="{Binding HasSelectedChartPattern}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
               <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
                          IsEnabled="{Binding !IsGenerating}">
+                <Button Classes="pill aiPill" Margin="0,0,6,4"
+                        ToolTip.Tip="Attach a chart and state exactly what should be similar.">
+                  <TextBlock><Run Text="▧  Reference chart" /><Run Text="  ▾" /></TextBlock>
+                  <Button.Flyout>
+                    <Flyout Placement="Top">
+                      <StackPanel Spacing="5" MinWidth="285">
+                        <TextBlock Text="WHAT SHOULD MATCH?" Classes="eyebrow" />
+                        <Button Content="Appearance &amp; layout"
+                                Command="{Binding AttachChartReferenceCommand}"
+                                CommandParameter="VisualStyle" />
+                        <Button Content="Indicators and overlays"
+                                Command="{Binding AttachChartReferenceCommand}"
+                                CommandParameter="IndicatorComposition" />
+                        <Button Content="Historical price pattern"
+                                Command="{Binding AttachChartReferenceCommand}"
+                                CommandParameter="MarketPattern" />
+                        <Button Content="Find related instruments / indexes"
+                                Command="{Binding AttachChartReferenceCommand}"
+                                CommandParameter="RelatedInstruments" />
+                        <TextBlock Text="Pattern and related-instrument requests search history before opening a chart. They do not copy appearance."
+                                   Classes="caption" TextWrapping="Wrap" MaxWidth="280" />
+                      </StackPanel>
+                    </Flyout>
+                  </Button.Flyout>
+                </Button>
                 <Border Background="{StaticResource Ai.Soft}"
                         BorderBrush="{StaticResource Ai.Glow.Brush}" BorderThickness="1"
                         CornerRadius="14" Padding="10,4" Margin="0,0,6,4">
@@ -1214,11 +1337,21 @@
                                  HorizontalAlignment="Center" />
                       <TextBlock Text="{Binding CandidateEmptyText}"
                                  Classes="caption" TextWrapping="Wrap" TextAlignment="Center" />
-                      <Button Classes="aiAction" Content="Generate implementations"
+                      <TextBlock Text="{Binding CanonicalPaperStrategyAvailabilityText}"
+                                 Classes="caption" TextWrapping="Wrap" TextAlignment="Center"
+                                 IsVisible="{Binding HasConfirmedStrategyIntent}" />
+                      <Button Classes="aiAction" Content="Build runnable Paper strategy"
+                              Command="{Binding GenerateCanonicalPaperStrategyCommand}"
+                              IsEnabled="{Binding CanGenerateCanonicalPaperStrategy}"
+                              IsVisible="{Binding ShowStartImplementationAction}"
+                              HorizontalAlignment="Center"
+                              AutomationProperties.Name="Build canonical runnable Paper strategy" />
+                      <Button Classes="ghost" Content="Explore 4 implementation formats"
                               Command="{Binding GenerateFourCandidatesCommand}"
                               IsEnabled="{Binding CanGenerateFourCandidates}"
                               IsVisible="{Binding ShowStartImplementationAction}"
                               HorizontalAlignment="Center"
+                              ToolTip.Tip="Generates Python, declarative rules, TradeIR, and CSP comparison artifacts. These are not the runnable SDK strategy."
                               AutomationProperties.Name="Start implementation generation" />
                     </StackPanel>
                     <Border IsVisible="{Binding HasCandidateRestoreWarning}"

@@ -1,6 +1,6 @@
 # TradingTerminal.MarketData — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `330db91800ba`. Declaration lines only;
+Generated from source fingerprint `e91d50e75733`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Pipeline/TradingTerminal.MarketData/Archive/ArchiveBundleBuilder.cs
@@ -159,6 +159,14 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
    18: public Task<string?> PromptAsync(string key, CancellationToken ct) => Task.FromResult<string?>(null);
 ```
 
+## src/linux/Pipeline/TradingTerminal.MarketData/ChartPatternSearchV1.cs
+```cs
+   12: public sealed class ChartPatternSearchV1 : IChartPatternSearchV1
+   19: public ChartPatternSearchV1(IMarketDataStore store, IInstrumentRegistry registry)
+   24: public ChartPatternSearchV1(
+   36: public async Task<ChartPatternSearchResultV1> SearchAsync(
+```
+
 ## src/linux/Pipeline/TradingTerminal.MarketData/InstrumentDiscoveryService.cs
 ```cs
    34: public InstrumentDiscoveryService(
@@ -191,27 +199,27 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
    68: public MarketDataIngestService(
    82: public InstrumentId Resolve(Contract contract, BrokerKind broker) =>
    85: public IDisposable Subscribe(Contract contract, BrokerKind broker)
-   97: public IDisposable SubscribeBars(Contract contract, BrokerKind broker, BarSize size)
-  106: public IDisposable SubscribeTrades(Contract contract, BrokerKind broker)
-  238: public Handle(MarketDataIngestService owner, (int, BrokerKind, string) key, Entry _)
-  244: public void Dispose()
+  112: public IDisposable SubscribeBars(Contract contract, BrokerKind broker, BarSize size)
+  131: public IDisposable SubscribeTrades(Contract contract, BrokerKind broker)
+  296: public Handle(MarketDataIngestService owner, (int, BrokerKind, string) key, Entry _)
+  302: public void Dispose()
 ```
 
 ## src/linux/Pipeline/TradingTerminal.MarketData/MarketDataPipelineServiceCollectionExtensions.cs
 ```cs
-   16: public static class MarketDataPipelineServiceCollectionExtensions
-   25: public static IServiceCollection AddMarketDataPipeline(this IServiceCollection services, IConfiguration configuration)
+   17: public static class MarketDataPipelineServiceCollectionExtensions
+   26: public static IServiceCollection AddMarketDataPipeline(this IServiceCollection services, IConfiguration configuration)
 ```
 
 ## src/linux/Pipeline/TradingTerminal.MarketData/MarketDataRepository.cs
 ```cs
-   31: public sealed class MarketDataRepository : IMarketDataRepository
-   40: public MarketDataRepository(
-   56: public async Task<IReadOnlyList<TradableInstrument>> ListInstrumentsAsync(CancellationToken ct = default)
-   81: public async Task<IReadOnlyList<Bar>> GetHistoricalBarsAsync(
-  119: public async IAsyncEnumerable<Bar> SubscribeBarsAsync(
-  159: public async IAsyncEnumerable<Tick> SubscribeTicksAsync(
-  200: public async IAsyncEnumerable<DepthSnapshot> SubscribeDepthAsync(
+   32: public sealed class MarketDataRepository : IMarketDataRepository
+   41: public MarketDataRepository(
+   57: public async Task<IReadOnlyList<TradableInstrument>> ListInstrumentsAsync(CancellationToken ct = default)
+   89: public async Task<IReadOnlyList<Bar>> GetHistoricalBarsAsync(
+  132: public async IAsyncEnumerable<Bar> SubscribeBarsAsync(
+  177: public async IAsyncEnumerable<Tick> SubscribeTicksAsync(
+  223: public async IAsyncEnumerable<DepthSnapshot> SubscribeDepthAsync(
 ```
 
 ## src/linux/Pipeline/TradingTerminal.MarketData/Store/CompositeMarketDataStore.cs

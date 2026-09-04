@@ -72,7 +72,10 @@ public sealed class RiskManager : IRiskManager
         var next = prev + signed;
 
         var (realised, newAvg) = ApplyFill(prev, prevAvg, signed, price);
-        _realisedPnlToday += realised * _options.DefaultContractMultiplier;
+        var multiplier = _options.ContractMultipliersBySymbol.TryGetValue(symbol, out var configured)
+            ? configured
+            : _options.DefaultContractMultiplier;
+        _realisedPnlToday += realised * multiplier;
 
         _positionBySymbol[symbol] = next;
         if (next == 0)

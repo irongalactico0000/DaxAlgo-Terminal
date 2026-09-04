@@ -17,10 +17,13 @@
       <StackPanel Spacing="7">
         <Grid ColumnDefinitions="2*,*,*,*,Auto">
           <StackPanel Grid.Column="0" Spacing="2">
-            <TextBlock Text="Instrument" FontSize="11" Foreground="{StaticResource Text.Secondary}" />
-            <ComboBox ItemsSource="{Binding Instruments}" SelectedItem="{Binding SelectedInstrument}">
+            <TextBlock Text="Reviewed instrument set" FontSize="11" Foreground="{StaticResource Text.Secondary}" />
+            <ComboBox ItemsSource="{Binding Instruments}" SelectedItem="{Binding SelectedInstrument}"
+                      IsEnabled="{Binding CanSelectInstrument}" ToolTip.Tip="{Binding ReviewedInstrumentSummary}">
               <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding DisplayName}" /></DataTemplate></ComboBox.ItemTemplate>
             </ComboBox>
+            <TextBlock Text="{Binding ReviewedInstrumentSummary}" IsVisible="{Binding IsAuthoredStrategy}"
+                       FontSize="9" Foreground="{StaticResource Accent.Brush}" TextWrapping="Wrap" />
           </StackPanel>
           <StackPanel Grid.Column="1" Spacing="2">
             <TextBlock Text="Data" FontSize="11" Foreground="{StaticResource Text.Secondary}" />
@@ -44,8 +47,37 @@
           <TextBox Width="120" Watermark="Fee bps/side" Text="{Binding FeeBps}" />
           <TextBox Width="120" Watermark="Max prints" Text="{Binding MaxTrades}" IsVisible="{Binding IsFullTape}" />
           <ComboBox Width="130" ItemsSource="{Binding BarSizes}" SelectedItem="{Binding SelectedBarSize}"
-                    IsVisible="{Binding IsBarSynthetic}" />
+                    IsVisible="{Binding IsBarSynthetic}" IsEnabled="{Binding CanSelectBarSize}" />
+          <TextBox Width="125" Watermark="Max position" Text="{Binding MaxPositionPerSymbol}" />
+          <TextBox Width="140" Watermark="Max daily loss" Text="{Binding MaxDailyLoss}" />
         </StackPanel>
+        <Expander Header="Strategy parameters" IsVisible="{Binding HasStrategyParameters}"
+                  IsEnabled="{Binding CanEditParameters}">
+          <ItemsControl ItemsSource="{Binding EditableParameters}" Margin="0,6,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid ColumnDefinitions="180,170,*" Margin="0,3">
+                  <StackPanel Grid.Column="0">
+                    <TextBlock Text="{Binding DisplayName}" />
+                    <TextBlock Text="{Binding Key}" FontSize="9" Foreground="{StaticResource Text.Secondary}" />
+                  </StackPanel>
+                  <Grid Grid.Column="1">
+                    <NumericUpDown Value="{Binding NumberValue, Mode=TwoWay}"
+                                   Minimum="{Binding Min}" Maximum="{Binding Max}" Increment="{Binding Step}"
+                                   IsVisible="{Binding IsNumeric}" />
+                    <CheckBox IsChecked="{Binding BoolValue, Mode=TwoWay}" Content="Enabled"
+                              IsVisible="{Binding IsBoolean}" />
+                    <ComboBox ItemsSource="{Binding Choices}" SelectedItem="{Binding SelectedChoice, Mode=TwoWay}"
+                              IsVisible="{Binding IsChoice}" />
+                    <TextBox Text="{Binding TextValue, Mode=TwoWay}" IsVisible="{Binding IsText}" />
+                  </Grid>
+                  <TextBlock Grid.Column="2" Margin="10,0,0,0" Text="{Binding Description}"
+                             FontSize="9.5" Foreground="{StaticResource Text.Secondary}" TextWrapping="Wrap" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Expander>
       </StackPanel>
     </Border>
 
@@ -76,14 +108,15 @@
       <ListBox ItemsSource="{Binding Trades}" Background="{StaticResource Background.Surface}">
         <ListBox.ItemTemplate>
           <DataTemplate>
-            <Grid ColumnDefinitions="150,150,70,80,110,110,*" Margin="8,4">
-              <TextBlock Grid.Column="0" Text="{Binding EntryUtc, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" />
-              <TextBlock Grid.Column="1" Text="{Binding ExitUtc, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" />
-              <TextBlock Grid.Column="2" Text="{Binding Side}" />
-              <TextBlock Grid.Column="3" Text="{Binding Quantity}" />
-              <TextBlock Grid.Column="4" Text="{Binding EntryPrice, StringFormat='{}{0:F4}'}" />
-              <TextBlock Grid.Column="5" Text="{Binding ExitPrice, StringFormat='{}{0:F4}'}" />
-              <TextBlock Grid.Column="6" Text="{Binding GrossPnl, StringFormat='P&amp;L {0:F4}'}" />
+            <Grid ColumnDefinitions="90,145,145,65,70,105,105,*" Margin="8,4">
+              <TextBlock Grid.Column="0" Text="{Binding Symbol}" Foreground="{StaticResource Accent.Brush}" />
+              <TextBlock Grid.Column="1" Text="{Binding EntryUtc, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" />
+              <TextBlock Grid.Column="2" Text="{Binding ExitUtc, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" />
+              <TextBlock Grid.Column="3" Text="{Binding Side}" />
+              <TextBlock Grid.Column="4" Text="{Binding Quantity}" />
+              <TextBlock Grid.Column="5" Text="{Binding EntryPrice, StringFormat='{}{0:F4}'}" />
+              <TextBlock Grid.Column="6" Text="{Binding ExitPrice, StringFormat='{}{0:F4}'}" />
+              <TextBlock Grid.Column="7" Text="{Binding GrossPnl, StringFormat='P&amp;L {0:F4}'}" />
             </Grid>
           </DataTemplate>
         </ListBox.ItemTemplate>

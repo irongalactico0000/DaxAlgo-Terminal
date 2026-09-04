@@ -12,6 +12,7 @@ using TradingTerminal.Infrastructure.Plugins;
 using TradingTerminal.Infrastructure.Strategies.Authoring;
 using TradingTerminal.Infrastructure.Threading;
 using TradingTerminal.Recording;
+using TradingTerminal.App.Avalonia.Execution;
 using TradingTerminal.UI;
 using TradingTerminal.UI.Logging;
 using TradingTerminal.UI.Strategies;
@@ -30,6 +31,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 {
     private readonly IBrokerSelector _brokerSelector;
     private readonly IStrategyFactory? _strategyFactory;
+    private readonly IVisualizerRegistry? _visualizerRegistry;
+    private readonly IStrategyKernelRegistry? _strategyKernelRegistry;
     private readonly SessionContext _session;
     private readonly ICliWorkspaceLauncher? _cliLauncher;
     private readonly DispatcherTimer _clockTimer;
@@ -42,15 +45,21 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         InMemoryLogSink activityLog,
         PluginHostContext pluginHost,
         SessionContext session,
+        IVisualizerRegistry visualizerRegistry,
+        IStrategyKernelRegistry strategyKernelRegistry,
         ICliWorkspaceLauncher? cliLauncher = null,
-        TickRecordingService? recorder = null)
+        TickRecordingService? recorder = null,
+        PaperExecutionBooksViewModel? executionBooks = null)
     {
         _brokerSelector = brokerSelector;
         _strategyFactory = factory;
+        _visualizerRegistry = visualizerRegistry;
+        _strategyKernelRegistry = strategyKernelRegistry;
         _session = session;
         _cliLauncher = cliLauncher;
         ApiMeter = apiMeter;
         Recorder = recorder;
+        ExecutionBooks = executionBooks;
         ActivityLog = activityLog;
         PluginProblemCount = pluginHost.Report?.AttentionCount ?? 0;
         var installedClis = cliLauncher?.AvailableClis() ?? [];
@@ -60,8 +69,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         Strategies = new ObservableCollection<ITradingStrategy>(factory.All);
         CatalogItems = new ObservableCollection<StrategyCatalogItemViewModel>(
-            factory.All.Select(strategy => new StrategyCatalogItemViewModel(strategy)));
+            factory.All.Select(strategy => new StrategyCatalogItemViewModel(strategy))
+                .Concat(visualizerRegistry.All.Select(visualizer =>
+                    new StrategyCatalogItemViewModel(visualizer.Descriptor)))
+                .Concat(strategyKernelRegistry.All.Select(strategy =>
+                    new StrategyCatalogItemViewModel(strategy))));
         factory.Changed += OnStrategyCatalogChanged;
+        visualizerRegistry.Changed += OnVisualizerCatalogChanged;
+        strategyKernelRegistry.Changed += OnStrategyKernelCatalogChanged;
         VisibleLog = new ObservableCollection<LogEntry>(activityLog.Entries);
         activityLog.Entries.CollectionChanged += OnLogEntriesChanged;
 
@@ -110,6 +125,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public IReadOnlyList<CliLaunchChoice> CliLaunchChoices { get; }
 
+    /// <summary>App-lifetime Paper books chip; null only in the design-time constructor.</summary>
+    public PaperExecutionBooksViewModel? ExecutionBooks { get; }
+
     public void LaunchCli(CliLaunchChoice? choice)
     {
         if (choice is null) return;
@@ -129,7 +147,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Description shown in the details panel for the selected strategy.</summary>
-    public string SelectedDetails => SelectedStrategy?.Description ?? "Select a strategy to see its description.";
+    public string SelectedDetails => SelectedCatalogItem?.Description ?? "Select a strategy or visualizer to see its description.";
 
     partial void OnSelectedCatalogItemChanged(StrategyCatalogItemViewModel? value)
     {
@@ -155,6 +173,44 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 var wasSelected = ReferenceEquals(SelectedCatalogItem, existingItem);
                 CatalogItems[CatalogItems.IndexOf(existingItem)] = replacement;
                 if (wasSelected) SelectedCatalogItem = replacement;
+            }
+
+            OnPropertyChanged(nameof(HasNoStrategies));
+            OnPropertyChanged(nameof(HasStrategies));
+        });
+
+    private void OnVisualizerCatalogChanged(object? sender, EventArgs e) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            for (var index = CatalogItems.Count - 1; index >= 0; index--)
+            {
+                if (CatalogItems[index].Kind == CatalogItemKind.Visualizer)
+                    CatalogItems.RemoveAt(index);
+            }
+
+            foreach (var registration in _visualizerRegistry?.All ?? [])
+                CatalogItems.Add(new StrategyCatalogItemViewModel(registration.Descriptor));
+
+            OnPropertyChanged(nameof(HasNoStrategies));
+            OnPropertyChanged(nameof(HasStrategies));
+        });
+
+    private void OnStrategyKernelCatalogChanged(object? sender, EventArgs e) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            var selectedId = SelectedCatalogItem?.StrategyKernel?.Id;
+            for (var index = CatalogItems.Count - 1; index >= 0; index--)
+            {
+                if (CatalogItems[index].StrategyKernel is not null)
+                    CatalogItems.RemoveAt(index);
+            }
+
+            foreach (var registration in _strategyKernelRegistry?.All ?? [])
+            {
+                var item = new StrategyCatalogItemViewModel(registration);
+                CatalogItems.Add(item);
+                if (string.Equals(item.Id, selectedId, StringComparison.Ordinal))
+                    SelectedCatalogItem = item;
             }
 
             OnPropertyChanged(nameof(HasNoStrategies));
@@ -319,6 +375,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         if (_brokerSelector is not null) _brokerSelector.StateChanged -= OnBrokerStateChanged;
         if (_session is not null) _session.Changed -= OnSessionChanged;
         if (_strategyFactory is not null) _strategyFactory.Changed -= OnStrategyCatalogChanged;
+        if (_visualizerRegistry is not null) _visualizerRegistry.Changed -= OnVisualizerCatalogChanged;
+        if (_strategyKernelRegistry is not null) _strategyKernelRegistry.Changed -= OnStrategyKernelCatalogChanged;
         ActivityLog.Entries.CollectionChanged -= OnLogEntriesChanged;
         ApiMeter?.Dispose();
     }

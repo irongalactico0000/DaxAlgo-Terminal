@@ -1,31 +1,35 @@
 # macOS index / Tools
 
-Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
+Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 
 | File | LOC | Tree | Project | Role | Public surface | Purpose |
 |---|---:|---|---|---|---|---|
-| `src/linux/Tools/DaxAlgo.Codegen/AgentCliCodegenClient.cs` | 389 | linux | DaxAlgo.Codegen | product | Y | Per-CLI details, isolated so one vendor's output-format drift doesn't touch the others. |
+| `src/linux/Tools/DaxAlgo.Codegen/AgentCliCodegenClient.cs` | 405 | linux | DaxAlgo.Codegen | product | Y | Per-CLI details, isolated so one vendor's output-format drift doesn't touch the others. |
 | `src/linux/Tools/DaxAlgo.Codegen/AiModelCatalog.cs` | 60 | linux | DaxAlgo.Codegen | product | Y | Anthropic model ids — the same strings Claude Code's |
 | `src/linux/Tools/DaxAlgo.Codegen/AiStrategyBuilder.cs` | 106 | linux | DaxAlgo.Codegen | product | Y | Every provider the app knows how to build, available or not — |
-| `src/linux/Tools/DaxAlgo.Codegen/AnthropicCodegenClient.cs` | 288 | linux | DaxAlgo.Codegen | product | Y | The models this key can actually call. A failure here is not |
+| `src/linux/Tools/DaxAlgo.Codegen/AnthropicCodegenClient.cs` | 314 | linux | DaxAlgo.Codegen | product | Y | The models this key can actually call. A failure here is not |
 | `src/linux/Tools/DaxAlgo.Codegen/AnthropicStreamParser.cs` | 111 | linux | DaxAlgo.Codegen | product | Y | Everything the model has written so far. |
+| `src/linux/Tools/DaxAlgo.Codegen/AuthoredUnitIntentClassifierV1.cs` | 119 | linux | DaxAlgo.Codegen | product | Y | Chooses the product lane before semantic strategy research begins. It cannot create |
+| `src/linux/Tools/DaxAlgo.Codegen/AuthoredUnitSourceGeneratorV1.cs` | 221 | linux | DaxAlgo.Codegen | product | Y | Converts one reviewed authored-unit specification into SDK source. The model may choose |
+| `src/linux/Tools/DaxAlgo.Codegen/AuthoredUnitSpecificationGeneratorV1.cs` | 419 | linux | DaxAlgo.Codegen | product | Y | AI-assisted lowering from reviewed language/reference evidence into a launchable authored-unit |
+| `src/linux/Tools/DaxAlgo.Codegen/ChartReferenceInspectorV1.cs` | 169 | linux | DaxAlgo.Codegen | product | Y | Sends the exact hash-verified image to a multimodal provider and accepts only |
 | `src/linux/Tools/DaxAlgo.Codegen/CliWorkspaceLauncher.cs` | 371 | linux | DaxAlgo.Codegen | product | Y | What |
 | `src/linux/Tools/DaxAlgo.Codegen/CodegenCodeExtractor.cs` | 148 | linux | DaxAlgo.Codegen | product | Y | A bare file name mentioned in prose/info strings — |
 | `src/linux/Tools/DaxAlgo.Codegen/FakeCodegenClient.cs` | 82 | linux | DaxAlgo.Codegen | product | Y | How many times the loop asked this client to generate — the |
-| `src/linux/Tools/DaxAlgo.Codegen/OpenAiCompatibleCodegenClient.cs` | 275 | linux | DaxAlgo.Codegen | product | Y | Every OpenAI-compatible endpoint (including Ollama) exposes |
+| `src/linux/Tools/DaxAlgo.Codegen/OpenAiCompatibleCodegenClient.cs` | 298 | linux | DaxAlgo.Codegen | product | Y | Every OpenAI-compatible endpoint (including Ollama) exposes |
 | `src/linux/Tools/DaxAlgo.Codegen/ParallelStrategyCandidateGeneratorV1.cs` | 1026 | linux | DaxAlgo.Codegen | product | Y | Conservative host-owned gate for the single optional repair call. It prefers stopping |
 | `src/linux/Tools/DaxAlgo.Codegen/ParallelStrategyGenerationContractsV1.cs` | 1063 | linux | DaxAlgo.Codegen | product | Y | The four authoring representations offered for every strategy brief. |
 | `src/linux/Tools/DaxAlgo.Codegen/ParallelStrategyGenerationPromptV1.cs` | 615 | linux | DaxAlgo.Codegen | product | Y |  |
 | `src/linux/Tools/DaxAlgo.Codegen/StrategyBacktestSmoke.cs` | 112 | linux | DaxAlgo.Codegen | product | Y | Ticks fed through |
 | `src/linux/Tools/DaxAlgo.Codegen/StrategyBuildSession.cs` | 469 | linux | DaxAlgo.Codegen | product | Y | What one turn of the conversation produced. |
-| `src/linux/Tools/DaxAlgo.Codegen/StrategyCandidateGenerationOrchestratorV1.cs` | 611 | linux | DaxAlgo.Codegen | product | Y | One intake or revision request. CurrentCandidate is null for the original idea; |
-| `src/linux/Tools/DaxAlgo.Codegen/StrategyCandidateGenerationPromptV1.cs` | 164 | linux | DaxAlgo.Codegen | product | Y |  |
+| `src/linux/Tools/DaxAlgo.Codegen/StrategyCandidateGenerationOrchestratorV1.cs` | 696 | linux | DaxAlgo.Codegen | product | Y | One intake or revision request. CurrentCandidate is null for the original idea; |
+| `src/linux/Tools/DaxAlgo.Codegen/StrategyCandidateGenerationPromptV1.cs` | 187 | linux | DaxAlgo.Codegen | product | Y |  |
 | `src/linux/Tools/DaxAlgo.Codegen/StrategyCodegenClientFactory.cs` | 161 | linux | DaxAlgo.Codegen | product | Y | Every provider the app knows how to build — installed agent CLIs, |
 | `src/linux/Tools/DaxAlgo.Codegen/StrategyCodegenOrchestrator.cs` | 80 | linux | DaxAlgo.Codegen | product | Y | The result of a one-shot build: whether it produced a compiling strategy, |
-| `src/linux/Tools/DaxAlgo.Codegen/StrategyCodegenServiceCollectionExtensions.cs` | 83 | linux | DaxAlgo.Codegen | product | Y | Wires the AI Strategy Builder into DI. Called once per shell from |
+| `src/linux/Tools/DaxAlgo.Codegen/StrategyCodegenServiceCollectionExtensions.cs` | 95 | linux | DaxAlgo.Codegen | product | Y | Wires the AI Strategy Builder into DI. Called once per shell from |
 | `src/linux/Tools/DaxAlgo.Codegen/StrategyContextPack.cs` | 31 | linux | DaxAlgo.Codegen | product | Y | The pack text — the codegen system prompt. |
 | `src/linux/Tools/DaxAlgo.Codegen/StrategyGenerationPackageCatalogV1.cs` | 622 | linux | DaxAlgo.Codegen | product | Y | Compatibility text for consumers that explain the absent runtime boundary. |
-| `src/linux/Tools/DaxAlgo.Codegen/StrategyGenerationSessionV1.cs` | 117 | linux | DaxAlgo.Codegen | product | Y | One user-facing strategy-generation conversation. It persists accepted candidate revisions, not |
+| `src/linux/Tools/DaxAlgo.Codegen/StrategyGenerationSessionV1.cs` | 131 | linux | DaxAlgo.Codegen | product | Y | One user-facing strategy-generation conversation. It persists accepted candidate revisions, not |
 | `src/linux/Tools/DaxAlgo.Codegen/StrategySkillLibrary.cs` | 163 | linux | DaxAlgo.Codegen | product | Y | One on-demand domain pack: what it knows, and the words that mean |
 | `src/linux/Tools/DaxAlgo.Codegen/TradeIrCandidateSynthesisV1.cs` | 596 | linux | DaxAlgo.Codegen | product | Y |  |
 | `src/linux/Tools/DaxAlgo.Codegen/VibeQuantDeclarativeRulesContractV1.cs` | 785 | linux | DaxAlgo.Codegen | product | Y | Deterministic structural enforcement for the closed Vibe Quant Declarative Rules v1 document. |
@@ -63,14 +67,14 @@ Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
 | `src/linux/Tools/TradingTerminal.Backtest/AvaloniaUi/BacktestAvaloniaWindow.axaml.cs` | 58 | linux | TradingTerminal.Backtest | product | Y | Avalonia (cross-platform) view for the Backtest tool — net9.0-leg counterpart to the |
 | `src/linux/Tools/TradingTerminal.Backtest/AvaloniaUi/BacktestAvaloniaWindow.axaml` | 40 | linux | TradingTerminal.Backtest | product | N | UI |
 | `src/linux/Tools/TradingTerminal.Backtest/AvaloniaUi/QuickBacktestAvaloniaWindow.axaml.cs` | 50 | linux | TradingTerminal.Backtest | product | Y |  |
-| `src/linux/Tools/TradingTerminal.Backtest/AvaloniaUi/QuickBacktestAvaloniaWindow.axaml` | 93 | linux | TradingTerminal.Backtest | product | N | UI |
+| `src/linux/Tools/TradingTerminal.Backtest/AvaloniaUi/QuickBacktestAvaloniaWindow.axaml` | 126 | linux | TradingTerminal.Backtest | product | N | UI |
 | `src/linux/Tools/TradingTerminal.Backtest/BacktestServiceCollectionExtensions.cs` | 27 | linux | TradingTerminal.Backtest | product | Y | DI registration for the Backtest tab. |
 | `src/linux/Tools/TradingTerminal.Backtest/BacktestView.xaml.cs` | 41 | linux | TradingTerminal.Backtest | product | Y |  |
 | `src/linux/Tools/TradingTerminal.Backtest/BacktestView.xaml` | 188 | linux | TradingTerminal.Backtest | product | N | UI |
 | `src/linux/Tools/TradingTerminal.Backtest/BacktestViewModel.cs` | 181 | linux | TradingTerminal.Backtest | product | Y | Raised after a run completes so the view can redraw the ScottPlot |
 | `src/linux/Tools/TradingTerminal.Backtest/QuickBacktestView.xaml.cs` | 37 | linux | TradingTerminal.Backtest | product | Y |  |
 | `src/linux/Tools/TradingTerminal.Backtest/QuickBacktestView.xaml` | 213 | linux | TradingTerminal.Backtest | product | N | UI |
-| `src/linux/Tools/TradingTerminal.Backtest/QuickBacktestViewModel.cs` | 426 | linux | TradingTerminal.Backtest | product | Y | How the Quick-backtest sources its replay data. |
+| `src/linux/Tools/TradingTerminal.Backtest/QuickBacktestViewModel.cs` | 680 | linux | TradingTerminal.Backtest | product | Y | How the Quick-backtest sources its replay data. |
 | `src/linux/Tools/TradingTerminal.BacktestStudio/AvaloniaUi/BacktestStudioAvaloniaWindow.axaml.cs` | 11 | linux | TradingTerminal.BacktestStudio | product | Y | Avalonia (cross-platform) view for Backtest Studio — net9.0-leg counterpart to the WPF |
 | `src/linux/Tools/TradingTerminal.BacktestStudio/AvaloniaUi/BacktestStudioAvaloniaWindow.axaml` | 83 | linux | TradingTerminal.BacktestStudio | product | N | UI |
 | `src/linux/Tools/TradingTerminal.BacktestStudio/AxisRowViewModel.cs` | 28 | linux | TradingTerminal.BacktestStudio | product | Y | One row in the optimization axis editor: a parameter the user can |
@@ -113,11 +117,11 @@ Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
 | `src/linux/Tools/TradingTerminal.QuantConnect/QuantConnectWindow.xaml` | 299 | linux | TradingTerminal.QuantConnect | product | N | UI |
 | `src/linux/Tools/TradingTerminal.Recording/AvaloniaUi/TickRecorderAvaloniaWindow.axaml.cs` | 10 | linux | TradingTerminal.Recording | product | Y | Avalonia (cross-platform) view for the live tick recorder — net9.0-leg counterpart to |
 | `src/linux/Tools/TradingTerminal.Recording/AvaloniaUi/TickRecorderAvaloniaWindow.axaml` | 10 | linux | TradingTerminal.Recording | product | N | UI |
-| `src/linux/Tools/TradingTerminal.Recording/RecorderEntry.cs` | 112 | linux | TradingTerminal.Recording | product | Y | Live subscriptions: the ingest pumps (which do the persisting) plus the hub |
+| `src/linux/Tools/TradingTerminal.Recording/RecorderEntry.cs` | 129 | linux | TradingTerminal.Recording | product | Y | Live subscriptions: the ingest pumps (which do the persisting) plus the hub |
 | `src/linux/Tools/TradingTerminal.Recording/RecorderPanelView.axaml.cs` | 18 | linux | TradingTerminal.Recording | product | Y |  |
 | `src/linux/Tools/TradingTerminal.Recording/RecorderPanelView.axaml` | 304 | linux | TradingTerminal.Recording | product | N | UI |
 | `src/linux/Tools/TradingTerminal.Recording/RecorderPanelViewModel.cs` | 146 | linux | TradingTerminal.Recording | product | Y | The recording service the whole panel binds to. |
 | `src/linux/Tools/TradingTerminal.Recording/RecorderWatchlistStore.cs` | 105 | linux | TradingTerminal.Recording | product | Y | The whole persisted recorder state — what to record and the upload |
 | `src/linux/Tools/TradingTerminal.Recording/RecordingServiceCollectionExtensions.cs` | 20 | linux | TradingTerminal.Recording | product | Y | DI registration for the live market-data recorder. |
 | `src/linux/Tools/TradingTerminal.Recording/TickRecorderViewModel.cs` | 22 | linux | TradingTerminal.Recording | product | Y | Compatibility name used by the first Avalonia shell. It now exposes the |
-| `src/linux/Tools/TradingTerminal.Recording/TickRecordingService.cs` | 393 | linux | TradingTerminal.Recording | product | Y | How often auto-upload asks the archiver to ship whatever is pending. The |
+| `src/linux/Tools/TradingTerminal.Recording/TickRecordingService.cs` | 423 | linux | TradingTerminal.Recording | product | Y | How often auto-upload asks the archiver to ship whatever is pending. The |

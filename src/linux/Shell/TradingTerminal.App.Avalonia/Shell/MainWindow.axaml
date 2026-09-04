@@ -267,6 +267,15 @@
         <Separator />
         <MenuItem Header="_Instant offload (all pending)&#x2026;" Click="OnInstantOffload" />
       </MenuItem>
+      <MenuItem Header="_Execution Engine">
+        <MenuItem Header="Paper Execution _Books&#x2026;" Click="OnExecutionBooks"
+                  ToolTip.Tip="Create, select, run, and stop persistent account-isolated Paper books." />
+        <Separator />
+        <MenuItem Header="_Paper Execution Console&#x2026;" Click="OnExecutionConsole"
+                  ToolTip.Tip="Durable local Paper OMS. No live broker order route is loaded." />
+        <MenuItem Header="Paper _Strategy Runner&#x2026;" Click="OnPaperStrategyRunner"
+                  ToolTip.Tip="Run one canonical strategy/asset through the authenticated local Paper OMS." />
+      </MenuItem>
       <MenuItem Header="_Settings">
         <MenuItem Header="_Notifications…" Click="OnNotifications" />
         <MenuItem Header="_Research (Paper Lab)…" Click="OnResearchSettings" />
@@ -307,9 +316,18 @@
           <TextBlock Text="{Binding ConnectionState}" Foreground="{DynamicResource Accent.Brush}" FontWeight="Bold" />
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal">
-          <TextBlock Text="LIVE " Foreground="{DynamicResource Text.Secondary}" />
           <TextBlock Text="{Binding ConnectedBrokerCount}" Foreground="{DynamicResource Bullish.Brush}" />
-          <TextBlock Text=" brokers" Foreground="{DynamicResource Text.Secondary}" />
+          <TextBlock Text=" market-data brokers connected" Foreground="{DynamicResource Text.Secondary}" />
+          <Button Margin="10,0,0,0" Padding="7,1" Click="OnExecutionBooks"
+                  ToolTip.Tip="Open persistent Paper execution books">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <TextBlock Text="PAPER EXECUTION ONLY" Foreground="{DynamicResource Warning.Brush}"
+                         FontSize="9" FontWeight="Bold" />
+              <TextBlock Text="·" Foreground="{DynamicResource Text.Secondary}" FontSize="9" />
+              <TextBlock Text="{Binding ExecutionBooks.Summary}" Foreground="{DynamicResource Text.Secondary}"
+                         FontSize="9" FontWeight="SemiBold" />
+            </StackPanel>
+          </Button>
         </StackPanel>
         <TextBlock Grid.Column="4" Text="{Binding FeedDropCount, StringFormat='DROP {0}'}"
                    IsVisible="{Binding HasFeedDrops}" Margin="0,0,16,0"
@@ -425,12 +443,16 @@
                   <StackPanel Grid.Column="0" Margin="0,0,14,0">
                    <StackPanel Orientation="Horizontal">
                      <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Text.Header}" FontWeight="Bold" FontSize="15" />
+                     <Border Background="{DynamicResource Accent.Soft}" Margin="8,0,0,0" Padding="5,1">
+                       <TextBlock Text="{Binding KindLabel}" Foreground="{DynamicResource Accent.Brush}"
+                                  FontSize="9" FontWeight="Bold" />
+                     </Border>
                    </StackPanel>
                    <TextBlock Text="{Binding Id}" Foreground="{DynamicResource Text.Highlight}" FontSize="10" Margin="12,0,0,2" />
                    <StackPanel Orientation="Horizontal" Margin="12,6,0,0">
-                     <Button Content="▶" Padding="6,2" Click="OnOpenStrategy" ToolTip.Tip="Open strategy" />
+                     <Button Content="▶" Padding="6,2" Click="OnOpenStrategy" ToolTip.Tip="{Binding PrimaryActionLabel}" />
                      <Button Content="⏱" Padding="6,2" Margin="4,0,0,0" Click="OnQuickBacktest"
-                             ToolTip.Tip="Quick backtest (last 1 year)" />
+                             IsVisible="{Binding HasQuickBacktest}" ToolTip.Tip="Quick backtest (last 1 year)" />
                      <Button Content="✎" Padding="6,2" Margin="4,0,0,0" Click="OnEditStrategyCard"
                              ToolTip.Tip="Edit strategy card" />
                    </StackPanel>
@@ -461,7 +483,8 @@
                     </ItemsControl>
                   </StackPanel>
                   <!-- Data-requirement pills -->
-                  <ItemsControl ItemsSource="{Binding Strategy, Converter={StaticResource DataReqPills}}" Margin="12,4,0,0">
+                  <ItemsControl ItemsSource="{Binding Strategy, Converter={StaticResource DataReqPills}}"
+                                IsVisible="{Binding HasLegacyStrategy}" Margin="12,4,0,0">
                     <ItemsControl.ItemsPanel>
                       <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
@@ -474,7 +497,8 @@
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
                   <!-- Classification pills -->
-                  <ItemsControl ItemsSource="{Binding Strategy, Converter={StaticResource ClassPills}}" Margin="12,3,0,0">
+                  <ItemsControl ItemsSource="{Binding Strategy, Converter={StaticResource ClassPills}}"
+                                IsVisible="{Binding HasLegacyStrategy}" Margin="12,3,0,0">
                     <ItemsControl.ItemsPanel>
                       <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
@@ -482,6 +506,19 @@
                       <DataTemplate x:DataType="vm:StrategyPill">
                         <Border Background="{Binding Background}" CornerRadius="3" Padding="5,1" Margin="0,0,3,3" VerticalAlignment="Center">
                           <TextBlock Text="{Binding Text}" Foreground="{Binding Foreground}" FontSize="10" FontWeight="SemiBold" />
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <ItemsControl ItemsSource="{Binding DataRequirementTags}"
+                                IsVisible="{Binding HasDataRequirementTags}" Margin="12,4,0,0">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border Background="{DynamicResource Highlight.Soft}" Padding="5,1" Margin="0,0,3,0">
+                          <TextBlock Text="{Binding}" FontSize="10" Foreground="{DynamicResource Text.Highlight}" />
                         </Border>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>

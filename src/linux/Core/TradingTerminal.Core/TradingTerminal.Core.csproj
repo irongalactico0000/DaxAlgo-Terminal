@@ -15,6 +15,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="TradingTerminal.Tests" />
     <InternalsVisibleTo Include="TradingTerminal.Tests.Headless" />
+    <InternalsVisibleTo Include="TradingTerminal.Infrastructure" />
   </ItemGroup>
 
 </Project>

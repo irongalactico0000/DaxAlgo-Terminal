@@ -23,6 +23,11 @@ public interface IMarketDataRepository
     /// </summary>
     Task<IReadOnlyList<TradableInstrument>> ListInstrumentsAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Cache-first historical bars from <paramref name="broker"/>. An unsupported history
+    /// channel throws <see cref="NotSupportedException"/> before the cache is consulted, so data
+    /// cached from another source cannot make an unsupported broker appear capable.
+    /// </summary>
     Task<IReadOnlyList<Bar>> GetHistoricalBarsAsync(
         Contract contract,
         BrokerKind broker,
@@ -33,7 +38,9 @@ public interface IMarketDataRepository
     /// <summary>
     /// Streaming bars from <paramref name="broker"/>. The sequence completes when
     /// <paramref name="ct"/> is cancelled or the connection is permanently lost. If the broker is
-    /// not currently connected, the call throws <see cref="InvalidOperationException"/>.
+    /// not currently connected, the call throws <see cref="InvalidOperationException"/>. If this
+    /// build does not provide live bars for the broker, enumeration throws
+    /// <see cref="NotSupportedException"/> before a subscription is opened.
     /// </summary>
     IAsyncEnumerable<Bar> SubscribeBarsAsync(
         Contract contract,
@@ -44,7 +51,8 @@ public interface IMarketDataRepository
     /// <summary>
     /// Streaming tick-by-tick bid/ask quotes from <paramref name="broker"/>. Marshalled to the UI
     /// dispatcher before yielding so view-model consumers stay single-threaded. Cancellation via
-    /// <paramref name="ct"/> is the unsubscribe path.
+    /// <paramref name="ct"/> is the unsubscribe path. An unsupported L1 channel throws
+    /// <see cref="NotSupportedException"/> before a subscription is opened.
     /// </summary>
     IAsyncEnumerable<Tick> SubscribeTicksAsync(
         Contract contract,
@@ -53,9 +61,9 @@ public interface IMarketDataRepository
 
     /// <summary>
     /// Streaming L2 order-book snapshots from <paramref name="broker"/>, marshalled to the UI
-    /// dispatcher. Only available when the broker supports depth (cTrader does; IB will when wired;
-    /// NinjaTrader and Alpaca don't). Falls through whatever <see cref="NotSupportedException"/>
-    /// the broker throws — callers should be ready to degrade to <see cref="SubscribeTicksAsync"/>.
+    /// dispatcher. Capability is checked before invoking the broker; unsupported implementations
+    /// throw <see cref="NotSupportedException"/> when enumeration begins. A broker that declares
+    /// support may still surface runtime failures. Callers may degrade to <see cref="SubscribeTicksAsync"/>.
     /// </summary>
     IAsyncEnumerable<DepthSnapshot> SubscribeDepthAsync(
         Contract contract,

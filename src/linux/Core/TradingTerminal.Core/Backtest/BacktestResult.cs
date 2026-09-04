@@ -15,4 +15,5 @@ public sealed record BacktestResult(
     BacktestStatistics? Stats = null,
     double TotalFees = 0d,
     IReadOnlyList<FillRecord>? Fills = null,
-    IReadOnlyList<StrategySignalEvent>? Signals = null);
+    IReadOnlyList<StrategySignalEvent>? Signals = null,
+    IReadOnlyDictionary<string, long>? EndingPositions = null);

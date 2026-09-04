@@ -11,10 +11,15 @@ using TradingTerminal.Core.Backtest;
 using TradingTerminal.Core.Brokers;
 using TradingTerminal.Core.Domain;
 using TradingTerminal.Core.MarketData;
+using TradingTerminal.Core.Risk;
+using TradingTerminal.Core.Strategies;
+using TradingTerminal.Core.Strategies.Generation;
 using TradingTerminal.Core.Trading;
 using TradingTerminal.Infrastructure.Backtest;
 using TradingTerminal.Infrastructure.Backtest.Persistence;
+using TradingTerminal.Sandbox;
 using TradingTerminal.UI;
+using TradingTerminal.UI.Strategies;
 
 namespace TradingTerminal.Backtest;
 
@@ -27,9 +32,9 @@ public enum QuickBacktestDataMode
     /// genuine backtest. Depth/OBI still cannot participate (the engine does not replay L2).</summary>
     FullTapeRealTrades,
 
-    /// <summary>Pull OHLCV bars and synthesize four ticks per bar. Portable to any broker, but there
-    /// are no real prints, so a tape-primary strategy runs in the discounted synthetic-L1 mode
-    /// (q ≈ 0.4). A rough P&amp;L sniff, not a faithful evaluation.</summary>
+    /// <summary>Pull exact completed OHLCV bars and also derive four deterministic L1 observations
+    /// per bar for the fill model. Portable to any historical-bar broker, but there are no real
+    /// prints, so a tape-primary strategy runs in discounted synthetic-L1 mode (q ≈ 0.4).</summary>
     BarSynthetic,
 }
 
@@ -47,25 +52,34 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
     private readonly IBacktestStrategyRegistry _registry;
     private readonly IBacktestSession _session;
     private readonly IBrokerSelector _brokers;
+    private readonly IStrategyKernelRegistry _kernelRegistry;
+    private readonly IInstrumentRegistry _instrumentRegistry;
     private readonly ILogger<QuickBacktestViewModel> _logger;
     private CancellationTokenSource? _runCts;
 
     private BacktestStrategyOption? _option;
+    private StrategyKernelRegistration? _kernelOption;
+    private IReadOnlyList<CanonicalBacktestSelection> _canonicalSelections = [];
 
     public QuickBacktestViewModel(
         IBacktestStrategyRegistry registry,
         IBacktestSession session,
         IBrokerSelector brokers,
+        IStrategyKernelRegistry kernelRegistry,
+        IInstrumentRegistry instrumentRegistry,
         ILogger<QuickBacktestViewModel> logger)
     {
         _registry = registry;
         _session = session;
         _brokers = brokers;
+        _kernelRegistry = kernelRegistry;
+        _instrumentRegistry = instrumentRegistry;
         _logger = logger;
 
         BarSizes = new ObservableCollection<BarSize>(new[]
         {
-            BarSize.OneHour, BarSize.FifteenMinutes, BarSize.FiveMinutes, BarSize.OneDay,
+            BarSize.OneMinute, BarSize.ThreeMinutes, BarSize.FiveMinutes,
+            BarSize.FifteenMinutes, BarSize.OneHour, BarSize.OneDay,
         });
         Lookbacks = new ObservableCollection<LookbackOption>(new[]
         {
@@ -121,15 +135,33 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
     /// <summary>Safety cap on how many real prints the full-tape pull fetches (each REST page = 1000).</summary>
     [ObservableProperty] private int _maxTrades = 150_000;
 
+    /// <summary>Risk cap applied before every simulated order dispatch.</summary>
+    [ObservableProperty] private long _maxPositionPerSymbol = 100;
+
+    /// <summary>Realised-loss cap applied by the replay risk manager.</summary>
+    [ObservableProperty] private double _maxDailyLoss = 10_000d;
+
     [ObservableProperty] private bool _isRunning;
     [ObservableProperty] private string? _status;
     [ObservableProperty] private string? _feedQuality;
+    [ObservableProperty] private StrategyParametersViewModel? _parameters;
 
     [ObservableProperty] private BacktestStatistics? _stats;
     [ObservableProperty] private double _totalPnl;
 
     public bool IsFullTape => SelectedDataMode == QuickBacktestDataMode.FullTapeRealTrades;
     public bool IsBarSynthetic => SelectedDataMode == QuickBacktestDataMode.BarSynthetic;
+    public bool IsAuthoredStrategy => _kernelOption is not null;
+    public bool CanSelectInstrument => !IsAuthoredStrategy && !IsRunning;
+    public bool CanSelectBarSize => !IsAuthoredStrategy && !IsRunning;
+    public IReadOnlyList<ParameterEditorItem> EditableParameters => Parameters?.Items
+        .Where(static item => !item.IsInstrument)
+        .ToArray() ?? [];
+    public bool HasStrategyParameters => EditableParameters.Count != 0;
+    public bool CanEditParameters => HasStrategyParameters && !IsRunning;
+    public string ReviewedInstrumentSummary => _canonicalSelections.Count == 0
+        ? SelectedInstrument?.DisplayName ?? "No instrument selected"
+        : string.Join(" · ", _canonicalSelections.Select(item => item.Instrument.CanonicalSymbol));
 
     partial void OnSelectedDataModeChanged(QuickBacktestDataMode value)
     {
@@ -137,7 +169,23 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsBarSynthetic));
     }
 
-    partial void OnSelectedBrokerChanged(BrokerKind value) => RebuildInstrumentsFor(value);
+    partial void OnParametersChanged(StrategyParametersViewModel? value)
+    {
+        OnPropertyChanged(nameof(EditableParameters));
+        OnPropertyChanged(nameof(HasStrategyParameters));
+        OnPropertyChanged(nameof(CanEditParameters));
+    }
+
+    partial void OnSelectedInstrumentChanged(SignalInstrument? value) =>
+        OnPropertyChanged(nameof(ReviewedInstrumentSummary));
+
+    partial void OnSelectedBrokerChanged(BrokerKind value)
+    {
+        if (_kernelOption?.AuthoredSpecification.Instruments is { Count: > 0 } requested)
+            BindCanonicalInstruments(requested, value);
+        else
+            RebuildInstrumentsFor(value);
+    }
 
     /// <summary>Raised after a run completes so the view can redraw the ScottPlot equity curve.</summary>
     public event EventHandler? EquityCurveUpdated;
@@ -150,6 +198,11 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
     /// </summary>
     public bool Initialize(string? backtestStrategyId, string displayName, bool preferFullTape)
     {
+        _kernelOption = null;
+        _canonicalSelections = [];
+        Parameters = null;
+        NotifyAuthoredSelectionState();
+        OnPropertyChanged(nameof(ReviewedInstrumentSummary));
         StrategyDisplayName = displayName;
 
         if (string.IsNullOrWhiteSpace(backtestStrategyId))
@@ -164,6 +217,7 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
             Status = $"No backtest strategy registered for id '{backtestStrategyId}'.";
             return false;
         }
+        Parameters = StrategyParametersViewModel.FromSchema(_option.Schema);
 
         if (preferFullTape && _brokers.IsAvailable(BrokerKind.Binance))
         {
@@ -174,6 +228,62 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
         }
 
         if (RunCommand.CanExecute(null)) RunCommand.Execute(null);
+        return true;
+    }
+
+    /// <summary>
+    /// Binds Quick Backtest to one installed canonical SDK strategy. The reviewed instrument and
+    /// timeframe remain fixed so the historical run cannot silently test a different artifact.
+    /// </summary>
+    public bool Initialize(StrategyKernelRegistration registration)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        StrategyDisplayName = registration.DisplayName;
+        _option = null;
+        _kernelOption = _kernelRegistry.Find(registration.Id);
+        Parameters = _kernelOption is null
+            ? null
+            : StrategyParametersViewModel.FromSchema(_kernelOption.Schema);
+        NotifyAuthoredSelectionState();
+        if (_kernelOption is null)
+        {
+            Status = $"Canonical strategy '{registration.Id}' is no longer registered.";
+            return false;
+        }
+
+        var specification = _kernelOption.AuthoredSpecification;
+        if (specification.Instruments.Count == 0)
+        {
+            Status = "Quick Backtest requires at least one reviewed strategy instrument.";
+            return false;
+        }
+        if ((specification.DataRequirement & StrategyDataRequirement.Depth) != 0)
+        {
+            Status = "Quick Backtest cannot replay Level-2 depth yet; use a capable live Paper feed.";
+            return false;
+        }
+        if (specification.Timeframe.BarSize is not { } interval ||
+            !TryResolveBarSize(interval, out var barSize))
+        {
+            Status = $"The reviewed timeframe '{specification.Timeframe.UserText}' is not supported by Quick Backtest.";
+            return false;
+        }
+
+        var requested = specification.Instruments[0];
+        if (requested.PreferredBroker is { } preferred && _brokers.IsAvailable(preferred))
+            SelectedBroker = preferred;
+        SelectedBarSize = barSize;
+        SelectedDataMode = QuickBacktestDataMode.BarSynthetic;
+        BindCanonicalInstruments(specification.Instruments, SelectedBroker);
+        if (_canonicalSelections.Count != specification.Instruments.Count)
+        {
+            Status = "One or more reviewed instruments are unavailable in the canonical registry for this data source.";
+            return false;
+        }
+
+        Status = HasStrategyParameters
+            ? $"Review parameters and risk, then replay {ReviewedInstrumentSummary} on one UTC clock."
+            : $"Review risk, then replay {ReviewedInstrumentSummary} on one UTC clock.";
         return true;
     }
 
@@ -197,6 +307,77 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
         SelectedInstrument = Instruments.FirstOrDefault(i => i.Contract.Symbol == keep) ?? Instruments.FirstOrDefault();
     }
 
+    private void BindCanonicalInstruments(
+        IReadOnlyList<AuthoredInstrumentRequestV1> requests,
+        BrokerKind broker)
+    {
+        Instruments.Clear();
+        var selections = new List<CanonicalBacktestSelection>(requests.Count);
+        foreach (var request in requests)
+        {
+            var instrument = _instrumentRegistry.Get(request.InstrumentId);
+            if (instrument is null) continue;
+
+            var brokerSymbol = _instrumentRegistry.ToBrokerSymbol(request.InstrumentId, broker)
+                ?? instrument.CanonicalSymbol;
+            var contract = new Contract(
+                brokerSymbol,
+                SecTypeFor(instrument.AssetClass),
+                instrument.Exchange,
+                instrument.Currency,
+                instrument.Exchange);
+            var choice = new SignalInstrument(
+                $"{instrument.CanonicalSymbol} · {instrument.AssetClass}",
+                instrument.AssetClass.ToString(),
+                contract,
+                broker);
+            Instruments.Add(choice);
+            selections.Add(new CanonicalBacktestSelection(instrument, choice));
+        }
+        _canonicalSelections = selections;
+        SelectedInstrument = selections.FirstOrDefault()?.Choice;
+        if (selections.FirstOrDefault()?.Instrument.TickSize is > 0d)
+            TickSize = selections[0].Instrument.TickSize;
+        OnPropertyChanged(nameof(ReviewedInstrumentSummary));
+    }
+
+    private void NotifyAuthoredSelectionState()
+    {
+        OnPropertyChanged(nameof(IsAuthoredStrategy));
+        OnPropertyChanged(nameof(CanSelectInstrument));
+        OnPropertyChanged(nameof(CanSelectBarSize));
+    }
+
+    partial void OnIsRunningChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanSelectInstrument));
+        OnPropertyChanged(nameof(CanSelectBarSize));
+        OnPropertyChanged(nameof(CanEditParameters));
+    }
+
+    private static bool TryResolveBarSize(TimeSpan interval, out BarSize size)
+    {
+        foreach (var candidate in Enum.GetValues<BarSize>())
+        {
+            if (candidate.ToTimeSpan() != interval) continue;
+            size = candidate;
+            return true;
+        }
+
+        size = default;
+        return false;
+    }
+
+    private static string SecTypeFor(AssetClass assetClass) => assetClass switch
+    {
+        AssetClass.Future => "FUT",
+        AssetClass.Forex => "CASH",
+        AssetClass.Crypto => "CRYPTO",
+        AssetClass.Option => "OPT",
+        AssetClass.Index => "IND",
+        _ => "STK",
+    };
+
     private static IReadOnlyList<SignalInstrument> CryptoInstruments() => new[]
     {
         Crypto("BTCUSDT", "BTC/USDT — Bitcoin"),
@@ -214,10 +395,28 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
     public async Task RunAsync()
     {
         if (IsRunning) return;
-        if (_option is null) { Status ??= "Strategy not initialised."; return; }
+        if (_option is null && _kernelOption is null) { Status ??= "Strategy not initialised."; return; }
         if (SelectedInstrument is null) { Status = "Pick an instrument."; return; }
         if (!_brokers.IsAvailable(SelectedBroker)) { Status = $"{SelectedBroker} is not registered. Pick another data source."; return; }
         if (TickSize <= 0) { Status = "Tick size must be greater than zero."; return; }
+        if (MaxPositionPerSymbol <= 0) { Status = "Maximum position must be greater than zero."; return; }
+        if (!double.IsFinite(MaxDailyLoss) || MaxDailyLoss <= 0) { Status = "Maximum daily loss must be a finite positive value."; return; }
+        if (Parameters?.Parameters.Validate() is { Count: > 0 } parameterErrors)
+        {
+            Status = $"Strategy parameters are invalid: {string.Join(" ", parameterErrors)}";
+            return;
+        }
+        if (_kernelOption is not null && IsFullTape &&
+            _kernelOption.DataRequirement.HasFlag(StrategyDataRequirement.Bars))
+        {
+            Status = "This authored strategy requires completed bars. Use bar-synthetic replay; real-tape mode does not manufacture broker candles.";
+            return;
+        }
+        if (_kernelOption is not null && _canonicalSelections.Count > 1 && IsFullTape)
+        {
+            Status = "Multi-instrument Quick Backtest currently requires completed-bar replay; historical tapes cannot yet be synchronized by canonical instrument.";
+            return;
+        }
 
         IsRunning = true;
         Trades.Clear();
@@ -242,6 +441,11 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
 
             if (SelectedDataMode == QuickBacktestDataMode.FullTapeRealTrades)
             {
+                if (!client.MarketDataCapabilities.SupportsHistoricalTrades)
+                {
+                    Status = $"{SelectedBroker} does not provide historical trade tape. Choose a capable broker or use completed-bar replay.";
+                    return;
+                }
                 Status = $"Fetching the real {contract.Symbol} tape from {SelectedBroker} (up to {MaxTrades:N0} prints)…";
                 IReadOnlyList<TradeTick> tape;
                 try
@@ -281,39 +485,98 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                Status = $"Fetching {SelectedBarSize} bars from {SelectedBroker}…";
-                var bars = await client.RequestHistoricalBarsAsync(contract, SelectedBarSize, SelectedLookback.Duration, ct).ConfigureAwait(true);
-                if (bars.Count == 0)
+                if (!client.MarketDataCapabilities.SupportsHistoricalBars)
                 {
-                    Status = $"No bars returned for '{contract.Symbol}' from {SelectedBroker}. Try a different instrument / bar size.";
+                    Status = $"{SelectedBroker} does not provide historical bars, so it cannot run this Quick Backtest.";
                     return;
                 }
+                IReadOnlyList<CanonicalBacktestSelection> selections = _kernelOption is null
+                    ? [new CanonicalBacktestSelection(
+                        new Instrument(InstrumentId.None, contract.Symbol, AssetClass.Equity, contract.Exchange, contract.Currency, TickSize, 1d),
+                        SelectedInstrument!)]
+                    : _canonicalSelections;
+                Status = $"Fetching {SelectedBarSize} bars for {string.Join(", ", selections.Select(item => item.Instrument.CanonicalSymbol))} from {SelectedBroker}…";
+                var histories = new List<(CanonicalBacktestSelection Selection, IReadOnlyList<Bar> Bars)>(selections.Count);
+                foreach (var selection in selections)
+                {
+                    var fetchedBars = await client.RequestHistoricalBarsAsync(
+                        selection.Choice.Contract,
+                        SelectedBarSize,
+                        SelectedLookback.Duration,
+                        ct).ConfigureAwait(true);
+                    if (fetchedBars.Count == 0)
+                    {
+                        Status = $"No bars returned for '{selection.Choice.Contract.Symbol}' from {SelectedBroker}; the basket was not partially replayed.";
+                        return;
+                    }
+                    histories.Add((selection, fetchedBars));
+                }
 
-                Status = $"Replaying {bars.Count} {SelectedBarSize} bars through the engine…";
-                quotesPath = Path.Combine(Path.GetTempPath(), $"quick-bt-{Guid.NewGuid():N}.parquet");
-                await WriteSyntheticTicksAsync(quotesPath, bars, SelectedBarSize.ToTimeSpan(), TickSize, ct).ConfigureAwait(true);
+                var primaryBars = histories[0].Bars;
+                var series = histories.Select(item => new BacktestBarSeries(
+                    item.Selection.Instrument.Id,
+                    item.Selection.Choice.Contract,
+                    SelectedBarSize,
+                    item.Bars,
+                    item.Selection.Instrument.TickSize > 0d ? item.Selection.Instrument.TickSize : TickSize,
+                    item.Selection.Instrument.Multiplier > 0d ? item.Selection.Instrument.Multiplier : 1d)).ToArray();
+                var coverage = AnalyzeCoverage(histories);
+                if (histories.Count > 1 && coverage.CommonBoundaryCount != coverage.UnionBoundaryCount)
+                {
+                    FeedQuality = coverage.Description;
+                    Status = "The reviewed instruments do not have identical completed-bar boundaries. " +
+                             "Quick Backtest stopped instead of forward-filling or evaluating a stale pair leg.";
+                    return;
+                }
+                Status = $"Replaying {histories.Sum(item => item.Bars.Count):N0} completed bars across {histories.Count} instrument(s) on one UTC clock…";
 
                 config = new BacktestConfig(
                     Contract: contract,
-                    TickDataPath: quotesPath,
+                    TickDataPath: string.Empty,
                     TickSize: TickSize,
                     SlippageTicks: 1,
                     ContractMultiplier: 1,
                     StartingCash: 100_000,
                     FeeModel: new BpsFeeModel(FeeBps),
-                    Source: BacktestDataSource.ParquetFile);
-                FeedQuality = "Synthetic L1 from bars (q ≈ 0.4) — degraded for tape-primary strategies; rough sniff only.";
+                    Source: BacktestDataSource.ParquetFile,
+                    ReplayBars: series.Length == 1 ? primaryBars : null,
+                    ReplayBarSize: SelectedBarSize,
+                    ReplayBarSeries: series.Length > 1 ? series : null);
+                FeedQuality = _kernelOption is null
+                    ? "Completed broker bars + deterministic synthetic L1 fills (q ≈ 0.4 for tape logic)."
+                    : $"Reviewed SDK bars + contract-scoped synthetic L1 fills. {coverage.Description} Missing bars are not forward-filled; orders are risk-gated.";
             }
 
-            var strategy = _option.Create(contract);
-            var result = await Task.Run(() => _session.RunAsync(config, strategy, risk: null, ct), ct).ConfigureAwait(true);
+            IBacktestStrategy strategy = _kernelOption is { } authored
+                ? new SdkStrategyBacktestAdapter(
+                    authored.Create(),
+                    _canonicalSelections.Select(item => new SdkBacktestInstrument(
+                        item.Instrument.Id,
+                        item.Choice.Contract)).ToArray(),
+                    SelectedBarSize,
+                    SelectedBroker,
+                    Parameters?.Parameters.ToDictionary())
+                : _option!.Create(contract, Parameters?.Parameters);
+            var risk = new RiskManager(new RiskOptions
+            {
+                MaxPositionPerSymbol = MaxPositionPerSymbol,
+                MaxDailyLoss = MaxDailyLoss,
+                DefaultContractMultiplier = config.ContractMultiplier,
+                ContractMultipliersBySymbol = (config.ReplayBarSeries ?? [])
+                    .ToDictionary(series => series.Contract.Symbol, series => series.ContractMultiplier, StringComparer.Ordinal),
+            });
+            var result = await Task.Run(
+                () => _session.RunAsync(config, strategy, risk, ct),
+                ct).ConfigureAwait(true);
 
             foreach (var t in result.Trades) Trades.Add(t);
             foreach (var p in result.EquityCurve) EquityCurve.Add(p);
             Stats = result.Stats;
             TotalPnl = result.EndingCash - result.StartingCash;
             Status = $"Done. {result.Trades.Count} trades, P&L {TotalPnl.ToString("C2", CultureInfo.CurrentCulture)} " +
-                     $"(fees {result.TotalFees.ToString("C2", CultureInfo.CurrentCulture)}).";
+                     $"(fees {result.TotalFees.ToString("C2", CultureInfo.CurrentCulture)}; " +
+                     $"risk max {MaxPositionPerSymbol:N0} units / " +
+                     $"{MaxDailyLoss.ToString("C0", CultureInfo.CurrentCulture)} daily loss).";
             EquityCurveUpdated?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException)
@@ -381,42 +644,33 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// Projects OHLCV bars into a synthetic quote stream (open → low/high by direction → close, four
-    /// prints per bar, one-tick-wide). No real prints, so a tape-primary strategy runs degraded.
-    /// Mirrors the LSE backtester's synthesizer.
-    /// </summary>
-    private static async Task WriteSyntheticTicksAsync(
-        string path, IReadOnlyList<Bar> bars, TimeSpan barSpan, double tickSize, CancellationToken ct)
-    {
-        var half = Math.Max(tickSize, 1e-9) / 2.0;
-        var step = barSpan / 4;
-
-        await using var writer = new ParquetTickWriter(path);
-        foreach (var bar in bars)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            var path4 = bar.Close >= bar.Open
-                ? new[] { bar.Open, bar.Low, bar.High, bar.Close }
-                : new[] { bar.Open, bar.High, bar.Low, bar.Close };
-            var sizePer = Math.Max(1, bar.Volume / 4);
-
-            for (var i = 0; i < path4.Length; i++)
-            {
-                var px = path4[i];
-                var ts = bar.TimestampUtc + step * i;
-                await writer.WriteAsync(new Tick(ts, px - half, px + half, sizePer, sizePer), ct).ConfigureAwait(false);
-            }
-        }
-    }
-
     private void TryDelete(string? path)
     {
         if (path is null) return;
         try { File.Delete(path); }
         catch (Exception ex) { _logger.LogDebug(ex, "Could not delete temp file {Path}", path); }
     }
+
+    private static ReplayCoverage AnalyzeCoverage(
+        IReadOnlyList<(CanonicalBacktestSelection Selection, IReadOnlyList<Bar> Bars)> histories)
+    {
+        var timestampSets = histories
+            .Select(item => item.Bars.Select(bar => bar.TimestampUtc).ToHashSet())
+            .ToArray();
+        var union = timestampSets.SelectMany(set => set).ToHashSet();
+        var common = timestampSets.Length == 0
+            ? 0
+            : timestampSets.Skip(1).Aggregate(
+                new HashSet<DateTime>(timestampSets[0]),
+                (current, next) => { current.IntersectWith(next); return current; }).Count;
+        return new ReplayCoverage(
+            common,
+            union.Count,
+            $"Coverage: {common:N0}/{union.Count:N0} UTC bar boundaries shared by every instrument.");
+    }
+
+    private sealed record CanonicalBacktestSelection(Instrument Instrument, SignalInstrument Choice);
+    private sealed record ReplayCoverage(int CommonBoundaryCount, int UnionBoundaryCount, string Description);
 }
 
 /// <summary>A named lookback window for the Quick-backtest control (label + duration).</summary>

@@ -12,6 +12,8 @@
   <ItemGroup>
     <!-- Portable VM layer (LiveSignalStrategyViewModelBase, ViewModelBase). -->
     <ProjectReference Include="..\TradingTerminal.UI.Core\TradingTerminal.UI.Core.csproj" />
+    <ProjectReference Include="..\..\Sdk\DaxAlgo.Sdk\DaxAlgo.Sdk.csproj" />
+    <ProjectReference Include="..\..\Pipeline\TradingTerminal.Sandbox\TradingTerminal.Sandbox.csproj" />
   </ItemGroup>
 
   <ItemGroup>

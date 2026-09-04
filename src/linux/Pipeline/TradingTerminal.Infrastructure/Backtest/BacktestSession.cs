@@ -12,10 +12,10 @@ namespace TradingTerminal.Infrastructure.Backtest;
 /// Drives a single backtest end-to-end:
 ///   1. Set up the simulated clock, fill model, order book, and router.
 ///   2. Forward order events to the strategy and track fills for the trade ledger.
-///   3. Iterate the tick stream (parquet file OR canonical local store, picked by
-///      <see cref="BacktestConfig.Source"/>): advance the clock, run the order book, sample
-///      equity at most once per minute, and dispatch <c>OnTickAsync</c>.
-///   4. After the last tick, flush the final equity point and close out the strategy.
+///   3. Iterate completed bars, a parquet stream, or the canonical local store: advance the clock,
+///      run the order book, sample equity at most once per minute, and dispatch the matching quote,
+///      trade, or completed-bar callback.
+///   4. After the last replay event, flush the final equity point and close out the strategy.
 ///
 /// Single-threaded by design — the engine has one logical timeline and we keep all state
 /// transitions on the caller's task. Concurrency belongs at the parameter-sweep layer
@@ -48,6 +48,11 @@ public sealed class BacktestSession : IBacktestSession
         IRiskManager? risk,
         CancellationToken ct = default)
     {
+        if (config.ReplayBarSeries is { Count: > 1 } && strategy is not IInstrumentAwareBacktestStrategy)
+        {
+            throw new InvalidOperationException(
+                "Multi-instrument replay requires an instrument-aware backtest strategy.");
+        }
         var clock = new SimulatedClock();
         var fillModel = new L1FillModel(config.TickSize, config.SlippageTicks);
         var orderBook = new SimulatedOrderBook(clock, fillModel);
@@ -57,15 +62,25 @@ public sealed class BacktestSession : IBacktestSession
         var equity = new List<EquityPoint>();
         var fills = new List<FillRecord>();
         DateTime? lastSample = null;
-        Tick? lastTickForFillContext = null;
+        var lastTicks = new Dictionary<Contract, Tick>();
+        var marks = new Dictionary<Contract, double>();
+        var multipliers = (config.ReplayBarSeries ?? [])
+            .ToDictionary(series => series.Contract, series => series.ContractMultiplier);
+        if (!multipliers.ContainsKey(config.Contract))
+            multipliers[config.Contract] = config.ContractMultiplier;
 
         var orderEventTask = Task.CompletedTask;
         using var sub = router.OrderEvents.Subscribe(evt =>
         {
             if (evt.LastFillQuantity > 0 && evt.LastFillPrice is { } px)
             {
-                ledger.OnFill(evt.TimestampUtc, evt.Side, evt.LastFillQuantity, px, evt.Liquidity);
-                var mid = lastTickForFillContext is { } lt ? (lt.Bid + lt.Ask) * 0.5 : px;
+                if (!router.TryGetContract(evt.ClientOrderId, out var contract) || contract is null)
+                    throw new InvalidOperationException($"No contract is bound to fill {evt.ClientOrderId}.");
+                var multiplier = multipliers.TryGetValue(contract, out var configuredMultiplier)
+                    ? configuredMultiplier
+                    : config.ContractMultiplier;
+                ledger.OnFill(contract, evt.TimestampUtc, evt.Side, evt.LastFillQuantity, px, evt.Liquidity, multiplier);
+                var mid = lastTicks.TryGetValue(contract, out var lt) ? (lt.Bid + lt.Ask) * 0.5 : px;
                 fills.Add(new FillRecord(
                     TimestampUtc: evt.TimestampUtc,
                     ClientOrderId: evt.ClientOrderId,
@@ -73,7 +88,8 @@ public sealed class BacktestSession : IBacktestSession
                     Quantity: evt.LastFillQuantity,
                     Price: px,
                     MidAtFill: mid,
-                    Liquidity: evt.Liquidity));
+                    Liquidity: evt.Liquidity,
+                    Symbol: contract.Symbol));
             }
 
             orderEventTask = orderEventTask.ContinueWith(
@@ -85,50 +101,79 @@ public sealed class BacktestSession : IBacktestSession
 
         await strategy.OnStartAsync(clock, router, ct).ConfigureAwait(false);
 
-        Tick? lastTick = null;
+        var batch = new List<BacktestEvent>();
+        DateTime? batchTimestamp = null;
         await foreach (var evt in BacktestTickSource.Resolve(config, _store, ct))
         {
-            clock.SetTo(evt.TimestampUtc);
-            await orderEventTask.ConfigureAwait(false);
-
-            if (evt.Quote is { } tick)
+            if (batchTimestamp is { } timestamp && evt.TimestampUtc != timestamp)
             {
-                lastTickForFillContext = tick;
-                orderBook.OnTick(tick);
-                await strategy.OnTickAsync(tick, clock, router, ct).ConfigureAwait(false);
-
-                var mid = (tick.Bid + tick.Ask) * 0.5;
-                if (lastSample is null || (tick.TimestampUtc - lastSample.Value).TotalSeconds >= 60)
-                {
-                    equity.Add(new EquityPoint(tick.TimestampUtc, ledger.Equity(mid)));
-                    lastSample = tick.TimestampUtc;
-                }
-                lastTick = tick;
+                await ProcessBatchAsync(batch, timestamp).ConfigureAwait(false);
+                batch.Clear();
             }
-            else if (evt.Trade is { } trade)
-            {
-                // Trades don't drive the L1 fill model or update fill-context bid/ask — they
-                // only inform strategies that consume the tape. Equity is sampled from quotes.
-                await strategy.OnTradeAsync(trade, clock, router, ct).ConfigureAwait(false);
-            }
+            batchTimestamp = evt.TimestampUtc;
+            batch.Add(evt);
         }
+        if (batchTimestamp is { } finalTimestamp)
+            await ProcessBatchAsync(batch, finalTimestamp).ConfigureAwait(false);
 
         await orderEventTask.ConfigureAwait(false);
         await strategy.OnEndAsync(clock, router, ct).ConfigureAwait(false);
 
-        if (lastTick is { } finalTick)
-        {
-            var mid = (finalTick.Bid + finalTick.Ask) * 0.5;
-            equity.Add(new EquityPoint(finalTick.TimestampUtc, ledger.Equity(mid)));
-        }
+        if (lastTicks.Count > 0 && batchTimestamp is { } finalEventTime)
+            equity.Add(new EquityPoint(finalEventTime, ledger.Equity(marks)));
 
-        var endingCash = lastTick is { } t
-            ? ledger.Equity((t.Bid + t.Ask) * 0.5)
-            : config.StartingCash;
+        var endingCash = lastTicks.Count > 0 ? ledger.Equity(marks) : config.StartingCash;
 
         var bare = new BacktestResult(
             ledger.Trades, equity, config.StartingCash, endingCash,
-            TotalFees: ledger.TotalFees, Fills: fills, Signals: router.Signals);
+            TotalFees: ledger.TotalFees,
+            Fills: fills,
+            Signals: router.Signals,
+            EndingPositions: ledger.Positions);
         return bare with { Stats = StatisticsCalculator.Calculate(bare) };
+
+        async Task ProcessBatchAsync(IReadOnlyList<BacktestEvent> events, DateTime timestamp)
+        {
+            clock.SetTo(timestamp);
+            await orderEventTask.ConfigureAwait(false);
+
+            var sawQuote = false;
+            foreach (var replayEvent in events.Where(item => item.Quote is not null))
+            {
+                var tick = replayEvent.Quote!;
+                lastTicks[replayEvent.Contract] = tick;
+                marks[replayEvent.Contract] = (tick.Bid + tick.Ask) * 0.5d;
+                orderBook.OnTick(replayEvent.Contract, tick);
+                sawQuote = true;
+            }
+            await orderEventTask.ConfigureAwait(false);
+
+            if (strategy is IInstrumentAwareBacktestStrategy aware)
+            {
+                await aware.OnMarketEventBatchAsync(
+                    events.Select(item => item.ToPublic()).ToArray(),
+                    clock,
+                    router,
+                    ct).ConfigureAwait(false);
+            }
+            else
+            {
+                foreach (var replayEvent in events)
+                {
+                    if (replayEvent.Quote is { } tick)
+                        await strategy.OnTickAsync(tick, clock, router, ct).ConfigureAwait(false);
+                    else if (replayEvent.Trade is { } trade)
+                        await strategy.OnTradeAsync(trade, clock, router, ct).ConfigureAwait(false);
+                    else if (replayEvent.Bar is { } bar)
+                        await strategy.OnBarAsync(bar, clock, router, ct).ConfigureAwait(false);
+                }
+            }
+
+            if (sawQuote && (lastSample is null || (timestamp - lastSample.Value).TotalSeconds >= 60))
+            {
+                equity.Add(new EquityPoint(timestamp, ledger.Equity(marks)));
+                lastSample = timestamp;
+            }
+        }
     }
 }

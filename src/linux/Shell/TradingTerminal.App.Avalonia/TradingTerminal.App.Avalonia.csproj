@@ -18,6 +18,8 @@
     <ProjectReference Include="..\..\..\linux\UI\TradingTerminal.UI.Core\TradingTerminal.UI.Core.csproj" />
     <!-- The headless stack (brokers, backtest engine + strategy catalog) â€” WPF-free on net9.0. -->
     <ProjectReference Include="..\..\..\linux\Pipeline\TradingTerminal.Infrastructure\TradingTerminal.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\linux\Pipeline\TradingTerminal.Sandbox\TradingTerminal.Sandbox.csproj" />
+    <ProjectReference Include="..\..\..\linux\Sandbox\TradingTerminal.Sandbox.Runtime\TradingTerminal.Sandbox.Runtime.csproj" />
     <ProjectReference Include="..\..\..\linux\Pipeline\TradingTerminal.MarketData\TradingTerminal.MarketData.csproj" />
     <!-- AI tool windows (portable VMs; file dialogs via the UiFile seam) + the shared analyst seam. -->
     <ProjectReference Include="..\..\..\linux\AI\TradingTerminal.Ai\TradingTerminal.Ai.csproj" />
@@ -26,6 +28,7 @@
     <ProjectReference Include="..\..\..\linux\AI\TradingTerminal.Ai.MlFeatures\TradingTerminal.Ai.MlFeatures.csproj" />
     <ProjectReference Include="..\..\..\linux\AI\TradingTerminal.Ai.BacktestAnalysis\TradingTerminal.Ai.BacktestAnalysis.csproj" />
     <ProjectReference Include="..\..\..\linux\AI\TradingTerminal.Ai.PaperLab\TradingTerminal.Ai.PaperLab.csproj" />
+    <ProjectReference Include="..\..\..\linux\Sdk\DaxAlgo.Package\DaxAlgo.Package.csproj" />
     <ProjectReference Include="..\..\..\linux\AI\DaxAlgo.Daxq.Host\DaxAlgo.Daxq.Host.csproj" />
     <ProjectReference Include="..\..\..\linux\AI\DaxAlgo.FootprintTransformer\DaxAlgo.FootprintTransformer.csproj" />
     <!-- Tools windows. -->

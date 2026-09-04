@@ -1,6 +1,6 @@
 # TradingTerminal.Core / Strategies — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `330db91800ba`. Declaration lines only;
+Generated from source fingerprint `e91d50e75733`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Core/TradingTerminal.Core/Strategies/Authoring/AiModelChoice.cs
@@ -36,41 +36,42 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
    32: public static class CodegenEfforts
    35: public static string? Wire(this CodegenEffort effort) => effort switch
    47: public static CodegenEffort Parse(string? value) => value?.Trim().ToLowerInvariant() switch
-   59: public sealed record CodegenMessage(CodegenRole Role, string Content);
-   72: public sealed record CodegenUsage(int InputTokens, int OutputTokens, int CachedInputTokens = 0)
-   74: public static CodegenUsage None { get; } = new(0, 0);
-   76: public int TotalTokens => InputTokens + OutputTokens;
-   79: public bool IsReported => InputTokens > 0 || OutputTokens > 0;
-   81: public CodegenUsage Add(CodegenUsage? other) => other is null
-   89: public enum StrategyCodegenOutputContract
-  102: public sealed record StrategyCodegenRequest(
-  110: public StrategyCodegenOutputContract OutputContract { get; init; } =
-  126: public sealed record StrategyCodegenResponse(
-  135: public IReadOnlyList<StrategyFile> FileList => Files ?? (string.IsNullOrWhiteSpace(Code)
-  140: public bool HasFiles => FileList.Count > 0;
-  142: public static StrategyCodegenResponse Ok(string code, string rawText) => new(true, code, rawText, null);
-  144: public static StrategyCodegenResponse Ok(IReadOnlyList<StrategyFile> files, string rawText, CodegenUsage? usage = null) =>
-  148: public static StrategyCodegenResponse Reply(string rawText, CodegenUsage? usage = null) =>
-  151: public static StrategyCodegenResponse Fail(string error) => new(false, null, null, error);
-  160: public abstract record CodegenEvent
-  165: public sealed record TextDelta(string Text) : CodegenEvent;
-  169: public sealed record UsageUpdate(CodegenUsage Usage) : CodegenEvent;
-  172: public sealed record Completed(StrategyCodegenResponse Response) : CodegenEvent;
-  187: public interface IStrategyCodegenClient
-  191:     string ProviderId { get; }
-  194:     string DisplayName { get; }
-  198:     bool IsAvailable { get; }
-  202:     string Model => string.Empty;
-  206:     CodegenEffort Effort => CodegenEffort.Default;
-  210:     IReadOnlyList<string> KnownModels => [];
-  215:     Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken ct = default) =>
-  216:     Task.FromResult<IReadOnlyList<string>>([]);
-  222:     Task<StrategyCodegenResponse> GenerateAsync(StrategyCodegenRequest request, CancellationToken ct = default);
-  235:     async IAsyncEnumerable<CodegenEvent> StreamAsync(
-  236:     StrategyCodegenRequest request,
-  239:     var response = await GenerateAsync(request, ct).ConfigureAwait(false);
-  240:     if (response.Usage is { IsReported: true } usage) yield return new CodegenEvent.UsageUpdate(usage);
-  241:     yield return new CodegenEvent.Completed(response);
+   59: public sealed record CodegenImageInput(
+   69: public sealed record CodegenMessage(
+   85: public sealed record CodegenUsage(int InputTokens, int OutputTokens, int CachedInputTokens = 0)
+   87: public static CodegenUsage None { get; } = new(0, 0);
+   89: public int TotalTokens => InputTokens + OutputTokens;
+   92: public bool IsReported => InputTokens > 0 || OutputTokens > 0;
+   94: public CodegenUsage Add(CodegenUsage? other) => other is null
+  102: public enum StrategyCodegenOutputContract
+  115: public sealed record StrategyCodegenRequest(
+  123: public StrategyCodegenOutputContract OutputContract { get; init; } =
+  139: public sealed record StrategyCodegenResponse(
+  148: public IReadOnlyList<StrategyFile> FileList => Files ?? (string.IsNullOrWhiteSpace(Code)
+  153: public bool HasFiles => FileList.Count > 0;
+  155: public static StrategyCodegenResponse Ok(string code, string rawText) => new(true, code, rawText, null);
+  157: public static StrategyCodegenResponse Ok(IReadOnlyList<StrategyFile> files, string rawText, CodegenUsage? usage = null) =>
+  161: public static StrategyCodegenResponse Reply(string rawText, CodegenUsage? usage = null) =>
+  164: public static StrategyCodegenResponse Fail(string error) => new(false, null, null, error);
+  173: public abstract record CodegenEvent
+  178: public sealed record TextDelta(string Text) : CodegenEvent;
+  182: public sealed record UsageUpdate(CodegenUsage Usage) : CodegenEvent;
+  185: public sealed record Completed(StrategyCodegenResponse Response) : CodegenEvent;
+  200: public interface IStrategyCodegenClient
+  204:     string ProviderId { get; }
+  207:     string DisplayName { get; }
+  211:     bool IsAvailable { get; }
+  215:     string Model => string.Empty;
+  219:     CodegenEffort Effort => CodegenEffort.Default;
+  223:     IReadOnlyList<string> KnownModels => [];
+  228:     Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken ct = default) =>
+  229:     Task.FromResult<IReadOnlyList<string>>([]);
+  235:     Task<StrategyCodegenResponse> GenerateAsync(StrategyCodegenRequest request, CancellationToken ct = default);
+  248:     async IAsyncEnumerable<CodegenEvent> StreamAsync(
+  249:     StrategyCodegenRequest request,
+  252:     var response = await GenerateAsync(request, ct).ConfigureAwait(false);
+  253:     if (response.Usage is { IsReported: true } usage) yield return new CodegenEvent.UsageUpdate(usage);
+  254:     yield return new CodegenEvent.Completed(response);
 ```
 
 ## src/linux/Core/TradingTerminal.Core/Strategies/Authoring/IStrategyCompiler.cs
@@ -371,6 +372,97 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
   155: public StrategyModuleRuntimeContractV1 Runtime { get; init; }
 ```
 
+## src/linux/Core/TradingTerminal.Core/Strategies/Generation/AuthoredUnitCompilationV1.cs
+```cs
+    8: public sealed record CompiledAuthoredUnitV1(
+   17: public sealed record AuthoredUnitCompilationResultV1(
+   22: public IEnumerable<StrategyDiagnostic> Errors =>
+   25: public static AuthoredUnitCompilationResultV1 Failed(IReadOnlyList<StrategyDiagnostic> diagnostics) =>
+   28: public static AuthoredUnitCompilationResultV1 Succeeded(
+   38: public interface IAuthoredUnitCompilerV1
+   40:     AuthoredUnitCompilationResultV1 Compile(
+   41:     AuthoredUnitSpecificationV1 specification,
+   42:     StrategyScript script);
+```
+
+## src/linux/Core/TradingTerminal.Core/Strategies/Generation/AuthoredUnitSpecificationV1.cs
+```cs
+   10: public enum AuthoredUnitKindV1
+   17: public enum AuthoredUnitSourceKindV1
+   28: public enum ChartReferenceSimilarityV1
+   39: public enum AuthoredChartPaneRoleV1
+   49: public enum AuthoredChartLayerKindV1
+   65: public enum AuthoredUnitExecutionIntentV1
+   76: public sealed record AuthoredChartReferenceV1(
+   88: public sealed record AuthoredChartReferenceResolutionV1(
+   99: public sealed record AuthoredChartReferenceInspectionV1(
+  115: public sealed record AuthoredInstrumentRequestV1(
+  123: public sealed record AuthoredUnitTimeframeV1(string UserText, TimeSpan? BarSize);
+  129: public sealed record AuthoredUnitParameterV1(
+  140: public sealed record AuthoredChartPaneV1(
+  150: public sealed record AuthoredChartLayerV1(
+  158: public sealed record AuthoredChartCompositionV1(
+  166: public sealed record AuthoredUnitSpecificationV1(
+  184: public const string CurrentSchemaVersion = "authored-unit-spec/v1";
+  187: public sealed record AuthoredUnitSpecificationIssueV1(string Code, string Path, string Message);
+  193: public sealed record AuthoredUnitInstrumentCandidateV1(
+  206: public sealed record AuthoredUnitSpecificationGenerationRequestV1(
+  215: public sealed record AuthoredUnitSpecificationGenerationIssueV1(
+  220: public sealed record AuthoredUnitSpecificationGenerationResultV1(
+  226: public bool Success => Specification is not null && Issues.Count == 0;
+  233: public interface IAuthoredUnitSpecificationGeneratorV1
+  235:     Task<AuthoredUnitSpecificationGenerationResultV1> GenerateAsync(
+  236:     IStrategyCodegenClient provider,
+  237:     AuthoredUnitSpecificationGenerationRequestV1 request,
+  238:     CancellationToken cancellationToken = default);
+  242: public sealed record AuthoredUnitIntentClassificationV1(
+  248: public sealed record AuthoredUnitIntentClassificationResultV1(
+  253: public bool Success => Classification is not null &&
+  258: public interface IAuthoredUnitIntentClassifierV1
+  260:     Task<AuthoredUnitIntentClassificationResultV1> ClassifyAsync(
+  261:     IStrategyCodegenClient provider,
+  262:     string rawRequest,
+  263:     IReadOnlyList<AuthoredChartReferenceV1>? chartReferences = null,
+  264:     CancellationToken cancellationToken = default);
+  271: public sealed record AuthoredUnitSourceGenerationRequestV1(
+  274: public sealed record AuthoredUnitSourceGenerationIssueV1(
+  284: public sealed record AuthoredUnitSourceGenerationResultV1(
+  291: public bool Success => Script is not null &&
+  300: public interface IAuthoredUnitSourceGeneratorV1
+  302:     Task<AuthoredUnitSourceGenerationResultV1> GenerateAsync(
+  303:     IStrategyCodegenClient provider,
+  304:     AuthoredUnitSourceGenerationRequestV1 request,
+  305:     CancellationToken cancellationToken = default);
+  309: public static class AuthoredUnitSpecificationValidatorV1
+  317: public static IReadOnlyList<AuthoredUnitSpecificationIssueV1> Validate(
+  321: public static IReadOnlyList<AuthoredUnitSpecificationIssueV1> ValidateForLaunch(
+  761: public static class AuthoredUnitSpecificationCanonicalJsonV1
+  763: public static string Serialize(AuthoredUnitSpecificationV1 specification) =>
+  766: public static AuthoredUnitSpecificationV1 Deserialize(string json) =>
+  769: public static string Hash(AuthoredUnitSpecificationV1 specification) =>
+  772: public static string Canonicalize(string json) =>
+```
+
+## src/linux/Core/TradingTerminal.Core/Strategies/Generation/ChartPatternSimilarityV1.cs
+```cs
+   11: public sealed record ChartPatternFingerprintV1(
+   15: public enum ChartPatternCandidateScopeV1
+   23: public sealed record ChartPatternSearchRequestV1(
+   41: public sealed record ChartPatternMatchV1(
+   57: public sealed record ChartPatternSearchResultV1(
+   72: public sealed record ChartPatternSelectionV1(
+   77: public interface IChartPatternSearchV1
+   79:     Task<ChartPatternSearchResultV1> SearchAsync(
+   80:     ChartPatternSearchRequestV1 request,
+   81:     CancellationToken cancellationToken = default);
+   85: public static class ChartPatternSimilarityCalculatorV1
+   87: public const int MinimumPathPoints = 8;
+   88: public const int MaximumPathPoints = 64;
+   90: public static void ValidateFingerprint(ChartPatternFingerprintV1 fingerprint)
+  112: public static ChartPatternScoreV1 Score(
+  227: public sealed record ChartPatternScoreV1(
+```
+
 ## src/linux/Core/TradingTerminal.Core/Strategies/Generation/ConfirmedStrategyIntentV1.cs
 ```cs
     9: public enum StrategyIntentKindV1
@@ -542,23 +634,26 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 
 ## src/linux/Core/TradingTerminal.Core/Strategies/Parameters/StrategyParameter.cs
 ```cs
-   14: public sealed record StrategyParameter
-   17: public required string Key { get; init; }
-   20: public required string DisplayName { get; init; }
-   23: public ParameterKind Kind { get; init; }
-   26: public object? Default { get; init; }
-   29: public double? Min { get; init; }
-   32: public double? Max { get; init; }
-   35: public double? Step { get; init; }
-   38: public IReadOnlyList<string>? Choices { get; init; }
-   41: public string? Description { get; init; }
-   44: public string? Group { get; init; }
-   47: public string? Unit { get; init; }
-   52: public static StrategyParameter Int(
-   63: public static StrategyParameter Number(
-   74: public static StrategyParameter Bool(
-   83: public static StrategyParameter Choice(
-   92: public static StrategyParameter Text(
+   16: public sealed record StrategyParameter
+   19: public required string Key { get; init; }
+   22: public string Name => Key;
+   25: public required string DisplayName { get; init; }
+   28: public ParameterKind Kind { get; init; }
+   31: public object? Default { get; init; }
+   34: public double? Min { get; init; }
+   37: public double? Max { get; init; }
+   40: public double? Step { get; init; }
+   43: public IReadOnlyList<string>? Choices { get; init; }
+   46: public string? Description { get; init; }
+   49: public string? Group { get; init; }
+   52: public string? Unit { get; init; }
+   57: public static StrategyParameter Int(
+   68: public static StrategyParameter Number(
+   79: public static StrategyParameter Bool(
+   88: public static StrategyParameter Choice(
+   97: public static StrategyParameter Enum<TEnum>(
+  119: public static StrategyParameter Instrument(
+  132: public static StrategyParameter Text(
 ```
 
 ## src/linux/Core/TradingTerminal.Core/Strategies/Parameters/StrategyParameterSchema.cs
@@ -575,18 +670,21 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 
 ## src/linux/Core/TradingTerminal.Core/Strategies/Parameters/StrategyParameters.cs
 ```cs
-   15: public sealed class StrategyParameters
-   17: public StrategyParameters(StrategyParameterSchema schema, IReadOnlyDictionary<string, object?>? values = null)
-   37: public StrategyParameterSchema Schema { get; }
-   40: public void Set(string key, object? value)
-   46: public int GetInt(string key) => (int)GetLong(key);
-   48: public long GetLong(string key) =>
-   51: public double GetDouble(string key) =>
-   54: public bool GetBool(string key) =>
-   57: public string GetString(string key) =>
-   61: public object? GetRaw(string key) => _values[Require(key).Key];
-   64: public IReadOnlyDictionary<string, object?> ToDictionary() =>
-   72: public IReadOnlyList<string> Validate()
+   16: public sealed class StrategyParameters
+   18: public StrategyParameters(StrategyParameterSchema schema, IReadOnlyDictionary<string, object?>? values = null)
+   38: public StrategyParameterSchema Schema { get; }
+   41: public void Set(string key, object? value)
+   47: public int GetInt(string key) => (int)GetLong(key);
+   49: public long GetLong(string key) =>
+   52: public double GetDouble(string key) =>
+   55: public bool GetBool(string key) =>
+   58: public string GetString(string key) =>
+   62: public string GetText(string key) => GetString(key);
+   65: public TEnum GetEnum<TEnum>(string key) where TEnum : struct, System.Enum
+   75: public InstrumentId GetInstrument(string key) =>
+   81: public object? GetRaw(string key) => _values[Require(key).Key];
+   84: public IReadOnlyDictionary<string, object?> ToDictionary() =>
+   92: public IReadOnlyList<string> Validate()
 ```
 
 ## src/linux/Core/TradingTerminal.Core/Strategies/PluginFaultEvents.cs
@@ -645,9 +743,9 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 ## src/linux/Core/TradingTerminal.Core/Strategies/StrategyBrokerCapability.cs
 ```cs
    12: public static class StrategyBrokerCapability
-   19: public static readonly IReadOnlyList<BrokerKind> TapeBrokers = new[]
-   30: public static readonly IReadOnlyList<BrokerKind> DepthBrokers = new[]
-   48: public static IReadOnlyList<BrokerKind> ForRequirement(StrategyDataRequirement requirement)
+   25: public static readonly IReadOnlyList<BrokerKind> TapeBrokers =
+   31: public static readonly IReadOnlyList<BrokerKind> DepthBrokers =
+   39: public static IReadOnlyList<BrokerKind> ForRequirement(StrategyDataRequirement requirement)
 ```
 
 ## src/linux/Core/TradingTerminal.Core/Strategies/StrategyDataRequirement.cs

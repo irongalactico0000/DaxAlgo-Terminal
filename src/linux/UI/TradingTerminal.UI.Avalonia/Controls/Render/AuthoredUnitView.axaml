@@ -1,0 +1,73 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:render="using:TradingTerminal.UI.Avalonia.Controls.Render"
+             x:Class="TradingTerminal.UI.Avalonia.Controls.Render.AuthoredUnitView"
+             x:CompileBindings="False">
+
+  <!--
+    Avalonia chrome for authored strategies/visualizers.
+    Portable AuthoredUnitPresenter/Host live in UI.Core; this control only binds the picture,
+    book row, and log — matching Windows AuthoredUnitView behavior without WPF.
+  -->
+
+  <Grid RowDefinitions="Auto,*,Auto,Auto">
+    <Expander Grid.Row="0"
+              IsExpanded="{Binding IsSetupExpanded}"
+              Padding="12,8">
+      <Expander.Header>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12" />
+          <TextBlock Text="PARAMETERS" FontSize="10" FontWeight="Bold" Opacity="0.65"
+                     VerticalAlignment="Center" />
+        </StackPanel>
+      </Expander.Header>
+      <ItemsControl ItemsSource="{Binding Parameters}" Margin="0,8,0,4">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Grid ColumnDefinitions="180,*" Margin="0,2">
+              <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="11" Opacity="0.7" />
+              <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="11"
+                         TextTrimming="CharacterEllipsis" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Expander>
+
+    <render:RenderSurfaceView x:Name="Surface" Grid.Row="1" MinHeight="180" />
+
+    <Border Grid.Row="2"
+            Padding="12,6"
+            IsVisible="{Binding HasBook}">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <TextBlock Text="BOOK" FontWeight="Bold" FontSize="10" Opacity="0.65"
+                   VerticalAlignment="Center" />
+        <TextBlock FontSize="11" VerticalAlignment="Center">
+          <Run Text="Position " /><Run Text="{Binding Book.PositionUnits, StringFormat=\{0:N2\}}" />
+          <Run Text="  @ " /><Run Text="{Binding Book.AverageEntryPrice, StringFormat=\{0:N4\}}" />
+          <Run Text="  Realised " /><Run Text="{Binding Book.RealizedProfitAndLoss, StringFormat=\{0:N2\}}" />
+          <Run Text="  Equity " /><Run Text="{Binding Book.Equity, StringFormat=\{0:N2\}}" />
+          <Run Text="  Resting " /><Run Text="{Binding Book.OpenOrders}" />
+        </TextBlock>
+      </StackPanel>
+    </Border>
+
+    <Border Grid.Row="3" MaxHeight="140">
+      <ScrollViewer x:Name="LogScroller" VerticalScrollBarVisibility="Auto" Padding="10,6">
+        <ItemsControl ItemsSource="{Binding Log}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <TextBlock FontFamily="SF Mono, Menlo, monospace" FontSize="10.5">
+                <Run Text="{Binding TimestampUtc, StringFormat=HH\\:mm\\:ss}" />
+                <Run Text=" " />
+                <Run Text="{Binding Source}" />
+                <Run Text=" " />
+                <Run Text="{Binding Message}" />
+              </TextBlock>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+  </Grid>
+</UserControl>

@@ -243,7 +243,7 @@ internal sealed class TradeIrRiskGatewayV1 : IDisposable
         PruneExposureAttempts(evaluatedAt);
         UpdatePeakEquity();
 
-        var command = CreateCommand(intent, evaluatedAt);
+        var command = CreateCommand(intent, evaluatedAt, currentPosition);
         var context = CreateRiskContext(evaluatedAt);
         var evidence = RiskPolicyEvidence.Capture(context);
         var riskDecision = RiskPolicy.Evaluate(command, context);
@@ -350,7 +350,10 @@ internal sealed class TradeIrRiskGatewayV1 : IDisposable
         return trace;
     }
 
-    private SubmitOrderCommand CreateCommand(TradeIrOrderIntentV1 intent, DateTimeOffset evaluatedAt)
+    private SubmitOrderCommand CreateCommand(
+        TradeIrOrderIntentV1 intent,
+        DateTimeOffset evaluatedAt,
+        long currentPosition)
     {
         var stem = $"{_plan.DefinitionSha256[..16]}-{intent.IntentSequence:D12}";
         var metadata = new ExecutionCommandMetadata(
@@ -368,14 +371,38 @@ internal sealed class TradeIrRiskGatewayV1 : IDisposable
         var terms = new OrderTerms(
             intent.Side == TradeIrOrderSideV1.Buy ? OrderSide.Buy : OrderSide.Sell,
             OrderType.Market,
-            intent.Quantity,
+            ScaledQuantity.FromWhole(intent.Quantity),
             timeInForce: MapTimeInForce(intent.TimeInForce),
             reduceOnly: intent.ReduceOnly);
+        var clientOrderId = new ClientOrderId($"tradeir-client-{stem}");
+        var instructionContext = new CanonicalInstructionMappingContext(
+            new IntentId($"tradeir-intent-{stem}"),
+            bucketId: null,
+            new LegId($"tradeir-leg-{stem}"),
+            new ExecutionLeaseId($"backtest-{_policy.AccountId.Value}"),
+            new FencingToken(1),
+            TradeIntentQuantityMode.TargetPosition,
+            ScaledQuantity.FromWhole(intent.TargetQuantity),
+            ScaledQuantity.FromWhole(currentPosition),
+            protectiveStopPrice: null,
+            profitTargetPrice: null,
+            estimatedRoundTripCostPerUnit: ScaledMoney.Zero,
+            strategyNoteId: intent.SourceEventSequence,
+            policyVersion: _policy.ProfileId);
+        var instructionFault = CanonicalOrderInstructionMapper.TryCreate(
+            metadata,
+            clientOrderId,
+            terms,
+            instructionContext,
+            out var canonicalInstruction);
+        if (instructionFault != OrderDomainFault.None || canonicalInstruction is null)
+            throw new InvalidOperationException($"Host-derived TradeIR instruction is invalid: {instructionFault}.");
         return new SubmitOrderCommand(
             metadata,
             new OrderId($"tradeir-order-{stem}"),
-            new ClientOrderId($"tradeir-client-{stem}"),
-            terms);
+            clientOrderId,
+            terms,
+            canonicalInstruction);
     }
 
     private RiskEvaluationContext CreateRiskContext(DateTimeOffset evaluatedAt)
@@ -392,28 +419,49 @@ internal sealed class TradeIrRiskGatewayV1 : IDisposable
             order.RemainingQuantity * order.ReservationPrice * multiplier);
         var equity = RequireFiniteDecimal(_portfolio.Equity(), "portfolio equity");
         _peakEquity = Math.Max(_peakEquity, equity);
+        var hasUnrepresentableMarketEconomics = false;
+        var marketPrice = CapturePrice(_lastMarketPrice, ref hasUnrepresentableMarketEconomics);
+        var exactMultiplier = CaptureRatio(multiplier, ref hasUnrepresentableMarketEconomics);
 
         return new RiskEvaluationContext(
             _policy.Limits,
             _policy.ControlMode,
             _policy.KillSwitchActive,
-            position,
-            buyReserved,
-            sellReserved,
-            grossReserved,
-            existingOrderSignedReservation: 0m,
-            existingOrderGrossReservation: 0m,
-            existingOrderFilledQuantity: 0m,
-            availableBuyingPower: Math.Max(0m, RequireFiniteDecimal(_portfolio.Cash, "portfolio cash")),
-            dailyNetRealizedPnl:
-                RequireFiniteDecimal(_portfolio.TotalRealizedPnl, "realized PnL") - _realizedPnlAtDayStart,
-            currentEquity: equity,
-            peakEquity: _peakEquity,
-            marketPrice: _lastMarketPrice,
+            ScaledQuantity.FromWhole(position),
+            ExecutionNumericBoundary.QuantityFromDecimal(buyReserved),
+            ExecutionNumericBoundary.QuantityFromDecimal(sellReserved),
+            ExecutionNumericBoundary.MoneyFromDecimal(grossReserved),
+            existingOrderSignedReservation: ScaledQuantity.Zero,
+            existingOrderGrossReservation: ScaledMoney.Zero,
+            existingOrderFilledQuantity: ScaledQuantity.Zero,
+            availableBuyingPower: ExecutionNumericBoundary.MoneyFromDecimal(
+                Math.Max(0m, RequireFiniteDecimal(_portfolio.Cash, "portfolio cash"))),
+            dailyNetRealizedPnl: ExecutionNumericBoundary.MoneyFromDecimal(
+                RequireFiniteDecimal(_portfolio.TotalRealizedPnl, "realized PnL") - _realizedPnlAtDayStart),
+            currentEquity: ExecutionNumericBoundary.MoneyFromDecimal(equity),
+            peakEquity: ExecutionNumericBoundary.MoneyFromDecimal(_peakEquity),
+            marketPrice: marketPrice,
             exposureCommandsInWindow: _exposureAttempts.Count,
             evaluatedAtUtc: evaluatedAt,
-            contractMultiplier: multiplier,
-            accountCurrency: _instrument.Contract.Currency);
+            contractMultiplier: exactMultiplier,
+            accountCurrency: _instrument.Contract.Currency,
+            hasUnrepresentableMarketEconomics: hasUnrepresentableMarketEconomics);
+    }
+
+    private static ScaledPrice CapturePrice(decimal value, ref bool outOfRange)
+    {
+        if (ExecutionNumericBoundary.TryPriceFromDecimal(value, out var exact) && exact.Coefficient > 0)
+            return exact;
+        outOfRange = true;
+        return new ScaledPrice(1, 0);
+    }
+
+    private static ScaledRatio CaptureRatio(decimal value, ref bool outOfRange)
+    {
+        if (ExecutionNumericBoundary.TryRatioFromDecimal(value, out var exact) && exact.Coefficient > 0)
+            return exact;
+        outOfRange = true;
+        return new ScaledRatio(1, 0);
     }
 
     private void OnBookEvent(TradingTerminal.Core.Domain.InstrumentId instrument, OrderEvent orderEvent)
@@ -459,10 +507,20 @@ internal sealed class TradeIrRiskGatewayV1 : IDisposable
         _instrument.Contract,
         command.Terms.Side,
         command.Terms.Type,
-        checked((long)command.Terms.Quantity),
-        command.Terms.LimitPrice is { } limit ? (double)limit : null,
-        command.Terms.StopPrice is { } stop ? (double)stop : null,
+        RequireWholeQuantity(command.Terms.Quantity),
+        command.Terms.LimitPrice is { } limit
+            ? checked((double)ExecutionNumericBoundary.ToDecimal(limit))
+            : null,
+        command.Terms.StopPrice is { } stop
+            ? checked((double)ExecutionNumericBoundary.ToDecimal(stop))
+            : null,
         command.Terms.TimeInForce);
+
+    private static long RequireWholeQuantity(ScaledQuantity quantity) =>
+        quantity.TryGetWholeUnits(out var units) && units > 0
+            ? units
+            : throw new InvalidOperationException(
+                "The legacy backtest book accepts positive whole quantities only.");
 
     private bool HasExactDelta(TradeIrOrderIntentV1 intent, long currentPosition)
     {

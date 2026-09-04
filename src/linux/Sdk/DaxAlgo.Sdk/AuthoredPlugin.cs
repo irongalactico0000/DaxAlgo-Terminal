@@ -8,6 +8,30 @@ using TradingTerminal.Core.Strategies.Parameters;
 namespace DaxAlgo.Sdk;
 
 /// <summary>
+/// UI-neutral registration contributed by a persisted authored visualizer plugin. The SDK records the
+/// runtime type; the host's visualizer registry converts it into its own catalog descriptor/factory.
+/// </summary>
+public sealed record AuthoredVisualizerPluginRegistration(
+    string Id,
+    string DisplayName,
+    string Description,
+    Type VisualizerType,
+    string? SpecificationJson = null,
+    int VerificationContractVersion = 0);
+
+/// <summary>
+/// UI-neutral registration contributed by a persisted canonical SDK strategy. The host validates
+/// the embedded authored-unit specification before exposing the kernel to backtest or Paper runtime.
+/// </summary>
+public sealed record AuthoredStrategyKernelPluginRegistration(
+    string Id,
+    string DisplayName,
+    string Description,
+    Type KernelType,
+    string? SpecificationJson = null,
+    int VerificationContractVersion = 0);
+
+/// <summary>
 /// The types a strategy assembly can contribute. A strategy authored in the AI builder is compiled from
 /// loose files, so the host discovers its parts by shape rather than by a hand-written registration:
 /// the kernel is required, the rest turn it from a backtest entry into a catalog card with a live window.
@@ -84,9 +108,70 @@ public sealed record AuthoredStrategyTypes(
 /// </summary>
 public static class AuthoredPluginBootstrap
 {
-    public static void Register(IPluginRegistrar registrar, Assembly assembly, string strategyId, string displayName)
+    /// <summary>
+    /// Version 2 proves data-responsive drawing plus every reviewed layer instance and its required
+    /// primitive semantics. Persisted units from earlier verifier contracts remain on disk but are
+    /// not made runnable by current authored-unit registries.
+    /// </summary>
+    public const int CurrentVerificationContractVersion = 2;
+
+    public static void Register(
+        IPluginRegistrar registrar,
+        Assembly assembly,
+        string strategyId,
+        string displayName,
+        string? authoredUnitSpecificationJson = null) =>
+        Register(
+            registrar,
+            assembly,
+            strategyId,
+            displayName,
+            authoredUnitSpecificationJson,
+            verificationContractVersion: 0);
+
+    public static void Register(
+        IPluginRegistrar registrar,
+        Assembly assembly,
+        string strategyId,
+        string displayName,
+        string? authoredUnitSpecificationJson,
+        int verificationContractVersion)
     {
         ArgumentNullException.ThrowIfNull(registrar);
+
+        var visualizers = assembly.GetTypes()
+            .Where(static type => type is { IsClass: true, IsAbstract: false, IsPublic: true } &&
+                typeof(IVisualizer).IsAssignableFrom(type) &&
+                type.GetConstructor(Type.EmptyTypes) is not null)
+            .ToArray();
+        if (visualizers.Length == 1)
+        {
+            registrar.Services.AddSingleton(new AuthoredVisualizerPluginRegistration(
+                strategyId,
+                displayName,
+                ReadStaticString(visualizers[0], "Description") ?? string.Empty,
+                visualizers[0],
+                authoredUnitSpecificationJson,
+                verificationContractVersion));
+            return;
+        }
+
+        var strategyKernels = assembly.GetTypes()
+            .Where(static type => type is { IsClass: true, IsAbstract: false, IsPublic: true } &&
+                typeof(IStrategyKernel).IsAssignableFrom(type) &&
+                type.GetConstructor(Type.EmptyTypes) is not null)
+            .ToArray();
+        if (strategyKernels.Length == 1)
+        {
+            registrar.Services.AddSingleton(new AuthoredStrategyKernelPluginRegistration(
+                strategyId,
+                displayName,
+                ReadStaticString(strategyKernels[0], "Description") ?? string.Empty,
+                strategyKernels[0],
+                authoredUnitSpecificationJson,
+                verificationContractVersion));
+            return;
+        }
 
         var found = AuthoredStrategyTypes.DiscoverIn(assembly);
         if (found.Kernel is null) return;  // nothing runnable — register nothing rather than half a plugin
@@ -131,6 +216,12 @@ public static class AuthoredPluginBootstrap
             StrategyId: strategyId,
             ViewFactory: viewFactory,
             ViewModelFactory: sp => ActivatorUtilities.CreateInstance(sp, viewModel)));
+    }
+
+    private static string? ReadStaticString(Type type, string name)
+    {
+        var property = type.GetProperty(name, BindingFlags.Public | BindingFlags.Static);
+        return property?.PropertyType == typeof(string) ? property.GetValue(null) as string : null;
     }
 
     /// <summary>Wires the kernel's <c>(Contract)</c> constructor — and its optional declarative

@@ -17,6 +17,12 @@ public interface IBrokerClient : IAsyncDisposable
 {
     BrokerKind Kind { get; }
 
+    /// <summary>
+    /// Source capability for this market-data client. This does not describe account entitlement,
+    /// current connection health, or order-execution readiness.
+    /// </summary>
+    MarketDataCapabilities MarketDataCapabilities => BrokerCapabilityCatalog.MarketDataFor(Kind);
+
     IObservable<ConnectionState> ConnectionState { get; }
 
     Task ConnectAsync(CancellationToken ct = default);

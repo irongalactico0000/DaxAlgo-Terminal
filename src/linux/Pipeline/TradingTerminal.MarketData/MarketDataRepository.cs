@@ -24,9 +24,10 @@ namespace TradingTerminal.Infrastructure.MarketData;
 /// before the broker, and a broker fetch is only issued when the cache is too small or too stale.
 /// Broker fetches are persisted back to the store so the next call is a hit.
 ///
-/// Depth stays on the direct broker path because the ingest layer silently absorbs the
-/// "broker has no L2" <see cref="NotSupportedException"/>, which existing callers rely on to
-/// degrade gracefully.
+/// Every request is capability-gated before cache, hub, ingest, or broker work begins.
+/// Unsupported channels fail with <see cref="NotSupportedException"/>; an empty supported
+/// result and an operational failure therefore remain distinguishable outcomes.
+/// Depth stays on the direct broker path so callers receive broker runtime failures directly.
 /// </summary>
 public sealed class MarketDataRepository : IMarketDataRepository
 {
@@ -61,9 +62,16 @@ public sealed class MarketDataRepository : IMarketDataRepository
         var merged = new List<TradableInstrument>();
         foreach (var kind in connected)
         {
+            var client = _selector.Get(kind);
+            if (!client.MarketDataCapabilities.SupportsInstruments)
+            {
+                _logger.LogDebug("Skipping instrument catalog for {Broker}: capability is unsupported", kind);
+                continue;
+            }
+
             try
             {
-                var list = await _selector.Get(kind).ListInstrumentsAsync(ct).ConfigureAwait(false);
+                var list = await client.ListInstrumentsAsync(ct).ConfigureAwait(false);
                 if (list is null) continue;
                 // Re-stamp Broker defensively — broker clients may have constructed rows before
                 // this field existed in their own code path. The selector knows the truth.
@@ -81,6 +89,11 @@ public sealed class MarketDataRepository : IMarketDataRepository
     public async Task<IReadOnlyList<Bar>> GetHistoricalBarsAsync(
         Contract contract, BrokerKind broker, BarSize barSize, TimeSpan duration, CancellationToken ct = default)
     {
+        var client = RequireCapability(
+            broker,
+            static capabilities => capabilities.SupportsHistoricalBars,
+            "historical bars");
+
         // Cache-first: consult the local store before hitting the broker. The cache is
         // considered fresh enough if it holds at least the requested count AND the newest
         // bar is within two bar-widths of "now" (so a strategy reopened a few seconds later
@@ -110,7 +123,7 @@ public sealed class MarketDataRepository : IMarketDataRepository
 
         _logger.LogDebug("Historical {Symbol} {Size} duration={Duration} cache-miss → broker {Broker} (cached={Cached})",
             contract.Symbol, barSize.ToDisplayString(), duration, broker, cached.Count);
-        var fresh = await _selector.Get(broker).RequestHistoricalBarsAsync(contract, barSize, duration, ct);
+        var fresh = await client.RequestHistoricalBarsAsync(contract, barSize, duration, ct);
         foreach (var bar in fresh)
             _store.EnqueueBar(OhlcvBar.FromBar(bar, instrumentId, barSize, broker, isFinal: true));
         return fresh;
@@ -120,6 +133,11 @@ public sealed class MarketDataRepository : IMarketDataRepository
         Contract contract, BrokerKind broker, BarSize barSize,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
+        RequireCapability(
+            broker,
+            static capabilities => capabilities.SupportsLiveBars,
+            "live bars");
+
         var instrumentId = _ingest.Resolve(contract, broker);
         var dropMeter = new FeedDropMeter();
         var channel = FeedChannel.CreateDropOldest<Bar>(FeedChannel.Capacity.Bars, onItemDropped: _ =>
@@ -160,6 +178,11 @@ public sealed class MarketDataRepository : IMarketDataRepository
         Contract contract, BrokerKind broker,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
+        RequireCapability(
+            broker,
+            static capabilities => capabilities.SupportsLevel1Quotes,
+            "level-one quotes");
+
         var instrumentId = _ingest.Resolve(contract, broker);
         var dropMeter = new FeedDropMeter();
         var channel = FeedChannel.CreateDropOldest<Tick>(FeedChannel.Capacity.Quotes, onItemDropped: _ =>
@@ -202,7 +225,12 @@ public sealed class MarketDataRepository : IMarketDataRepository
         int levels = 10,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        await foreach (var snapshot in _selector.Get(broker).SubscribeDepthAsync(contract, levels, ct))
+        var client = RequireCapability(
+            broker,
+            static capabilities => capabilities.SupportsLevel2Depth,
+            "level-two depth");
+
+        await foreach (var snapshot in client.SubscribeDepthAsync(contract, levels, ct))
         {
             if (_dispatcher.CheckAccess())
             {
@@ -215,5 +243,17 @@ public sealed class MarketDataRepository : IMarketDataRepository
                 yield return marshalled;
             }
         }
+    }
+
+    private IBrokerClient RequireCapability(
+        BrokerKind broker,
+        Func<MarketDataCapabilities, bool> isSupported,
+        string channel)
+    {
+        var client = _selector.Get(broker);
+        if (!isSupported(client.MarketDataCapabilities))
+            throw new NotSupportedException($"{broker} does not provide {channel} in this build.");
+
+        return client;
     }
 }

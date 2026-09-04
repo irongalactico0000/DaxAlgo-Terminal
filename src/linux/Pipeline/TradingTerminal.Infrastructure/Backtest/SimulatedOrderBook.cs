@@ -60,8 +60,13 @@ public sealed class SimulatedOrderBook
             order.FilledQuantity, order.AveragePrice));
     }
 
-    public void OnTick(Tick tick)
+    /// <summary>
+    /// Evaluates only orders for <paramref name="contract"/>. Multi-asset replay must never let one
+    /// leg's quote fill another leg's working order.
+    /// </summary>
+    public void OnTick(Contract contract, Tick tick)
     {
+        ArgumentNullException.ThrowIfNull(contract);
         if (_byClientId.Count == 0) return;
 
         // Snapshot to allow removals while iterating.
@@ -69,6 +74,7 @@ public sealed class SimulatedOrderBook
         foreach (var order in orders)
         {
             if (IsTerminal(order.State)) continue;
+            if (order.Request.Contract != contract) continue;
             if (!_fillModel.TryFill(order, tick, out var price, out var qty)) continue;
 
             order.FilledQuantity += qty;
@@ -93,6 +99,17 @@ public sealed class SimulatedOrderBook
             if (newState == OrderState.Filled)
                 _byClientId.Remove(order.Request.ClientOrderId);
         }
+    }
+
+    /// <summary>Legacy single-contract entry point retained for direct callers.</summary>
+    public void OnTick(Tick tick)
+    {
+        if (_byClientId.Count == 0) return;
+        var contracts = _byClientId.Values.Select(order => order.Request.Contract).Distinct().ToArray();
+        if (contracts.Length > 1)
+            throw new InvalidOperationException("An unscoped tick cannot evaluate a multi-contract order book.");
+        if (contracts.Length == 1)
+            OnTick(contracts[0], tick);
     }
 
     private static bool IsTerminal(OrderState s) =>

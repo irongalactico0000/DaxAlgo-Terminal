@@ -83,6 +83,11 @@ public abstract partial class LiveSignalStrategyViewModelBase : ViewModelBase, I
     private const int DepthChannelCapacity = 2_048;
     private const int TradeChannelCapacity = 65_536;
     private const int MaxStreamDrainBatch = 4_096;
+    private const StrategyDataRequirement KnownDataRequirements =
+        StrategyDataRequirement.L1 |
+        StrategyDataRequirement.Bars |
+        StrategyDataRequirement.Depth |
+        StrategyDataRequirement.TradeTape;
 
     protected LiveSignalStrategyViewModelBase(
         string strategyId,
@@ -167,11 +172,11 @@ public abstract partial class LiveSignalStrategyViewModelBase : ViewModelBase, I
     [ObservableProperty] private DepthSnapshot? _latestDepth;
 
     /// <summary>
-    /// True when the active broker is known to support the trade tape for the selected
-    /// instrument, false when it threw <see cref="NotSupportedException"/> during the
-    /// trade-pump probe. Only meaningful when <see cref="DataRequirement"/> includes
-    /// <see cref="StrategyDataRequirement.TradeTape"/>. Derived windows bind this to a
-    /// feed-quality badge. Set on the UI thread; defaults to false until the pump starts.
+    /// True while a strategy that requires trade tape has an active tape pump backed by a
+    /// broker client that declares <see cref="MarketDataCapabilities.SupportsLiveTrades"/>.
+    /// This is source capability plus local pump health, not proof of account entitlement or
+    /// symbol permission. Derived windows bind this to a feed-quality badge. Set on the UI
+    /// thread; false before start, after stop, and when the pump fails.
     /// </summary>
     [ObservableProperty] private bool _tradeTapeAvailable;
 
@@ -447,6 +452,22 @@ public abstract partial class LiveSignalStrategyViewModelBase : ViewModelBase, I
         try { broker = ResolveBroker(SelectedInstrument); }
         catch (InvalidOperationException ex) { ValidationError = ex.Message; return; }
 
+        // Snapshot the selected client's immutable source capabilities once. Every decision for
+        // this run is made from the same descriptor, so a strategy cannot be constructed against
+        // one capability view and have its pumps opened against another.
+        var capabilities = _services.Selector.Get(broker).MarketDataCapabilities;
+        var requirement = DataRequirement;
+        if (DescribeCapabilityMismatch(broker, requirement, capabilities) is { } capabilityError)
+        {
+            IsConfigured = false;
+            LatestDepth = null;
+            TradeTapeAvailable = false;
+            ValidationError = capabilityError;
+            Status = capabilityError;
+            Log("CAPABILITY", capabilityError);
+            return;
+        }
+
         var contract = SelectedInstrument.Contract;
         var instrumentId = _services.Ingest.Resolve(contract, broker);
 
@@ -513,15 +534,25 @@ public abstract partial class LiveSignalStrategyViewModelBase : ViewModelBase, I
             _ingestHandle = _services.Ingest.Subscribe(contract, broker);
 
             _ = RunQuoteStreamAsync(instrumentId, runToken);
-            _ = RunDepthStreamAsync(instrumentId, runToken);
 
-            // Opt-in trade-tape pump: only started when the hosted strategy declares TradeTape in
-            // its DataRequirement. The pump probes broker capability before subscribing so the
-            // TradeTapeAvailable badge reflects reality rather than crashing on NotSupportedException.
-            if (DataRequirement.HasFlag(StrategyDataRequirement.TradeTape))
+            // Depth remains a useful optional display feed for baseline strategies, but opening a
+            // hub reader for a broker that cannot publish it creates a permanently empty stream.
+            // Required depth was already fail-closed above; optional depth is started only when
+            // this exact selected client declares it.
+            LatestDepth = null;
+            if (capabilities.SupportsLevel2Depth)
+                _ = RunDepthStreamAsync(
+                    instrumentId,
+                    requirement.HasFlag(StrategyDataRequirement.Depth),
+                    runCts);
+
+            // Tape is strategy-required rather than display-optional. Capability was validated
+            // before BuildStrategy, so no exception-probe or speculative broker subscription is
+            // needed here.
+            TradeTapeAvailable = false;
+            if (requirement.HasFlag(StrategyDataRequirement.TradeTape))
             {
-                TradeTapeAvailable = false;
-                _ = RunTradeStreamAsync(broker, contract, instrumentId, runToken);
+                _ = RunTradeStreamAsync(broker, contract, instrumentId, runCts);
             }
         }
         finally
@@ -576,6 +607,54 @@ public abstract partial class LiveSignalStrategyViewModelBase : ViewModelBase, I
 
     private bool IsCurrentRun(CancellationTokenSource runCts) =>
         Volatile.Read(ref _disposeState) == 0 && ReferenceEquals(Volatile.Read(ref _streamCts), runCts);
+
+    private static string? DescribeCapabilityMismatch(
+        BrokerKind broker,
+        StrategyDataRequirement requirement,
+        MarketDataCapabilities capabilities)
+    {
+        var unknown = requirement & ~KnownDataRequirements;
+        if (unknown != StrategyDataRequirement.None)
+            return $"Cannot start strategy: unknown market-data requirement flags 0x{(int)unknown:X}.";
+
+        var missing = new List<string>(3);
+        if ((requirement.HasFlag(StrategyDataRequirement.L1) ||
+             requirement.HasFlag(StrategyDataRequirement.Bars)) &&
+            !capabilities.SupportsLevel1Quotes)
+        {
+            missing.Add(requirement.HasFlag(StrategyDataRequirement.Bars)
+                ? "L1 quotes (required for live bars)"
+                : "L1 quotes");
+        }
+        if (requirement.HasFlag(StrategyDataRequirement.Depth) && !capabilities.SupportsLevel2Depth)
+            missing.Add("L2 depth");
+        if (requirement.HasFlag(StrategyDataRequirement.TradeTape) && !capabilities.SupportsLiveTrades)
+            missing.Add("trade tape");
+
+        return missing.Count == 0
+            ? null
+            : $"Cannot start strategy: {broker} does not provide {string.Join(" and ", missing)} in this build.";
+    }
+
+    private async Task FailRequiredFeedAsync(
+        CancellationTokenSource runCts,
+        string feed,
+        Exception? error = null)
+    {
+        if (!IsCurrentRun(runCts)) return;
+
+        var detail = error is null ? "stream ended" : error.Message;
+        var message = $"Required {feed} feed failed: {detail}";
+        await UiThread.RunAsync(async () =>
+        {
+            if (!IsCurrentRun(runCts)) return;
+            await StopAsync();
+            IsConfigured = false;
+            ValidationError = message;
+            Status = message;
+            Log("CAPABILITY", message);
+        });
+    }
 
     [RelayCommand]
     private void ClearSignals() => Signals.Clear();
@@ -673,13 +752,17 @@ public abstract partial class LiveSignalStrategyViewModelBase : ViewModelBase, I
     }
 
     /// <summary>
-    /// Best-effort L2 depth pump running alongside the quote stream. Forwards each book
+    /// Capability-gated L2 depth pump running alongside the quote stream. Forwards each book
     /// snapshot to the strategy's <see cref="IBacktestStrategy.OnDepthAsync"/> so book-aware
-    /// signals (OBI) can use real depth. Brokers without depth (Alpaca, IB-not-yet-wired)
-    /// produce no events on the hub — we degrade silently to the L1 path.
+    /// signals (OBI) can use real depth. <see cref="StartAsync"/> never calls this method for a
+    /// selected client whose capability snapshot declares depth unsupported.
     /// </summary>
-    private async Task RunDepthStreamAsync(InstrumentId instrumentId, CancellationToken ct)
+    private async Task RunDepthStreamAsync(
+        InstrumentId instrumentId,
+        bool required,
+        CancellationTokenSource runCts)
     {
+        var ct = runCts.Token;
         var channel = Channel.CreateBounded<DepthSnapshot>(new BoundedChannelOptions(DepthChannelCapacity)
         {
             SingleReader = true,
@@ -687,12 +770,12 @@ public abstract partial class LiveSignalStrategyViewModelBase : ViewModelBase, I
             FullMode = BoundedChannelFullMode.DropOldest,
         });
 
-        using var subscription = _services.Hub.Depth(instrumentId).Subscribe(s =>
-            channel.Writer.TryWrite(s));
-
         var batch = new List<DepthSnapshot>(64);
         try
         {
+            using var subscription = _services.Hub.Depth(instrumentId).Subscribe(s =>
+                channel.Writer.TryWrite(s));
+
             while (await channel.Reader.WaitToReadAsync(ct))
             {
                 batch.Clear();
@@ -720,10 +803,16 @@ public abstract partial class LiveSignalStrategyViewModelBase : ViewModelBase, I
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "{Strategy} depth stream ended", StrategyId);
+            if (required)
+                await FailRequiredFeedAsync(runCts, "L2 depth", ex);
+            else if (IsCurrentRun(runCts))
+                await UiThread.RunAsync(() => LatestDepth = null);
         }
         finally
         {
             channel.Writer.TryComplete();
+            if (required && IsCurrentRun(runCts) && !ct.IsCancellationRequested)
+                await FailRequiredFeedAsync(runCts, "L2 depth");
         }
     }
 
@@ -731,47 +820,20 @@ public abstract partial class LiveSignalStrategyViewModelBase : ViewModelBase, I
     /// Opt-in trade-tape pump running alongside the quote and depth pumps, started only when
     /// <see cref="DataRequirement"/> includes <see cref="StrategyDataRequirement.TradeTape"/>.
     ///
-    /// <para>Capability is probed before subscribing: the active broker client's
-    /// <c>SubscribeTradesAsync</c> is called in a try/catch for
-    /// <see cref="NotSupportedException"/>. Brokers without a trade tape (NinjaTrader,
-    /// cTrader, Alpaca in this build) throw synchronously from the method body; IB and
-    /// Simulated return a valid async enumerator. On a <see cref="NotSupportedException"/>
-    /// the pump logs once via the shared Activity Log, sets
-    /// <see cref="TradeTapeAvailable"/> to <c>false</c>, and exits — quote/bar/depth pumps
-    /// are unaffected. On success the pump subscribes the ingest trade feed, consumes
-    /// <see cref="IMarketDataHub.Trades"/> off the hub, and forwards each
-    /// <see cref="TradePrint"/> to <see cref="IBacktestStrategy.OnTradeAsync"/>.</para>
+    /// <para><see cref="StartAsync"/> validates the selected client's immutable
+    /// <see cref="MarketDataCapabilities"/> snapshot before constructing the strategy. This pump
+    /// therefore opens only the canonical ingest/hub route; it never calls the broker's
+    /// <c>SubscribeTradesAsync</c> as an exception-based capability probe. Runtime pump failures
+    /// clear <see cref="TradeTapeAvailable"/> without affecting quote/depth pumps.</para>
     ///
     /// <para>The channel/marshalling/cancellation pattern is identical to
     /// <see cref="RunDepthStreamAsync"/>. A bounded <see cref="Channel{T}"/> decouples the
     /// hub publish thread from the consumer so a slow strategy cannot block ingest.</para>
     /// </summary>
     private async Task RunTradeStreamAsync(
-        BrokerKind broker, Contract contract, InstrumentId instrumentId, CancellationToken ct)
+        BrokerKind broker, Contract contract, InstrumentId instrumentId, CancellationTokenSource runCts)
     {
-        // Probe broker capability before subscribing. Brokers without a trade tape throw
-        // NotSupportedException directly from SubscribeTradesAsync (before any MoveNextAsync),
-        // so a plain try/catch here is sufficient — we don't need to start iterating.
-        try
-        {
-            // Probe: discard the enumerator immediately; we only want to know if it throws.
-            // The actual streaming goes through the ingest / hub below.
-            _ = _services.Selector.Get(broker).SubscribeTradesAsync(contract, ct);
-        }
-        catch (NotSupportedException nse)
-        {
-            await UiThread.RunAsync(() =>
-            {
-                TradeTapeAvailable = false;
-                Log("TAPE", $"Trade tape not available on {broker}: {nse.Message.Split('.')[0]}");
-            });
-            return;
-        }
-
-        // Broker supports trades — subscribe the ingest feed and set the availability flag.
-        _tradeIngestHandle = _services.Ingest.SubscribeTrades(contract, broker);
-        await UiThread.RunAsync(() => TradeTapeAvailable = true);
-
+        var ct = runCts.Token;
         var channel = Channel.CreateBounded<TradePrint>(new BoundedChannelOptions(TradeChannelCapacity)
         {
             SingleReader = true,
@@ -779,12 +841,15 @@ public abstract partial class LiveSignalStrategyViewModelBase : ViewModelBase, I
             FullMode = BoundedChannelFullMode.DropOldest,
         });
 
-        using var subscription = _services.Hub.Trades(instrumentId).Subscribe(t =>
-            channel.Writer.TryWrite(t));
-
         var batch = new List<TradePrint>(256);
         try
         {
+            _tradeIngestHandle = _services.Ingest.SubscribeTrades(contract, broker);
+            using var subscription = _services.Hub.Trades(instrumentId).Subscribe(t =>
+                channel.Writer.TryWrite(t));
+            if (IsCurrentRun(runCts))
+                await UiThread.RunAsync(() => TradeTapeAvailable = true);
+
             while (await channel.Reader.WaitToReadAsync(ct))
             {
                 batch.Clear();
@@ -810,10 +875,18 @@ public abstract partial class LiveSignalStrategyViewModelBase : ViewModelBase, I
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "{Strategy} trade stream ended", StrategyId);
+            if (IsCurrentRun(runCts))
+                await UiThread.RunAsync(() => TradeTapeAvailable = false);
+            await FailRequiredFeedAsync(runCts, $"trade tape ({broker})", ex);
         }
         finally
         {
             channel.Writer.TryComplete();
+            if (IsCurrentRun(runCts) && !ct.IsCancellationRequested)
+            {
+                await UiThread.RunAsync(() => TradeTapeAvailable = false);
+                await FailRequiredFeedAsync(runCts, $"trade tape ({broker})");
+            }
         }
     }
 

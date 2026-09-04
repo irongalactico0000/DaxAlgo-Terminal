@@ -51,6 +51,8 @@ using TradingTerminal.UI;
 using TradingTerminal.UI.Logging;
 using TradingTerminal.UI.Strategies;
 using TradingTerminal.StrategyComposer;
+using TradingTerminal.App.Avalonia.Execution;
+using TradingTerminal.UI.Execution;
 
 namespace TradingTerminal.App.Avalonia.Composition;
 
@@ -151,6 +153,10 @@ public static class ServiceConfiguration
         services.AddSingleton<IPostConfigureOptions<TelegramArchiveOptions>, TelegramArchiveOptionsPostConfigure>();
         services.AddParquetLake(configuration);
         services.AddBacktestStrategyCatalog();
+        services.AddSingleton<TradingTerminal.UI.Strategies.IVisualizerRegistry,
+            TradingTerminal.UI.Strategies.VisualizerRegistry>();
+        services.AddSingleton<TradingTerminal.UI.Strategies.IStrategyKernelRegistry,
+            TradingTerminal.UI.Strategies.StrategyKernelRegistry>();
         services.AddFastBacktestRunner();
 
         var useLocalDaxqLicensing = false;
@@ -178,6 +184,8 @@ public static class ServiceConfiguration
         services.AddSingleton<IStrategyFactory, StrategyFactory>();
         services.TryAddSingleton<TradingTerminal.Core.Strategies.Authoring.IStrategyCompiler,
             RoslynStrategyCompiler>();
+        services.TryAddSingleton<TradingTerminal.Core.Strategies.Generation.IAuthoredUnitCompilerV1,
+            RoslynAuthoredUnitCompilerV1>();
         services.AddStrategyCodegen(configuration);
         services.AddSingleton<TradingTerminal.Core.Strategies.Authoring.ITradeIrSimulatedBacktestRunnerV1,
             TradeIrSimulatedBacktestRunnerV1>();
@@ -235,6 +243,15 @@ public static class ServiceConfiguration
         // Infrastructure layer); MainWindowViewModel binds the catalog to IStrategyFactory.All.
         services.AddSingleton<BrokerApiMeterViewModel>();
         services.AddSingleton<IThemeManager, ThemeManager>();
+
+        // Persistent Paper books own lazy, account-isolated sessions. The shell acquires the
+        // explicitly selected book for each Console/Runner window; no live adapter is registered.
+        services.AddSingleton<IPaperExecutionBookStore, JsonPaperExecutionBookStore>();
+        services.AddSingleton<PaperExecutionBookManager>();
+        services.AddSingleton<PaperExecutionBooksViewModel>();
+        services.AddTransient<PaperExecutionBooksWindow>();
+        services.AddTransient<PaperExecutionConsoleWindow>();
+        services.AddTransient<PaperStrategyRunnerWindow>();
 
         // AI tool VMs (portable — ILogger-only ctors; file I/O via the UiFile seam).
         services.AddTransient<TradingTerminal.Ai.MarketAnalyst.AiAnalystViewModel>();

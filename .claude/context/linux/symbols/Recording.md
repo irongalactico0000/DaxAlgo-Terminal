@@ -1,6 +1,6 @@
 # TradingTerminal.Recording — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `330db91800ba`. Declaration lines only;
+Generated from source fingerprint `e91d50e75733`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Tools/TradingTerminal.Recording/AvaloniaUi/TickRecorderAvaloniaWindow.axaml.cs
@@ -11,22 +11,24 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 
 ## src/linux/Tools/TradingTerminal.Recording/RecorderEntry.cs
 ```cs
-   18: public sealed partial class RecorderEntry : ObservableObject
-   29: public RecorderEntry(SignalInstrument instrument, BrokerKind? pinnedBroker)
-   35: public SignalInstrument Instrument { get; }
-   38: public BrokerKind? PinnedBroker { get; }
-   40: public string DisplayName => Instrument.DisplayName;
-   41: public string Category => Instrument.Category;
-   42: public string Symbol => Instrument.Contract.Symbol;
-   45: public InstrumentId Id { get; internal set; }
-   56: public long Quotes => Interlocked.Read(ref QuotesRaw);
-   57: public long Trades => Interlocked.Read(ref TradesRaw);
-   58: public long Bars => Interlocked.Read(ref BarsRaw);
-   59: public long Depth => Interlocked.Read(ref DepthRaw);
-   64: public bool SupportsTape => ActiveBroker is { } b && StrategyBrokerCapability.TapeBrokers.Contains(b);
-   67: public bool SupportsDepth => ActiveBroker is { } b && StrategyBrokerCapability.DepthBrokers.Contains(b);
-   72: public static bool SupportsL3 => false;
-  111: public RecorderWatchlistItem ToWatchlistItem() => RecorderWatchlistItem.From(Instrument, PinnedBroker);
+   17: public sealed partial class RecorderEntry : ObservableObject
+   28: public RecorderEntry(SignalInstrument instrument, BrokerKind? pinnedBroker)
+   34: public SignalInstrument Instrument { get; }
+   37: public BrokerKind? PinnedBroker { get; }
+   39: public string DisplayName => Instrument.DisplayName;
+   40: public string Category => Instrument.Category;
+   41: public string Symbol => Instrument.Contract.Symbol;
+   44: public InstrumentId Id { get; internal set; }
+   57: public long Quotes => Interlocked.Read(ref QuotesRaw);
+   58: public long Trades => Interlocked.Read(ref TradesRaw);
+   59: public long Bars => Interlocked.Read(ref BarsRaw);
+   60: public long Depth => Interlocked.Read(ref DepthRaw);
+   63: public bool SupportsQuotes => _activeCapabilities?.SupportsLevel1Quotes == true;
+   66: public bool SupportsBars => _activeCapabilities?.SupportsLiveBars == true;
+   69: public bool SupportsTape => _activeCapabilities?.SupportsLiveTrades == true;
+   72: public bool SupportsDepth => _activeCapabilities?.SupportsLevel2Depth == true;
+   77: public static bool SupportsL3 => false;
+  128: public RecorderWatchlistItem ToWatchlistItem() => RecorderWatchlistItem.From(Instrument, PinnedBroker);
 ```
 
 ## src/linux/Tools/TradingTerminal.Recording/RecorderPanelView.axaml.cs
@@ -72,17 +74,17 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 
 ## src/linux/Tools/TradingTerminal.Recording/TickRecordingService.cs
 ```cs
-   34: public sealed partial class TickRecordingService : ObservableObject, IHostedService, IDisposable
-   61: public TickRecordingService(
-   83: public ObservableCollection<RecorderEntry> Instruments { get; } = new();
-   99: public bool HasInstruments => Instruments.Count > 0;
-  103: public Task StartAsync(CancellationToken cancellationToken)
-  120: public Task StopAsync(CancellationToken cancellationToken)
-  130: public void Add(SignalInstrument instrument)
-  143: public void Remove(RecorderEntry entry)
-  154: public void ToggleRecording()
-  160: public void StartRecording()
-  188: public void StopRecording(string reason)
-  380: public void RefreshElapsed() =>
-  388: public void Dispose()
+   35: public sealed partial class TickRecordingService : ObservableObject, IHostedService, IDisposable
+   62: public TickRecordingService(
+   84: public ObservableCollection<RecorderEntry> Instruments { get; } = new();
+  100: public bool HasInstruments => Instruments.Count > 0;
+  104: public Task StartAsync(CancellationToken cancellationToken)
+  121: public Task StopAsync(CancellationToken cancellationToken)
+  131: public void Add(SignalInstrument instrument)
+  144: public void Remove(RecorderEntry entry)
+  155: public void ToggleRecording()
+  161: public void StartRecording()
+  189: public void StopRecording(string reason)
+  410: public void RefreshElapsed() =>
+  418: public void Dispose()
 ```

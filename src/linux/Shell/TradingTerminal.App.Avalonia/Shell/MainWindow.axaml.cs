@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Microsoft.Extensions.DependencyInjection;
+using TradingTerminal.Core.Brokers;
 using TradingTerminal.Core.MarketData;
 using TradingTerminal.Core.Strategies;
 
@@ -12,6 +13,9 @@ namespace TradingTerminal.App.Avalonia.Shell;
 public partial class MainWindow : Window
 {
     private TradingTerminal.App.Avalonia.Theming.IThemeManager? _themeManager;
+    private Window? _executionBooksWindow;
+    private Window? _executionConsoleWindow;
+    private Window? _paperStrategyRunnerWindow;
 
     public MainWindow()
     {
@@ -108,6 +112,130 @@ public partial class MainWindow : Window
     }
 
     private void OnExit(object? sender, RoutedEventArgs e) => Close();
+
+    private void OnExecutionBooks(object? sender, RoutedEventArgs e)
+    {
+        if (_executionBooksWindow is { } existing)
+        {
+            existing.Activate();
+            return;
+        }
+        if ((Application.Current as App)?.Services is not { } services) return;
+        var viewModel = services.GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperExecutionBooksViewModel>();
+        var window = services.GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperExecutionBooksWindow>();
+        window.DataContext = viewModel;
+        _executionBooksWindow = window;
+        window.Closed += (_, _) => _executionBooksWindow = null;
+        window.Show();
+        Vm?.ActivityLog.Append("Execution", "INFO", "Opened persistent Paper execution books.");
+    }
+
+    private async void OnExecutionConsole(object? sender, RoutedEventArgs e)
+    {
+        if (_executionConsoleWindow is { } existing)
+        {
+            existing.Activate();
+            return;
+        }
+        if ((Application.Current as App)?.Services is not { } services) return;
+        TradingTerminal.App.Avalonia.Execution.PaperExecutionBookSessionLease? bookLease = null;
+        try
+        {
+            var books = services.GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperExecutionBookManager>();
+            bookLease = books.AcquireSelectedSession();
+            var session = bookLease.Session;
+            var viewModel = new TradingTerminal.UI.Execution.PaperExecutionConsoleViewModel(
+                session.Client,
+                session);
+            if (bookLease.Book.PrimarySymbol.Length != 0)
+                viewModel.SelectedInstrument = viewModel.Instruments.FirstOrDefault(instrument =>
+                    string.Equals(instrument.Symbol, bookLease.Book.PrimarySymbol, StringComparison.OrdinalIgnoreCase))
+                    ?? viewModel.SelectedInstrument;
+            var window = services.GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperExecutionConsoleWindow>();
+            window.Title = $"Paper Execution Console — {bookLease.Book.Name}";
+            window.DataContext = viewModel;
+            _executionConsoleWindow = window;
+            var ownedLease = bookLease;
+            bookLease = null;
+            window.Closed += (_, _) =>
+            {
+                _executionConsoleWindow = null;
+                ownedLease.Dispose();
+            };
+            ShowDisposing(window, viewModel);
+            Vm?.ActivityLog.Append("Execution", "INFO",
+                $"Opened Paper Execution Console for {ownedLease.Book.Name}/{ownedLease.Book.AccountId}.");
+        }
+        catch (Exception exception)
+        {
+            bookLease?.Dispose();
+            Vm?.ActivityLog.Append("Execution", "ERROR",
+                $"Paper execution remained unavailable: {exception.Message}");
+            await new TradingTerminal.App.Avalonia.Execution.PaperExecutionUnavailableWindow(exception.Message)
+                .ShowDialog(this);
+        }
+    }
+
+    private async void OnPaperStrategyRunner(object? sender, RoutedEventArgs e) =>
+        await OpenPaperStrategyRunnerAsync(initialStrategy: null);
+
+    private async Task OpenPaperStrategyRunnerAsync(
+        TradingTerminal.UI.Strategies.StrategyKernelRegistration? initialStrategy)
+    {
+        if (_paperStrategyRunnerWindow is { } existing)
+        {
+            if (initialStrategy is not null && existing.DataContext is
+                TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerViewModel existingViewModel)
+            {
+                existingViewModel.SelectedStrategy = existingViewModel.Strategies.FirstOrDefault(choice =>
+                    string.Equals(choice.Id, initialStrategy.Id, StringComparison.Ordinal));
+            }
+            existing.Activate();
+            return;
+        }
+        if ((Application.Current as App)?.Services is not { } services) return;
+        TradingTerminal.App.Avalonia.Execution.PaperExecutionBookSessionLease? bookLease = null;
+        try
+        {
+            var books = services.GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperExecutionBookManager>();
+            bookLease = books.AcquireSelectedSession();
+            var session = bookLease.Session;
+            var viewModel = new TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerViewModel(
+                services.GetRequiredService<TradingTerminal.Infrastructure.Backtest.IBacktestStrategyRegistry>(),
+                services.GetRequiredService<TradingTerminal.Core.MarketData.IMarketDataHub>(),
+                services.GetRequiredService<TradingTerminal.Core.Time.IClock>(),
+                services.GetRequiredService<TradingTerminal.UI.Logging.InMemoryLogSink>(),
+                session,
+                services.GetRequiredService<TradingTerminal.Core.MarketData.IInstrumentRegistry>(),
+                bookLease.Book,
+                services.GetRequiredService<TradingTerminal.UI.Strategies.IStrategyKernelRegistry>(),
+                services.GetRequiredService<TradingTerminal.Core.MarketData.IMarketDataIngest>(),
+                services.GetRequiredService<TradingTerminal.Core.Brokers.IBrokerSelector>(),
+                initialStrategy);
+            var window = services.GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerWindow>();
+            window.Title = $"Paper Strategy Runner — {bookLease.Book.Name}";
+            window.DataContext = viewModel;
+            _paperStrategyRunnerWindow = window;
+            var ownedLease = bookLease;
+            bookLease = null;
+            window.Closed += (_, _) =>
+            {
+                _paperStrategyRunnerWindow = null;
+                ownedLease.Dispose();
+            };
+            ShowDisposing(window, viewModel);
+            Vm?.ActivityLog.Append("Execution", "INFO",
+                $"Opened Paper Strategy Runner for {ownedLease.Book.Name}/{ownedLease.Book.AccountId}.");
+        }
+        catch (Exception exception)
+        {
+            bookLease?.Dispose();
+            Vm?.ActivityLog.Append("Execution", "ERROR",
+                $"Paper strategy execution remained unavailable: {exception.Message}");
+            await new TradingTerminal.App.Avalonia.Execution.PaperExecutionUnavailableWindow(exception.Message)
+                .ShowDialog(this);
+        }
+    }
 
     private async void OnReconnect(object? sender, RoutedEventArgs e)
     {
@@ -481,11 +609,66 @@ public partial class MainWindow : Window
     // Opens the selected strategy through the plug-in seam — IStrategyFactory.Create(id). The shell
     // never names a concrete strategy: each strategy project ships its own Avalonia view + registration.
     // The VM is disposed on window close (it owns the render timer + hub subscriptions).
-    private void OnOpenStrategy(object? sender, RoutedEventArgs e)
+    private async void OnOpenStrategy(object? sender, RoutedEventArgs e)
     {
-        if (Vm is not { } shell || shell.SelectedStrategy is not { } selected) return;
+        if (Vm is not { } shell || shell.SelectedCatalogItem is not { } item) return;
         var services = (Application.Current as App)?.Services;
         if (services is null) return;
+
+        if (item.Kind == TradingTerminal.UI.Strategies.CatalogItemKind.Visualizer)
+        {
+            var registration = services
+                .GetRequiredService<TradingTerminal.UI.Strategies.IVisualizerRegistry>()
+                .Find(item.Id);
+            if (registration is null)
+            {
+                shell.ActivityLog.Append("Visualizers", "WARN",
+                    $"'{item.Name}' has no runnable visualizer registered behind its catalog card.");
+                return;
+            }
+
+            shell.BeginBusy("Opening visualizer", $"Starting {item.Name} and warming its data feed...");
+            try
+            {
+                await TradingTerminal.UI.Avalonia.Controls.Render.AuthoredVisualizerSession.OpenAsync(
+                    item.Name,
+                    registration.Create,
+                    services.GetRequiredService<IMarketDataHub>(),
+                    services.GetRequiredService<TradingTerminal.Core.Time.IClock>(),
+                    shell.ActivityLog,
+                    specification: registration.AuthoredSpecification,
+                    ingest: registration.AuthoredSpecification is null
+                        ? null
+                        : services.GetRequiredService<IMarketDataIngest>(),
+                    instrumentRegistry: registration.AuthoredSpecification is null
+                        ? null
+                        : services.GetRequiredService<IInstrumentRegistry>(),
+                    brokerSelector: registration.AuthoredSpecification is null
+                        ? null
+                        : services.GetRequiredService<IBrokerSelector>(),
+                    owner: this);
+                shell.ActivityLog.Append("Visualizers", "INFO", $"Opened '{item.Name}'.");
+            }
+            catch (Exception ex)
+            {
+                shell.ActivityLog.Append("Visualizers", "ERROR",
+                    $"Could not open '{item.Name}': {ex.Message}");
+            }
+            finally
+            {
+                shell.EndBusy();
+            }
+
+            return;
+        }
+
+        if (item.StrategyKernel is { } authoredStrategy)
+        {
+            await OpenPaperStrategyRunnerAsync(authoredStrategy);
+            return;
+        }
+
+        if (shell.SelectedStrategy is not { } selected) return;
 
         Window? window = null;
         object? strategyVm = null;
@@ -514,19 +697,24 @@ public partial class MainWindow : Window
 
     private void OnQuickBacktest(object? sender, RoutedEventArgs e)
     {
-        if (Vm?.SelectedStrategy is not { } strategy ||
+        if (Vm?.SelectedCatalogItem is not { HasQuickBacktest: true } item ||
             (Application.Current as App)?.Services is not { } sp) return;
 
         var vm = sp.GetRequiredService<TradingTerminal.Backtest.QuickBacktestViewModel>();
         var window = sp.GetRequiredService<TradingTerminal.Backtest.AvaloniaUi.QuickBacktestAvaloniaWindow>();
         window.DataContext = vm;
-        window.Title = $"Quick backtest - {strategy.DisplayName}";
+        window.Title = $"Quick backtest - {item.Name}";
         ShowDisposing(window, vm);
-        vm.Initialize(
-            strategy.BacktestStrategyId,
-            strategy.DisplayName,
-            strategy.DataRequirement.HasFlag(StrategyDataRequirement.TradeTape));
-        Vm.ActivityLog.Append("Backtest", "INFO", $"Opened quick backtest for '{strategy.DisplayName}'.");
+        if (item.StrategyKernel is { } authored)
+            vm.Initialize(authored);
+        else if (item.Strategy is { } strategy)
+            vm.Initialize(
+                strategy.BacktestStrategyId,
+                strategy.DisplayName,
+                strategy.DataRequirement.HasFlag(StrategyDataRequirement.TradeTape));
+        else
+            return;
+        Vm.ActivityLog.Append("Backtest", "INFO", $"Opened quick backtest for '{item.Name}'.");
     }
 
     private async void OnEditStrategyCard(object? sender, RoutedEventArgs e)

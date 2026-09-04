@@ -22,14 +22,19 @@ public sealed partial class StrategyAuthoringViewModel
 
     public int WorkbenchGridColumn => IsDesignScreen ? 3 : 1;
     public int WorkbenchGridColumnSpan => IsDesignScreen ? 1 : 3;
-    public bool ShowImplementationTabs => IsBuildScreen || !GenerateCandidateFirst;
+    public bool ShowImplementationTabs => IsBuildScreen || !GenerateCandidateFirst || AuthoredUnitSpecification is not null;
     public bool ShowScreenNavigation => GenerateCandidateFirst;
     public bool ShowDesignRequestHeader => IsDesignScreen && GenerateCandidateFirst;
     public bool ShowImplementationHeader =>
         (IsBuildScreen && !ShowNativeStrategyRunPanel) || !GenerateCandidateFirst;
     public bool ShowNativeImplementationHeader => ShowNativeStrategyRunPanel;
+    public bool HasAuthoredUnitCSharpFiles =>
+        AuthoredUnitSpecification is not null &&
+        Files.Count > 0 &&
+        Files.All(static file => file.Name.EndsWith(".cs", StringComparison.OrdinalIgnoreCase));
+
     public bool CanCompileCurrentSource =>
-        HasExpertCSharpFiles &&
+        (HasExpertCSharpFiles || HasAuthoredUnitCSharpFiles) &&
         !HasDetachedImplementationSource &&
         !IsGenerating;
 
@@ -48,11 +53,13 @@ public sealed partial class StrategyAuthoringViewModel
         IsBuildScreen && !ShowNativeStrategyRunPanel && HasGeneratedCandidates;
     public bool ShowCandidateEmptyState => IsDesignScreen
         ? !HasCandidate
-        : !ShowNativeStrategyRunPanel && !HasGeneratedCandidates && !IsGeneratingCandidates;
+        : !ShowNativeStrategyRunPanel && !HasGeneratedCandidates &&
+          !HasAuthoredUnitCSharpFiles && !IsGeneratingCandidates;
     public bool ShowStartImplementationAction =>
         IsBuildScreen &&
         !ShowNativeStrategyRunPanel &&
         !HasGeneratedCandidates &&
+        !HasAuthoredUnitCSharpFiles &&
         !IsGeneratingCandidates;
     public bool ShowCliWorkspaceFooter =>
         IsBuildScreen && !ShowNativeStrategyRunPanel && AvailableClis.Count > 0;

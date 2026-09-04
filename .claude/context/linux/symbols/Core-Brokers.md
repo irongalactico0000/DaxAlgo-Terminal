@@ -1,11 +1,33 @@
 # TradingTerminal.Core / Brokers — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `330db91800ba`. Declaration lines only;
+Generated from source fingerprint `e91d50e75733`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Core/TradingTerminal.Core/Brokers/BrokerApiUsage.cs
 ```cs
    17: public sealed record BrokerApiUsage(
+```
+
+## src/linux/Core/TradingTerminal.Core/Brokers/BrokerCapabilities.cs
+```cs
+    8: public enum InstrumentCatalogMode
+   19: public enum MarketDataDeliveryMode
+   31: public sealed record MarketDataCapabilities(
+   40: public bool SupportsInstruments => Instruments != InstrumentCatalogMode.Unsupported;
+   41: public bool SupportsHistoricalBars => HistoricalBars != MarketDataDeliveryMode.Unsupported;
+   42: public bool SupportsLiveBars => LiveBars != MarketDataDeliveryMode.Unsupported;
+   43: public bool SupportsLevel1Quotes => Level1Quotes != MarketDataDeliveryMode.Unsupported;
+   44: public bool SupportsLevel2Depth => Level2Depth != MarketDataDeliveryMode.Unsupported;
+   45: public bool SupportsLiveTrades => LiveTrades != MarketDataDeliveryMode.Unsupported;
+   46: public bool SupportsHistoricalTrades => HistoricalTrades != MarketDataDeliveryMode.Unsupported;
+   54: public sealed record ExecutionCapabilities(
+   65: public static ExecutionCapabilities Unavailable { get; } = new(
+   76: public bool IsAvailable =>
+   85: public sealed record BrokerCapabilities(
+   93: public static class BrokerCapabilityCatalog
+   95: public static BrokerCapabilities For(BrokerKind broker) => broker switch
+  179: public static MarketDataCapabilities MarketDataFor(BrokerKind broker) => For(broker).MarketData;
+  181: public static ExecutionCapabilities ExecutionFor(BrokerKind broker) => For(broker).Execution;
 ```
 
 ## src/linux/Core/TradingTerminal.Core/Brokers/BrokerConnectionMode.cs

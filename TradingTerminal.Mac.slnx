@@ -26,9 +26,13 @@
   <Project Path="src/linux/Charts/TradingTerminal.VolumeFootprint/TradingTerminal.VolumeFootprint.csproj" />
   <Project Path="src/linux/Core/TradingTerminal.Core/TradingTerminal.Core.csproj" />
   <Project Path="src/linux/Sdk/DaxAlgo.Strategy.Bundle/DaxAlgo.Strategy.Bundle.csproj" />
+  <Project Path="src/linux/Sdk/DaxAlgo.Package/DaxAlgo.Package.csproj" />
   <Project Path="src/linux/Sdk/DaxAlgo.Sdk/DaxAlgo.Sdk.csproj" />
   <Project Path="src/linux/Pipeline/TradingTerminal.Infrastructure/TradingTerminal.Infrastructure.csproj" />
   <Project Path="src/linux/Pipeline/TradingTerminal.MarketData/TradingTerminal.MarketData.csproj" />
+  <Project Path="src/linux/Pipeline/TradingTerminal.Sandbox/TradingTerminal.Sandbox.csproj" />
+  <Project Path="src/linux/Sandbox/TradingTerminal.Sandbox.Portfolio/TradingTerminal.Sandbox.Portfolio.csproj" />
+  <Project Path="src/linux/Sandbox/TradingTerminal.Sandbox.Runtime/TradingTerminal.Sandbox.Runtime.csproj" />
   <Project Path="src/linux/Shell/TradingTerminal.Accounts/TradingTerminal.Accounts.csproj" />
   <Project Path="src/linux/Shell/TradingTerminal.Login/TradingTerminal.Login.csproj" />
   <Project Path="src/linux/Shell/TradingTerminal.App.Avalonia/TradingTerminal.App.Avalonia.csproj" />
@@ -52,6 +56,12 @@
   <Project Path="tests/linux/DaxAlgo.Daxq.Vm.Tests/DaxAlgo.Daxq.Vm.Tests.csproj" />
   <Project Path="tests/linux/DaxAlgo.Daxq.Compiler.Tests/DaxAlgo.Daxq.Compiler.Tests.csproj" />
   <Project Path="tests/linux/DaxAlgo.Daxq.Host.Tests/DaxAlgo.Daxq.Host.Tests.csproj" />
+  <Project Path="tests/linux/DaxAlgo.Package.Tests/DaxAlgo.Package.Tests.csproj" />
+  <Project Path="tests/linux/DaxAlgo.Sdk.Drawing.Tests/DaxAlgo.Sdk.Drawing.Tests.csproj" />
+  <Project Path="tests/linux/TradingTerminal.Sandbox.Tests/TradingTerminal.Sandbox.Tests.csproj" />
+  <Project Path="tests/linux/TradingTerminal.Sandbox.Portfolio.Tests/TradingTerminal.Sandbox.Portfolio.Tests.csproj" />
+  <Project Path="tests/linux/TradingTerminal.Sandbox.Runtime.Tests/TradingTerminal.Sandbox.Runtime.Tests.csproj" />
+  <Project Path="tests/linux/TradingTerminal.UI.Core.Tests/TradingTerminal.UI.Core.Tests.csproj" />
   <Project Path="tests/linux/Fixtures/DaxAlgo.SamplePlugin/DaxAlgo.SamplePlugin.csproj" />
   <Project Path="tests/linux/TradingTerminal.Tests.Headless/TradingTerminal.Tests.Headless.csproj" />
   <Project Path="tests/linux/TradingTerminal.App.Avalonia.Tests/TradingTerminal.App.Avalonia.Tests.csproj" />

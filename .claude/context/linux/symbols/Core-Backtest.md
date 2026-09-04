@@ -1,12 +1,24 @@
 # TradingTerminal.Core / Backtest — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `330db91800ba`. Declaration lines only;
+Generated from source fingerprint `e91d50e75733`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Core/TradingTerminal.Core/Backtest/BacktestConfig.cs
 ```cs
     9: public enum BacktestDataSource
-   37: public sealed record BacktestConfig(
+   44: public sealed record BacktestConfig(
+   67: public sealed record BacktestBarSeries(
+```
+
+## src/linux/Core/TradingTerminal.Core/Backtest/BacktestInstrumentEvent.cs
+```cs
+   10: public sealed record BacktestInstrumentEvent(
+   25: public interface IInstrumentAwareBacktestStrategy
+   27:     Task OnMarketEventBatchAsync(
+   28:     IReadOnlyList<BacktestInstrumentEvent> events,
+   29:     Time.IClock clock,
+   30:     Trading.IOrderRouter router,
+   31:     CancellationToken ct);
 ```
 
 ## src/linux/Core/TradingTerminal.Core/Backtest/BacktestResult.cs

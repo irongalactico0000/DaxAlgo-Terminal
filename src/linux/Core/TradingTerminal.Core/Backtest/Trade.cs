@@ -13,4 +13,6 @@ public sealed record Trade(
     long Quantity,
     double EntryPrice,
     double ExitPrice,
-    double GrossPnl);
+    double GrossPnl,
+    string? Symbol = null,
+    double ContractMultiplier = 1d);

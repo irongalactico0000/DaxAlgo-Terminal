@@ -1,12 +1,12 @@
 # macOS index / Pipeline
 
-Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
+Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 
 | File | LOC | Tree | Project | Role | Public surface | Purpose |
 |---|---:|---|---|---|---|---|
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Alpaca/RealAlpacaClient.cs` | 482 | linux | TradingTerminal.Infrastructure | product | Y | Stock + trading must be wired (the primary product). Crypto is optional |
-| `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/BacktestOrderRouter.cs` | 97 | linux | TradingTerminal.Infrastructure | product | Y | backed by a . Synchronous — |
-| `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/BacktestSession.cs` | 134 | linux | TradingTerminal.Infrastructure | product | Y | Parameterless ctor for parquet-only callers (CLI, existing tests). |
+| `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/BacktestOrderRouter.cs` | 109 | linux | TradingTerminal.Infrastructure | product | Y | Resolves the original contract for fill accounting and canonical callbacks. |
+| `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/BacktestSession.cs` | 179 | linux | TradingTerminal.Infrastructure | product | Y | Parameterless ctor for parquet-only callers (CLI, existing tests). |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/BacktestStrategyCatalog.cs` | 22 | linux | TradingTerminal.Infrastructure | product | Y | Registers the dynamic backtest-strategy registry. The macOS product intentionally ships no |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Fast/FastBacktestServiceCollectionExtensions.cs` | 94 | linux | TradingTerminal.Infrastructure | product | Y | Registers with a real |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Fast/NullFastBacktestRunner.cs` | 24 | linux | TradingTerminal.Infrastructure | product | Y | Fallback implementation registered when the C++ tick backtester binary is not present |
@@ -14,7 +14,7 @@ Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/IBacktestStrategyRegistry.cs` | 67 | linux | TradingTerminal.Infrastructure | product | Y | Look up a strategy by id, or null if not registered. |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/L1FillModel.cs` | 97 | linux | TradingTerminal.Infrastructure | product | Y | Strategy for deciding whether a pending order fills against the current L1 |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/PendingOrder.cs` | 16 | linux | TradingTerminal.Infrastructure | product | Y | Mutable bookkeeping for an order resting in the simulated order book. |
-| `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Persistence/BacktestTickSource.cs` | 137 | linux | TradingTerminal.Infrastructure | product | Y | Yields the event stream the engine should replay for this config. For |
+| `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Persistence/BacktestTickSource.cs` | 315 | linux | TradingTerminal.Infrastructure | product | Y | Yields the event stream the engine should replay for this config. Completed-bar |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Persistence/CsvTickReader.cs` | 47 | linux | TradingTerminal.Infrastructure | product | Y | Streams quotes from a CSV file — header timestamp_micros,bid,ask,bid_size,ask_size |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Persistence/CsvTradeReader.cs` | 54 | linux | TradingTerminal.Infrastructure | product | Y | Streams trade prints from a CSV file — header timestamp_micros,price,size,aggressor |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Persistence/DuckDbParquetQueryService.cs` | 154 | linux | TradingTerminal.Infrastructure | product | Y | Normalizes a filesystem path/glob for embedding in a SQL string literal: |
@@ -26,14 +26,14 @@ Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Persistence/TradeRecord.cs` | 16 | linux | TradingTerminal.Infrastructure | product | Y | Wire format for trade prints written to parquet — the optional trade |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Persistence/UnsupportedParquetQueryService.cs` | 28 | linux | TradingTerminal.Infrastructure | product | Y | Non-Windows fallback for . The DuckDB-backed implementation is |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/SimulatedClock.cs` | 23 | linux | TradingTerminal.Infrastructure | product | Y | Engine-only — advance the clock to the timestamp of the next replayed |
-| `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/SimulatedOrderBook.cs` | 100 | linux | TradingTerminal.Infrastructure | product | Y | Holds working orders and evaluates fills on every tick using an injected |
+| `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/SimulatedOrderBook.cs` | 117 | linux | TradingTerminal.Infrastructure | product | Y | Legacy single-contract entry point retained for direct callers. |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/StatisticsCalculator.cs` | 176 | linux | TradingTerminal.Infrastructure | product | Y | Computes from a finished run. All ratios are computed |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Strategies/IReproStrategyRegistrar.cs` | 36 | linux | TradingTerminal.Infrastructure | product | Y | Bridge the result to a manifest, score confidence, build the paper-tagged option, |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Strategies/ReproStrategyRegistrar.cs` | 55 | linux | TradingTerminal.Infrastructure | product | Y | Default : runs the bridge, scores confidence, builds the |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Strategies/ReproducedSignalBacktestStrategy.cs` | 66 | linux | TradingTerminal.Infrastructure | product | Y | Single-instrument view of a paper reproduction's replay, for the |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Strategies/ReproducedSignalStrategyKernel.cs` | 121 | linux | TradingTerminal.Infrastructure | product | Y | Advance this instrument's cursor to the latest signal at-or-before the engine clock |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/Strategies/ReproducedStrategyFactory.cs` | 81 | linux | TradingTerminal.Infrastructure | product | Y | Prefix for ids of reproduced strategies so they're recognisable in the catalog |
-| `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/TradeLedger.cs` | 71 | linux | TradingTerminal.Infrastructure | product | Y | Position + cash accounting for the backtester. Pairs entry fills with exit |
+| `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/TradeLedger.cs` | 141 | linux | TradingTerminal.Infrastructure | product | Y | Shared-cash, per-contract backtest accounting. Each contract owns its own FIFO lots and |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Backtest/WalkForwardGridBuilders.cs` | 28 | linux | TradingTerminal.Infrastructure | product | Y | The strategy's walk-forward grid for the given axes, as (label, fresh-builder) pairs. |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Binance/RealBinanceClient.cs` | 495 | linux | TradingTerminal.Infrastructure | product | Y | Reads one full WebSocket text message (re-assembling continuation frames), or null on |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Brokers/BrokerApiMeter.cs` | 80 | linux | TradingTerminal.Infrastructure | product | Y | Heuristic per-minute soft cap by broker. 0 = no known cap. |
@@ -47,6 +47,11 @@ Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Crypto/CryptoStream.cs` | 165 | linux | TradingTerminal.Infrastructure | product | Y | Reads one full WebSocket text message (re-assembling continuation frames), or null on |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Crypto/L2OrderBook.cs` | 54 | linux | TradingTerminal.Infrastructure | product | Y | Apply one level. |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/DependencyInjection.cs` | 273 | linux | TradingTerminal.Infrastructure | product | Y | Registers the broker layer (real clients only — no synthetic fallbacks), market-data |
+| `src/linux/Pipeline/TradingTerminal.Infrastructure/Execution/ExecutionUnixSocket.cs` | 297 | linux | TradingTerminal.Infrastructure | product | Y | Authenticated, same-user, Unix-domain-socket server over one Paper service engine. |
+| `src/linux/Pipeline/TradingTerminal.Infrastructure/Execution/MacExecutionServiceSecretStore.cs` | 117 | linux | TradingTerminal.Infrastructure | product | Y | Stores the local execution-service authentication secret directly in the current user's macOS |
+| `src/linux/Pipeline/TradingTerminal.Infrastructure/Execution/PaperExecutionServiceRuntime.cs` | 180 | linux | TradingTerminal.Infrastructure | product | Y | Renews the current durable owner generation without changing its fencing token. |
+| `src/linux/Pipeline/TradingTerminal.Infrastructure/Execution/SqliteOrderEventStore.cs` | 1366 | linux | TradingTerminal.Infrastructure | product | Y | File-backed Paper OMS event store. Inbox dedupe, immutable event, replayed projection, risk/fill |
+| `src/linux/Pipeline/TradingTerminal.Infrastructure/Execution/SqliteOrderLedgerSchema.cs` | 466 | linux | TradingTerminal.Infrastructure | product | N |  |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Ib/ConnectionManager.cs` | 196 | linux | TradingTerminal.Infrastructure | product | Y | Test/internal hook for supplying a non-generic logger (e.g. one created per broker |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Ib/IbCuratedCatalog.cs` | 555 | linux | TradingTerminal.Infrastructure | product | Y | Comprehensive hand-curated instrument catalog for Interactive Brokers. TWS API has no |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Ib/RealIbClient.cs` | 482 | linux | TradingTerminal.Infrastructure | product | Y | Real Interactive Brokers client. Compiled only when the TWS CSharpAPI.dll is resolvable |
@@ -119,7 +124,8 @@ Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Sidecar/SidecarHostService.cs` | 422 | linux | TradingTerminal.Infrastructure | product | Y | Walks up from |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Sidecar/SidecarServiceCollectionExtensions.cs` | 26 | linux | TradingTerminal.Infrastructure | product | Y | Registers the managed Python sidecar launcher: binds , registers the |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Simulation/SimulatedBrokerClient.cs` | 446 | linux | TradingTerminal.Infrastructure | product | Y | Find the stored |
-| `src/linux/Pipeline/TradingTerminal.Infrastructure/Strategies/Authoring/AuthoredStrategyInstaller.cs` | 182 | linux | TradingTerminal.Infrastructure | product | Y | What an install did, in the terms the user cares about: is |
+| `src/linux/Pipeline/TradingTerminal.Infrastructure/Strategies/Authoring/AuthoredStrategyInstaller.cs` | 223 | linux | TradingTerminal.Infrastructure | product | Y | What an install did, in the terms the user cares about: is |
+| `src/linux/Pipeline/TradingTerminal.Infrastructure/Strategies/Authoring/RoslynAuthoredUnitCompilerV1.cs` | 887 | linux | TradingTerminal.Infrastructure | product | Y | Roslyn compiler for canonical SDK visualizers and strategy kernels. Unlike the legacy |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Strategies/Authoring/RoslynStrategyCompiler.cs` | 369 | linux | TradingTerminal.Infrastructure | product | Y | Ambient namespaces every script gets for free (kept in a dedicated tree |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/StrategyAgent/IStrategyAgentClient.cs` | 56 | linux | TradingTerminal.Infrastructure | product | Y | Typed client for the existing native-strategy session and run lifecycle. |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/StrategyAgent/IStrategyAgentHost.cs` | 11 | linux | TradingTerminal.Infrastructure | product | Y | Owns the dedicated local Python strategy-agent process. |
@@ -144,11 +150,12 @@ Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
 | `src/linux/Pipeline/TradingTerminal.MarketData/Archive/MarketDataArchiver.cs` | 574 | linux | TradingTerminal.MarketData | product | Y | Period-aligned windows spanning the local data extent (oldest first), each labelled |
 | `src/linux/Pipeline/TradingTerminal.MarketData/Archive/Telegram/TelegramArchiveTransport.cs` | 254 | linux | TradingTerminal.MarketData | product | Y | Set by the explicit-credentials |
 | `src/linux/Pipeline/TradingTerminal.MarketData/Archive/Telegram/TelegramAuthPrompt.cs` | 19 | linux | TradingTerminal.MarketData | product | Y | Trivial prompt that always returns null — used in headless contexts where |
+| `src/linux/Pipeline/TradingTerminal.MarketData/ChartPatternSearchV1.cs` | 277 | linux | TradingTerminal.MarketData | product | Y | Searches the latest persisted OHLCV window for every eligible canonical instrument. It |
 | `src/linux/Pipeline/TradingTerminal.MarketData/InstrumentDiscoveryService.cs` | 128 | linux | TradingTerminal.MarketData | product | Y | Hosted background service that loads each connected broker's full tradable universe once |
 | `src/linux/Pipeline/TradingTerminal.MarketData/MarketDataHub.cs` | 46 | linux | TradingTerminal.MarketData | product | Y | In-memory built on Rx subjects, one per instrument/stream. The |
-| `src/linux/Pipeline/TradingTerminal.MarketData/MarketDataIngestService.cs` | 249 | linux | TradingTerminal.MarketData | product | Y | Brokers that stamp ticks with local arrival time rather than exchange time, |
-| `src/linux/Pipeline/TradingTerminal.MarketData/MarketDataPipelineServiceCollectionExtensions.cs` | 195 | linux | TradingTerminal.MarketData | product | Y | Best-effort startup probe — opens and closes a connection to decide availability. |
-| `src/linux/Pipeline/TradingTerminal.MarketData/MarketDataRepository.cs` | 219 | linux | TradingTerminal.MarketData | product | Y | Default . Routes per-request to the broker named in the |
+| `src/linux/Pipeline/TradingTerminal.MarketData/MarketDataIngestService.cs` | 307 | linux | TradingTerminal.MarketData | product | Y | Brokers that stamp ticks with local arrival time rather than exchange time, |
+| `src/linux/Pipeline/TradingTerminal.MarketData/MarketDataPipelineServiceCollectionExtensions.cs` | 197 | linux | TradingTerminal.MarketData | product | Y | Best-effort startup probe — opens and closes a connection to decide availability. |
+| `src/linux/Pipeline/TradingTerminal.MarketData/MarketDataRepository.cs` | 259 | linux | TradingTerminal.MarketData | product | Y | Default . Routes per-request to the broker named in the |
 | `src/linux/Pipeline/TradingTerminal.MarketData/Store/CompositeMarketDataStore.cs` | 87 | linux | TradingTerminal.MarketData | product | Y | Routes the canonical store seam across two backends by data kind: the |
 | `src/linux/Pipeline/TradingTerminal.MarketData/Store/EpochTime.cs` | 20 | linux | TradingTerminal.MarketData | product | Y | Converts between (UTC) and epoch microseconds — the on-disk timestamp |
 | `src/linux/Pipeline/TradingTerminal.MarketData/Store/IInstrumentPersistence.cs` | 23 | linux | TradingTerminal.MarketData | product | N | Insert (or fetch existing) by the canonical key, returning the row id. |
@@ -171,3 +178,12 @@ Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
 | `src/linux/Pipeline/TradingTerminal.MarketData/Threading/FeedChannel.cs` | 91 | linux | TradingTerminal.MarketData | product | Y | Per-stream queue ceilings (items). Sized so a healthy consumer never sees a |
 | `src/linux/Pipeline/TradingTerminal.MarketData/Threading/IUiDispatcher.cs` | 17 | linux | TradingTerminal.MarketData | product | Y | True when the caller is already on the UI thread. |
 | `src/linux/Pipeline/TradingTerminal.MarketData/Threading/ImmediateUiDispatcher.cs` | 20 | linux | TradingTerminal.MarketData | product | Y | Synchronous, headless : there is no UI thread to marshal to, so |
+| `src/linux/Pipeline/TradingTerminal.Sandbox/LegacyStrategyKernelAdapter.cs` | 340 | linux | TradingTerminal.Sandbox | product | Y | Creates an adapter with the parameter schema already resolved by the loader. |
+| `src/linux/Pipeline/TradingTerminal.Sandbox/MediatedAlertSink.cs` | 178 | linux | TradingTerminal.Sandbox | product | Y | An accepted alert routed by the host to its fixed in-view banner |
+| `src/linux/Pipeline/TradingTerminal.Sandbox/PaperMarketDataExecutionBridge.cs` | 308 | linux | TradingTerminal.Sandbox | product | Y | Observable fail-closed diagnostic from the L1-to-Paper execution boundary. |
+| `src/linux/Pipeline/TradingTerminal.Sandbox/PositionTrackingOrderRouter.cs` | 476 | linux | TradingTerminal.Sandbox | product | Y | The instrument receiving every translated target. |
+| `src/linux/Pipeline/TradingTerminal.Sandbox/SandboxParameters.cs` | 102 | linux | TradingTerminal.Sandbox | product | Y | A read-only, kind-checked view over host-owned strategy parameter values. Parameter names are |
+| `src/linux/Pipeline/TradingTerminal.Sandbox/SandboxVisualizerContext.cs` | 96 | linux | TradingTerminal.Sandbox | product | Y | The complete read/input capability context for a sandboxed visualizer. |
+| `src/linux/Pipeline/TradingTerminal.Sandbox/SandboxVisualizerRuntime.cs` | 975 | linux | TradingTerminal.Sandbox | product | Y | Lifecycle state for one automatically hosted sandbox visualizer. |
+| `src/linux/Pipeline/TradingTerminal.Sandbox/ScopedMarketDataView.cs` | 292 | linux | TradingTerminal.Sandbox | product | Y | A host-owned, read-only projection of . Instruments or stream |
+| `src/linux/Pipeline/TradingTerminal.Sandbox/SdkStrategyBacktestAdapter.cs` | 473 | linux | TradingTerminal.Sandbox | product | Y | One reviewed canonical instrument and its backtest routing contract. |

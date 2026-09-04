@@ -37,6 +37,18 @@ public static class StrategyCodegenServiceCollectionExtensions
         services.AddSingleton<StrategyCandidateGenerationOrchestratorV1>();
         services.AddSingleton<IStrategyCandidateGeneratorV1>(sp =>
             sp.GetRequiredService<StrategyCandidateGenerationOrchestratorV1>());
+        services.AddSingleton<ChartReferenceInspectorV1>();
+        services.AddSingleton<IChartReferenceInspectorV1>(sp =>
+            sp.GetRequiredService<ChartReferenceInspectorV1>());
+        services.AddSingleton<AuthoredUnitSpecificationGeneratorV1>();
+        services.AddSingleton<IAuthoredUnitSpecificationGeneratorV1>(sp =>
+            sp.GetRequiredService<AuthoredUnitSpecificationGeneratorV1>());
+        services.AddSingleton<AuthoredUnitIntentClassifierV1>();
+        services.AddSingleton<IAuthoredUnitIntentClassifierV1>(sp =>
+            sp.GetRequiredService<AuthoredUnitIntentClassifierV1>());
+        services.AddSingleton<AuthoredUnitSourceGeneratorV1>();
+        services.AddSingleton<IAuthoredUnitSourceGeneratorV1>(sp =>
+            sp.GetRequiredService<AuthoredUnitSourceGeneratorV1>());
         services.AddSingleton<IStrategyGenerationLaneAgentV1>(
             sp => new StrategyGenerationLaneAgentV1(
                 StrategyGenerationLaneV1.VibePython,

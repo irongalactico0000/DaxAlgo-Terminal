@@ -35,7 +35,11 @@ public sealed record StrategyCandidateGenerationRequestV1(
     string CandidateId,
     string RawIntent,
     StrategyCandidateV1? CurrentCandidate = null,
-    string? UserMessage = null);
+    string? UserMessage = null,
+    IReadOnlyList<AuthoredChartReferenceV1>? ChartReferences = null,
+    IReadOnlyList<AuthoredChartReferenceInspectionV1>? ChartReferenceInspections = null,
+    IReadOnlyList<AuthoredChartReferenceResolutionV1>? ChartReferenceResolutions = null,
+    IReadOnlyList<ChartPatternSelectionV1>? ChartPatternSelections = null);
 
 public sealed record StrategyCandidateGenerationResultV1(
     StrategyCandidateV1? Candidate,
@@ -329,7 +333,88 @@ public sealed class StrategyCandidateGenerationOrchestratorV1(
                     "The candidate revision cannot be incremented."));
         }
 
+        ValidateChartReferences(request, issues);
+
         return !issues.Any(IsError);
+    }
+
+    private static void ValidateChartReferences(
+        StrategyCandidateGenerationRequestV1 request,
+        ICollection<StrategyCandidateGenerationIssueV1> issues)
+    {
+        var references = request.ChartReferences ?? [];
+        var inspections = request.ChartReferenceInspections ?? [];
+        var resolutions = request.ChartReferenceResolutions ?? [];
+        var selections = request.ChartPatternSelections ?? [];
+        if (references.Count > 8)
+            issues.Add(Error("GENERATION_CHART_REFERENCE_LIMIT", "chartReferences",
+                "At most eight reference charts may be supplied to one request."));
+
+        var duplicateId = references
+            .Where(static item => item is not null && !string.IsNullOrWhiteSpace(item.ReferenceId))
+            .GroupBy(static item => item.ReferenceId, StringComparer.Ordinal)
+            .FirstOrDefault(static group => group.Count() > 1);
+        if (duplicateId is not null)
+            issues.Add(Error("GENERATION_CHART_REFERENCE_DUPLICATE", "chartReferences",
+                $"Reference id '{duplicateId.Key}' is duplicated."));
+
+        for (var index = 0; index < references.Count; index++)
+        {
+            var reference = references[index];
+            var path = $"chartReferences[{index}]";
+            if (reference is null)
+            {
+                issues.Add(Error("GENERATION_CHART_REFERENCE_REQUIRED", path,
+                    "Reference chart entries cannot be null."));
+                continue;
+            }
+            if (string.IsNullOrWhiteSpace(reference.ReferenceId))
+                issues.Add(Error("GENERATION_CHART_REFERENCE_ID_REQUIRED", $"{path}.referenceId",
+                    "A reference id is required."));
+            if (reference.ContentHashSha256 is not { Length: 64 } hash ||
+                !hash.All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f'))
+                issues.Add(Error("GENERATION_CHART_REFERENCE_HASH_INVALID", $"{path}.contentHashSha256",
+                    "The reference must carry a lowercase SHA-256 content hash."));
+            if (reference.Similarity is null || reference.Similarity.Count == 0 ||
+                reference.Similarity.Any(static value => !Enum.IsDefined(value)))
+                issues.Add(Error("GENERATION_CHART_REFERENCE_SIMILARITY_REQUIRED", $"{path}.similarity",
+                    "The user must state what should be similar about this chart."));
+        }
+
+        var referenceIds = references.Where(static item => item is not null)
+            .Select(static item => item.ReferenceId).ToHashSet(StringComparer.Ordinal);
+        foreach (var inspection in inspections)
+        {
+            var reference = references.FirstOrDefault(item => item is not null &&
+                string.Equals(item.ReferenceId, inspection?.ReferenceId, StringComparison.Ordinal));
+            if (inspection is null || reference is null ||
+                !string.Equals(
+                    inspection.ContentHashSha256,
+                    reference.ContentHashSha256,
+                    StringComparison.Ordinal))
+            {
+                issues.Add(Error("GENERATION_CHART_REFERENCE_INSPECTION_ORPHAN", "chartReferenceInspections",
+                    "Every chart inspection must match one supplied reference id and SHA-256 hash."));
+            }
+        }
+        foreach (var resolution in resolutions)
+        {
+            if (resolution is null || !referenceIds.Contains(resolution.ReferenceId))
+                issues.Add(Error("GENERATION_CHART_REFERENCE_RESOLUTION_ORPHAN", "chartReferenceResolutions",
+                    "Every chart analysis must identify one of the supplied reference artifacts."));
+        }
+        foreach (var selection in selections)
+        {
+            var reference = references.FirstOrDefault(item => item is not null &&
+                string.Equals(item.ReferenceId, selection?.ReferenceId, StringComparison.Ordinal));
+            if (selection is null || reference is null ||
+                !string.Equals(selection.ReferenceContentHashSha256, reference.ContentHashSha256, StringComparison.Ordinal) ||
+                selection.Match is null || selection.Match.InstrumentId.IsNone)
+            {
+                issues.Add(Error("GENERATION_CHART_PATTERN_SELECTION_ORPHAN", "chartPatternSelections",
+                    "Every historical-pattern selection must carry a resolved instrument and match one supplied reference id and hash."));
+            }
+        }
     }
 
     private static void ValidateDraft(

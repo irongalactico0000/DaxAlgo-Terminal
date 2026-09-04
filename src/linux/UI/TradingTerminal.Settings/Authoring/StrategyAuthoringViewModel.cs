@@ -9,6 +9,9 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TradingTerminal.Core.Configuration;
+using TradingTerminal.Core.Brokers;
+using TradingTerminal.Core.Domain;
+using TradingTerminal.Core.MarketData;
 using TradingTerminal.Core.Strategies.Authoring;
 using TradingTerminal.Core.Strategies.Definition;
 using TradingTerminal.Core.Strategies.Generation;
@@ -53,6 +56,16 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     private readonly AuthoredStrategyInstaller? _installer;
     private readonly ICliWorkspaceLauncher? _cliLauncher;
     private readonly IAuthoringSessionRepository _sessionRepository;
+    private readonly IAuthoringChartReferenceRepository _chartReferenceRepository;
+    private readonly IChartReferenceInspectorV1? _chartReferenceInspector;
+    private readonly IChartPatternSearchV1? _chartPatternSearch;
+    private readonly IAuthoredUnitIntentClassifierV1? _authoredUnitIntentClassifier;
+    private readonly IAuthoredUnitSpecificationGeneratorV1? _authoredUnitSpecificationGenerator;
+    private readonly IAuthoredUnitSourceGeneratorV1? _authoredUnitSourceGenerator;
+    private readonly IAuthoredUnitCompilerV1? _authoredUnitCompiler;
+    private readonly IVisualizerRegistry? _visualizerRegistry;
+    private readonly IStrategyKernelRegistry? _strategyKernelRegistry;
+    private readonly IInstrumentRegistry? _instrumentRegistry;
 
     private CancellationTokenSource? _generateCts;
     private StrategyBuildSession? _session;
@@ -92,7 +105,17 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         ITradeIrCandidateSynthesizerV1? tradeIrCandidateSynthesizer = null,
         ITradeIrSimulatedBacktestRunnerV1? tradeIrSimulatedBacktestRunner = null,
         IStrategyIntentExtensionRegistryV1? strategyIntentExtensionRegistry = null,
-        IStrategyAgentClient? strategyAgentClient = null)
+        IStrategyAgentClient? strategyAgentClient = null,
+        IAuthoringChartReferenceRepository? chartReferenceRepository = null,
+        IChartReferenceInspectorV1? chartReferenceInspector = null,
+        IChartPatternSearchV1? chartPatternSearch = null,
+        IAuthoredUnitIntentClassifierV1? authoredUnitIntentClassifier = null,
+        IAuthoredUnitSpecificationGeneratorV1? authoredUnitSpecificationGenerator = null,
+        IInstrumentRegistry? instrumentRegistry = null,
+        IAuthoredUnitSourceGeneratorV1? authoredUnitSourceGenerator = null,
+        IAuthoredUnitCompilerV1? authoredUnitCompiler = null,
+        IVisualizerRegistry? visualizerRegistry = null,
+        IStrategyKernelRegistry? strategyKernelRegistry = null)
     {
         _compiler = compiler;
         _registry = registry;
@@ -108,6 +131,16 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         _installer = installer;
         _cliLauncher = cliLauncher;
         _sessionRepository = sessionRepository ?? FileAuthoringSessionRepository.Instance;
+        _chartReferenceRepository = chartReferenceRepository ?? new FileAuthoringChartReferenceRepository();
+        _chartReferenceInspector = chartReferenceInspector;
+        _chartPatternSearch = chartPatternSearch;
+        _authoredUnitIntentClassifier = authoredUnitIntentClassifier;
+        _authoredUnitSpecificationGenerator = authoredUnitSpecificationGenerator;
+        _authoredUnitSourceGenerator = authoredUnitSourceGenerator;
+        _authoredUnitCompiler = authoredUnitCompiler;
+        _visualizerRegistry = visualizerRegistry;
+        _strategyKernelRegistry = strategyKernelRegistry;
+        _instrumentRegistry = instrumentRegistry;
 
         Diagnostics = [];
         Messages = [];
@@ -120,6 +153,9 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         CandidateIssues = [];
         GeneratedCandidateOptions = [];
         GenerationLaneProgressRows = [];
+        ChartReferences = [];
+        ChartReferenceInspections = [];
+        ChartPatternSelections = [];
         AllStarterBriefs = StrategyStarterCatalog.All;
         foreach (var brief in AllStarterBriefs) AddStrategyIntentProfile(brief);
         VisibleStarterBriefs = [];
@@ -288,6 +324,374 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     public ObservableCollection<StrategyCandidateIssueV1> CandidateIssues { get; }
     public ObservableCollection<StrategyGenerationCandidateOption> GeneratedCandidateOptions { get; }
     public ObservableCollection<StrategyGenerationLaneProgressRow> GenerationLaneProgressRows { get; }
+
+    /// <summary>
+    /// Exact reference artifacts attached to this request. Their similarity modes are explicit so
+    /// "like this chart" cannot silently mean visual styling in one stage and price-pattern search
+    /// in another.
+    /// </summary>
+    public ObservableCollection<AuthoringChartReferenceSnapshot> ChartReferences { get; }
+    public ObservableCollection<AuthoredChartReferenceInspectionV1> ChartReferenceInspections { get; }
+    public ObservableCollection<ChartPatternSelectionV1> ChartPatternSelections { get; }
+    public IReadOnlyList<BarSize> ChartPatternTimeframeOptions { get; } = Enum.GetValues<BarSize>();
+
+    [ObservableProperty] private AuthoredUnitSpecificationV1? _authoredUnitSpecification;
+    [ObservableProperty] private bool _isInspectingChartReferences;
+    [ObservableProperty] private bool _isSearchingChartPatterns;
+    [ObservableProperty] private BarSize _selectedChartPatternTimeframe = BarSize.OneHour;
+    [ObservableProperty] private ChartPatternSearchResultV1? _chartPatternSearchResult;
+
+    public bool HasChartReferences => ChartReferences.Count > 0;
+    public bool HasChartReferenceInspections => ChartReferenceInspections.Count > 0;
+    public bool HasSearchableChartReference => ChartReferences.Any(reference =>
+        reference.Reference.Similarity.Any(static aspect => aspect is
+            ChartReferenceSimilarityV1.MarketPattern or ChartReferenceSimilarityV1.RelatedInstruments) &&
+        ChartReferenceInspections.Any(inspection =>
+            string.Equals(inspection.ReferenceId, reference.Reference.ReferenceId, StringComparison.Ordinal) &&
+            string.Equals(inspection.ContentHashSha256, reference.Reference.ContentHashSha256, StringComparison.Ordinal) &&
+            inspection.PatternFingerprint is not null));
+    public bool HasChartPatternSearchResult => ChartPatternSearchResult is not null;
+    public bool HasChartPatternMatches => ChartPatternSearchResult?.Matches.Count > 0;
+    public bool HasSelectedChartPattern => ChartPatternSelections.Count > 0;
+    public string SelectedChartPatternText => ChartPatternSelections.LastOrDefault() is { } selection
+        ? $"Selected {selection.Match.CanonicalSymbol} · score {selection.Match.Score:0.0} · {selection.Match.Timeframe.ToDisplayString()}"
+        : "No historical match selected";
+    public bool HasUninspectedChartReferences => ChartReferences.Any(reference =>
+        !ChartReferenceInspections.Any(inspection =>
+            string.Equals(inspection.ReferenceId, reference.Reference.ReferenceId, StringComparison.Ordinal) &&
+            string.Equals(inspection.ContentHashSha256, reference.Reference.ContentHashSha256, StringComparison.Ordinal)));
+    public bool HasUnresolvedChartReferences
+    {
+        get
+        {
+            if (ChartReferences.Count == 0) return false;
+            if (AuthoredUnitSpecification is null) return true;
+
+            var resolvedIds = AuthoredUnitSpecification.ReferenceResolutions
+                .Select(static resolution => resolution.ReferenceId)
+                .ToHashSet(StringComparer.Ordinal);
+            return ChartReferences.Any(item => !resolvedIds.Contains(item.Reference.ReferenceId));
+        }
+    }
+
+    public string ChartReferenceSummary => ChartReferences.Count switch
+    {
+        0 => "No reference chart attached",
+        1 => "1 exact reference chart attached",
+        _ => $"{ChartReferences.Count} exact reference charts attached",
+    };
+    public string ChartReferenceReadinessText => HasUninspectedChartReferences
+        ? "Reference analysis is required before implementation generation. Hyperion will not guess from the filename or prompt."
+        : HasUnresolvedChartReferences && ChartReferences.Any(item => item.Reference.Similarity.Any(static aspect => aspect is
+                ChartReferenceSimilarityV1.MarketPattern or ChartReferenceSimilarityV1.RelatedInstruments))
+            ? "The image was inspected; historical similarity search and instrument selection are still required before generation."
+            : HasUnresolvedChartReferences
+                ? "The image was inspected; its reviewed layers must now be frozen into the authored-unit specification before generation."
+        : HasChartReferences
+            ? "Every attached reference is hash-bound to a verified analysis."
+            : string.Empty;
+
+    partial void OnAuthoredUnitSpecificationChanged(AuthoredUnitSpecificationV1? value)
+    {
+        OnPropertyChanged(nameof(HasUnresolvedChartReferences));
+        OnPropertyChanged(nameof(ChartReferenceReadinessText));
+        OnPropertyChanged(nameof(CanGenerateFourCandidates));
+        OnPropertyChanged(nameof(CanGenerateCanonicalPaperStrategy));
+        OnPropertyChanged(nameof(HasAuthoredUnitCSharpFiles));
+        OnPropertyChanged(nameof(CanCompileCurrentSource));
+        GenerateFourCandidatesCommand.NotifyCanExecuteChanged();
+        GenerateCanonicalPaperStrategyCommand.NotifyCanExecuteChanged();
+        RegenerateFourCandidatesCommand.NotifyCanExecuteChanged();
+        CompileCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsInspectingChartReferencesChanged(bool value)
+    {
+        InspectChartReferencesCommand.NotifyCanExecuteChanged();
+        SendCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsSearchingChartPatternsChanged(bool value) => SendCommand.NotifyCanExecuteChanged();
+
+    partial void OnChartPatternSearchResultChanged(ChartPatternSearchResultV1? value)
+    {
+        OnPropertyChanged(nameof(HasChartPatternSearchResult));
+        OnPropertyChanged(nameof(HasChartPatternMatches));
+    }
+
+    private bool CanInspectChartReferences() =>
+        HasUninspectedChartReferences &&
+        !IsInspectingChartReferences &&
+        !IsGenerating &&
+        _chartReferenceInspector is not null &&
+        SelectedAiProvider is { IsAvailable: true };
+
+    [RelayCommand(CanExecute = nameof(CanInspectChartReferences))]
+    private async Task InspectChartReferencesAsync()
+    {
+        var choice = SelectedAiProvider;
+        var provider = choice is null ? null : ResolveClient(choice) ?? choice.Client;
+        if (provider is null || _chartReferenceInspector is null) return;
+
+        IsInspectingChartReferences = true;
+        try
+        {
+            foreach (var reference in ChartReferences.Where(item =>
+                         !ChartReferenceInspections.Any(inspection =>
+                             string.Equals(inspection.ReferenceId, item.Reference.ReferenceId, StringComparison.Ordinal) &&
+                             string.Equals(inspection.ContentHashSha256, item.Reference.ContentHashSha256, StringComparison.Ordinal))))
+            {
+                var content = await File.ReadAllBytesAsync(reference.ArtifactPath);
+                var result = await _chartReferenceInspector.InspectAsync(
+                    provider,
+                    new ChartReferenceInspectionRequestV1(reference.Reference, content));
+                InputTokens += result.Usage.InputTokens;
+                OutputTokens += result.Usage.OutputTokens;
+                CachedTokens += result.Usage.CachedInputTokens;
+                if (!result.Success)
+                {
+                    Status = $"Reference analysis stopped: {result.Error}";
+                    return;
+                }
+
+                ChartReferenceInspections.Add(result.Inspection!);
+                if (TryParseChartTimeframe(result.Inspection!.VisibleTimeframe, out var inspectedTimeframe))
+                    SelectedChartPatternTimeframe = inspectedTimeframe;
+            }
+
+            OnPropertyChanged(nameof(HasChartReferenceInspections));
+            OnPropertyChanged(nameof(HasUninspectedChartReferences));
+            OnPropertyChanged(nameof(HasSearchableChartReference));
+            Status = ChartReferences.Any(item => item.Reference.Similarity.Any(static aspect => aspect is
+                    ChartReferenceSimilarityV1.MarketPattern or ChartReferenceSimilarityV1.RelatedInstruments))
+                ? "Chart pixels were inspected. The extracted pattern query must now search real market history before matching instruments can be selected."
+                : "Chart pixels were inspected and hash-bound. The observed layout and indicators are ready for authored-unit specification generation.";
+            Save();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(exception, "Could not read a saved reference artifact");
+            Status = $"Reference analysis stopped: {exception.Message}";
+        }
+        finally
+        {
+            IsInspectingChartReferences = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task SearchSimilarChartsAsync(string? scopeName)
+    {
+        if (_chartPatternSearch is null)
+        {
+            Status = "Historical chart search is not available in this app composition.";
+            return;
+        }
+        if (!Enum.TryParse<ChartPatternCandidateScopeV1>(scopeName, ignoreCase: true, out var scope) ||
+            !Enum.IsDefined(scope))
+        {
+            Status = "Choose whether to search all known instruments or indexes only.";
+            return;
+        }
+
+        var reference = ChartReferences.FirstOrDefault(item => item.Reference.Similarity.Any(static aspect =>
+            aspect is ChartReferenceSimilarityV1.MarketPattern or ChartReferenceSimilarityV1.RelatedInstruments));
+        if (reference is null)
+        {
+            Status = "Attach a reference as a historical pattern or related-instrument request first.";
+            return;
+        }
+        var inspection = ChartReferenceInspections.FirstOrDefault(item =>
+            string.Equals(item.ReferenceId, reference.Reference.ReferenceId, StringComparison.Ordinal) &&
+            string.Equals(item.ContentHashSha256, reference.Reference.ContentHashSha256, StringComparison.Ordinal));
+        if (inspection?.PatternFingerprint is null)
+        {
+            Status = "Analyze the reference image before searching market history.";
+            return;
+        }
+
+        IsSearchingChartPatterns = true;
+        try
+        {
+            ChartPatternSearchResult = await _chartPatternSearch.SearchAsync(
+                new ChartPatternSearchRequestV1(
+                    reference.Reference.ReferenceId,
+                    reference.Reference.ContentHashSha256,
+                    inspection.PatternFingerprint,
+                    SelectedChartPatternTimeframe,
+                    Scope: scope),
+                CancellationToken.None);
+            RemoveChartPatternSelections(reference.Reference.ReferenceId);
+            Status = ChartPatternSearchResult.Matches.Count == 0
+                ? $"No comparable {SelectedChartPatternTimeframe.ToDisplayString()} history was found. {ChartPatternSearchResult.Explanation}"
+                : $"Found {ChartPatternSearchResult.Matches.Count} evidence-backed matches. Choose one before generating the chart unit. " +
+                  ChartPatternSearchResult.Explanation;
+            Save();
+        }
+        catch (OperationCanceledException)
+        {
+            Status = "Historical chart search stopped.";
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
+        {
+            _logger.LogWarning(exception, "Historical chart similarity search failed");
+            Status = $"Historical chart search stopped: {exception.Message}";
+        }
+        finally
+        {
+            IsSearchingChartPatterns = false;
+        }
+    }
+
+    [RelayCommand]
+    private void UseChartPatternMatch(ChartPatternMatchV1? match)
+    {
+        if (match is null || ChartPatternSearchResult is null ||
+            !ChartPatternSearchResult.Matches.Contains(match)) return;
+
+        RemoveChartPatternSelections(ChartPatternSearchResult.ReferenceId);
+        ChartPatternSelections.Add(new ChartPatternSelectionV1(
+            ChartPatternSearchResult.ReferenceId,
+            ChartPatternSearchResult.ReferenceContentHashSha256,
+            match));
+        OnPropertyChanged(nameof(HasSelectedChartPattern));
+        OnPropertyChanged(nameof(SelectedChartPatternText));
+        Status = $"Selected {match.CanonicalSymbol} from real {match.Timeframe.ToDisplayString()} history. " +
+                 "The selection describes similarity, not expected future return.";
+        AuthoredUnitSpecification = null;
+        Save();
+    }
+
+    private void RemoveChartPatternSelections(string referenceId)
+    {
+        for (var index = ChartPatternSelections.Count - 1; index >= 0; index--)
+            if (string.Equals(ChartPatternSelections[index].ReferenceId, referenceId, StringComparison.Ordinal))
+                ChartPatternSelections.RemoveAt(index);
+        OnPropertyChanged(nameof(HasSelectedChartPattern));
+        OnPropertyChanged(nameof(SelectedChartPatternText));
+    }
+
+    private static bool TryParseChartTimeframe(string? value, out BarSize timeframe)
+    {
+        var normalized = value?.Trim().ToLowerInvariant().Replace(" ", string.Empty);
+        timeframe = normalized switch
+        {
+            "1m" or "1min" or "1minute" => BarSize.OneMinute,
+            "3m" or "3min" or "3minutes" => BarSize.ThreeMinutes,
+            "5m" or "5min" or "5minutes" => BarSize.FiveMinutes,
+            "15m" or "15min" or "15minutes" => BarSize.FifteenMinutes,
+            "1h" or "1hr" or "1hour" => BarSize.OneHour,
+            "1d" or "1day" or "daily" => BarSize.OneDay,
+            _ => default,
+        };
+        return normalized is "1m" or "1min" or "1minute" or
+            "3m" or "3min" or "3minutes" or
+            "5m" or "5min" or "5minutes" or
+            "15m" or "15min" or "15minutes" or
+            "1h" or "1hr" or "1hour" or
+            "1d" or "1day" or "daily";
+    }
+
+    [RelayCommand]
+    private async Task AttachChartReferenceAsync(string? similarityName)
+    {
+        if (!Enum.TryParse<ChartReferenceSimilarityV1>(similarityName, ignoreCase: true, out var similarity) ||
+            !Enum.IsDefined(similarity))
+        {
+            Status = "Choose whether the reference means appearance, indicators, market pattern, or related instruments.";
+            return;
+        }
+
+        var path = await UiFile.OpenAsync(
+            "Reference chart",
+            ["png", "jpg", "jpeg", "webp", "pdf", "json"]);
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        try
+        {
+            var imported = await _chartReferenceRepository.ImportAsync(path, similarity);
+            var duplicate = ChartReferences.FirstOrDefault(item =>
+                string.Equals(
+                    item.Reference.ContentHashSha256,
+                    imported.Reference.ContentHashSha256,
+                    StringComparison.Ordinal));
+            if (duplicate is not null)
+            {
+                var merged = duplicate.Reference.Similarity
+                    .Append(similarity)
+                    .Distinct()
+                    .OrderBy(static value => value)
+                    .ToArray();
+                var index = ChartReferences.IndexOf(duplicate);
+                ChartReferences[index] = duplicate with
+                {
+                    Reference = duplicate.Reference with { Similarity = merged },
+                };
+            }
+            else
+            {
+                ChartReferences.Add(imported);
+            }
+
+            AuthoredUnitSpecification = null;
+            RemoveChartReferenceInspections(imported.Reference.ReferenceId);
+            ChartPatternSearchResult = null;
+            RemoveChartPatternSelections(imported.Reference.ReferenceId);
+            OnPropertyChanged(nameof(HasChartReferences));
+            OnPropertyChanged(nameof(HasChartReferenceInspections));
+            OnPropertyChanged(nameof(HasUninspectedChartReferences));
+            OnPropertyChanged(nameof(HasSearchableChartReference));
+            OnPropertyChanged(nameof(HasUnresolvedChartReferences));
+            OnPropertyChanged(nameof(ChartReferenceSummary));
+            OnPropertyChanged(nameof(ChartReferenceReadinessText));
+            Status = similarity switch
+            {
+                ChartReferenceSimilarityV1.MarketPattern =>
+                    "Reference saved for historical price-pattern search. It must resolve candidate instruments before a chart can launch.",
+                ChartReferenceSimilarityV1.RelatedInstruments =>
+                    "Reference saved for related-instrument search. It must resolve candidate instruments before a chart can launch.",
+                ChartReferenceSimilarityV1.IndicatorComposition =>
+                    "Reference saved for indicator extraction. The analyzed layers must be reviewed before generation.",
+                _ => "Reference saved for chart appearance and layout analysis.",
+            };
+            Save();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            _logger.LogWarning(exception, "Could not import reference chart");
+            Status = $"Reference chart was not attached: {exception.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void RemoveChartReference(AuthoringChartReferenceSnapshot? reference)
+    {
+        if (reference is null || !ChartReferences.Remove(reference)) return;
+        RemoveChartReferenceInspections(reference.Reference.ReferenceId);
+        if (string.Equals(ChartPatternSearchResult?.ReferenceId, reference.Reference.ReferenceId, StringComparison.Ordinal))
+            ChartPatternSearchResult = null;
+        RemoveChartPatternSelections(reference.Reference.ReferenceId);
+        AuthoredUnitSpecification = null;
+        OnPropertyChanged(nameof(HasChartReferences));
+        OnPropertyChanged(nameof(HasChartReferenceInspections));
+        OnPropertyChanged(nameof(HasUninspectedChartReferences));
+        OnPropertyChanged(nameof(HasSearchableChartReference));
+        OnPropertyChanged(nameof(HasUnresolvedChartReferences));
+        OnPropertyChanged(nameof(ChartReferenceSummary));
+        OnPropertyChanged(nameof(ChartReferenceReadinessText));
+        Status = "Reference removed from this request. The host-owned artifact remains available to other saved sessions.";
+        Save();
+    }
+
+    private void RemoveChartReferenceInspections(string referenceId)
+    {
+        for (var index = ChartReferenceInspections.Count - 1; index >= 0; index--)
+            if (string.Equals(
+                    ChartReferenceInspections[index].ReferenceId,
+                    referenceId,
+                    StringComparison.Ordinal))
+                ChartReferenceInspections.RemoveAt(index);
+    }
 
     public bool HasCandidate => CurrentCandidate is not null;
     public bool HasGeneratedCandidates => GeneratedCandidateOptions.Count > 0;
@@ -616,8 +1020,10 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         ResetSession("Switched provider.");
         Models.Clear();
         OnPropertyChanged(nameof(EffortSupported));
+        InspectChartReferencesCommand.NotifyCanExecuteChanged();
         RegenerateRecoveredCandidatesCommand.NotifyCanExecuteChanged();
         RegenerateFourCandidatesCommand.NotifyCanExecuteChanged();
+        GenerateCanonicalPaperStrategyCommand.NotifyCanExecuteChanged();
         if (value is null)
         {
             SyncModelChoice();
@@ -1065,6 +1471,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     partial void OnIsGeneratingChanged(bool value)
     {
         if (!value && IsSynthesizingTradeIr) IsSynthesizingTradeIr = false;
+        InspectChartReferencesCommand.NotifyCanExecuteChanged();
         SendCommand.NotifyCanExecuteChanged();
         RegenerateRecoveredCandidatesCommand.NotifyCanExecuteChanged();
         RegenerateFourCandidatesCommand.NotifyCanExecuteChanged();
@@ -1090,7 +1497,8 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         RegenerateRecoveredCandidatesCommand.NotifyCanExecuteChanged();
     }
 
-    private bool CanSend => !IsGenerating && !string.IsNullOrWhiteSpace(Composer);
+    private bool CanSend => !IsGenerating && !IsInspectingChartReferences && !IsSearchingChartPatterns &&
+        !string.IsNullOrWhiteSpace(Composer);
 
     private bool CanRegenerateRecoveredCandidatesAction() =>
         HasCandidateRestoreWarning &&
@@ -1103,6 +1511,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     private bool CanRegenerateFourCandidatesAction() =>
         CanEnterFourLaneConformance &&
         GenerateCandidateFirst &&
+        !HasUnresolvedChartReferences &&
         !HasPendingFourLanePrompt &&
         !IsGenerating &&
         !string.IsNullOrWhiteSpace(StrategyId) &&
@@ -1114,6 +1523,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     public bool CanGenerateFourCandidates =>
         CanEnterFourLaneConformance &&
         GenerateCandidateFirst &&
+        !HasUnresolvedChartReferences &&
         (!HasPendingFourLanePrompt || !HasGeneratedCandidates) &&
         !IsGenerating &&
         !string.IsNullOrWhiteSpace(StrategyId) &&
@@ -1209,9 +1619,19 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
                 return;
             }
 
-            // Chat always works on strategy meaning. Implementation generation is a separate,
-            // explicit action unlocked only after the local research/intent review is confirmed.
-            await SendCandidateTurnAsync(choice, prompt);
+            // The first turn chooses the product lane. A display-only request freezes a Visualizer
+            // specification; an exposure-changing request continues into the established strategy
+            // meaning/research confirmation flow. Revisions stay in their already chosen lane.
+            if (CurrentCandidate is null &&
+                _authoredUnitIntentClassifier is not null &&
+                _authoredUnitSpecificationGenerator is not null)
+            {
+                await ClassifyAndRouteInitialRequestAsync(choice, prompt);
+            }
+            else
+            {
+                await SendCandidateTurnAsync(choice, prompt);
+            }
             return;
         }
 
@@ -1967,6 +2387,223 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     /// Legacy semantic lane retained for saved sessions and deployments that have not registered the
     /// four-way coordinator yet.
     /// </summary>
+    private async Task ClassifyAndRouteInitialRequestAsync(AiProviderChoice choice, string prompt)
+    {
+        var provider = ResolveClient(choice) ?? choice.Client;
+        var effectiveRequest = AuthoredUnitSpecification is { Kind: AuthoredUnitKindV1.Visualizer } existing
+            ? $"{existing.RawRequest}\nRevision requested by user: {prompt}"
+            : prompt;
+        if (_authoredUnitIntentClassifier is null || _authoredUnitSpecificationGenerator is null)
+        {
+            await SendCandidateTurnAsync(choice, prompt);
+            return;
+        }
+
+        IsGenerating = true;
+        AiStatus = "Deciding whether this request is a display-only visualizer or a position-changing strategy…";
+        AuthoredUnitIntentClassificationResultV1 classification;
+        try
+        {
+            classification = await _authoredUnitIntentClassifier.ClassifyAsync(
+                provider,
+                effectiveRequest,
+                ChartReferences.Select(static item => item.Reference).ToArray(),
+                CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            AiStatus = "Classification stopped; no artifact was generated.";
+            IsGenerating = false;
+            return;
+        }
+        finally
+        {
+            // The strategy lane owns its own generation state. Clear this first so its command state
+            // and progress strip start from a clean boundary.
+            IsGenerating = false;
+        }
+
+        InputTokens += classification.Usage.InputTokens;
+        OutputTokens += classification.Usage.OutputTokens;
+        CachedTokens += classification.Usage.CachedInputTokens;
+
+        if (classification.Classification?.ClarificationQuestion is { Length: > 0 } question)
+        {
+            Composer = string.Empty;
+            Append(new AuthoringMessage(CodegenRole.User, prompt));
+            Append(new AuthoringMessage(CodegenRole.Assistant, question));
+            AwaitingAnswer = true;
+            AiStatus = "Hyperion needs one execution-intent choice before selecting the runtime contract.";
+            Save();
+            return;
+        }
+
+        if (!classification.Success)
+        {
+            var detail = string.Join(Environment.NewLine, classification.Issues.Select(issue =>
+                $"{issue.Path}: {issue.Message}"));
+            AiStatus = "The visualizer/strategy classification failed closed. No source was generated.";
+            Append(AuthoringMessage.Tool("Fail", "Unit type not accepted", detail));
+            return;
+        }
+
+        if (classification.Classification!.Kind == AuthoredUnitKindV1.Strategy)
+        {
+            AuthoredUnitSpecification = null;
+            await SendCandidateTurnAsync(choice, effectiveRequest);
+            return;
+        }
+
+        Composer = string.Empty;
+        Append(new AuthoringMessage(CodegenRole.User, prompt));
+        InvalidateDerivedArtifactState(markUnregistered: true);
+        IsGenerating = true;
+        AiStatus = "Freezing the visualizer's asset, timeframe, data streams, parameters, and drawing contract…";
+        try
+        {
+            var instruments = BuildAuthoredUnitInstrumentCandidates(effectiveRequest);
+            var result = await _authoredUnitSpecificationGenerator.GenerateAsync(
+                provider,
+                new AuthoredUnitSpecificationGenerationRequestV1(
+                    StrategyId.Trim(),
+                    effectiveRequest,
+                    instruments,
+                    ChartReferences: ChartReferences.Select(static item => item.Reference).ToArray(),
+                    ChartReferenceInspections: ChartReferenceInspections.ToArray(),
+                    ChartPatternSelections: ChartPatternSelections.ToArray()),
+                CancellationToken.None);
+            InputTokens += result.Usage.InputTokens;
+            OutputTokens += result.Usage.OutputTokens;
+            CachedTokens += result.Usage.CachedInputTokens;
+
+            if (!result.Success)
+            {
+                var detail = string.Join(Environment.NewLine, result.Issues.Select(issue =>
+                    $"{issue.Path}: {issue.Message}"));
+                AiStatus = "The visualizer specification failed launch validation. Nothing was compiled or registered.";
+                Append(AuthoringMessage.Tool("Fail", "Visualizer specification rejected", detail));
+                return;
+            }
+
+            AuthoredUnitSpecification = result.Specification;
+            var specification = result.Specification!;
+            var hash = AuthoredUnitSpecificationCanonicalJsonV1.Hash(specification);
+            Append(new AuthoringMessage(
+                CodegenRole.Assistant,
+                $"I classified this as a display-only visualizer. It will use {string.Join(", ", specification.Instruments.Select(static item => item.UserText))}, " +
+                $"{specification.Timeframe.UserText}, {specification.DataRequirement}, and {specification.Drawing.Layers.Count} drawing layer(s)."));
+            Append(AuthoringMessage.Tool(
+                "Ok",
+                "Runnable visualizer contract frozen",
+                $"No order target · launch-valid · specification hash {hash[..12]}… · generating the bound IVisualizer source."));
+
+            if (!await GenerateAuthoredUnitSourceAsync(provider, specification))
+                return;
+
+            AwaitingAnswer = false;
+            WorkbenchTab = 0;
+        }
+        catch (OperationCanceledException)
+        {
+            AiStatus = "Visualizer specification generation stopped; nothing was compiled.";
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Authored visualizer specification generation failed for {Id}", StrategyId);
+            AiStatus = $"Visualizer specification error: {exception.Message}";
+            Append(AuthoringMessage.System(AiStatus));
+        }
+        finally
+        {
+            IsGenerating = false;
+            Save();
+        }
+    }
+
+    private async Task<bool> GenerateAuthoredUnitSourceAsync(
+        IStrategyCodegenClient provider,
+        AuthoredUnitSpecificationV1 specification,
+        CancellationToken cancellationToken = default)
+    {
+        if (_authoredUnitSourceGenerator is null)
+        {
+            AiStatus = "The authored-unit source generator is not registered. The validated specification was kept, but no code was generated.";
+            Append(AuthoringMessage.Tool("Fail", $"{specification.Kind} source unavailable", AiStatus));
+            return false;
+        }
+
+        var interfaceName = specification.Kind == AuthoredUnitKindV1.Visualizer
+            ? "IVisualizer"
+            : "IStrategyKernel";
+        AiStatus = $"Generating {interfaceName} source bound to the reviewed intent, assets, feeds, timeframe, and chart layers…";
+        var result = await _authoredUnitSourceGenerator.GenerateAsync(
+            provider,
+            new AuthoredUnitSourceGenerationRequestV1(specification),
+            cancellationToken);
+        InputTokens += result.Usage.InputTokens;
+        OutputTokens += result.Usage.OutputTokens;
+        CachedTokens += result.Usage.CachedInputTokens;
+
+        if (!result.Success || result.Script is null)
+        {
+            var detail = string.Join(Environment.NewLine, result.Issues.Select(issue =>
+                $"{issue.Path}: {issue.Message}"));
+            AiStatus = $"Generated {specification.Kind.ToString().ToLowerInvariant()} source did not preserve the frozen specification. Nothing was compiled.";
+            Append(AuthoringMessage.Tool("Fail", $"{specification.Kind} source rejected", detail));
+            return false;
+        }
+
+        SetFiles(result.Script.Files);
+        _filesEditedByUser = false;
+        HasDetachedImplementationSource = false;
+        CompiledOk = false;
+        IsRegistered = false;
+        Append(AuthoringMessage.Tool(
+            "Ok",
+            "Specification-bound source generated",
+            $"{result.Script.Files.Count} C# file(s) · {result.SpecificationHashSha256![..12]}… · review and compile before registration."));
+        AiStatus = $"The requested {specification.Kind.ToString().ToLowerInvariant()} source is ready. Review it, then Compile & Register.";
+        NotifyEditorFileModeChanged();
+        return true;
+    }
+
+    private IReadOnlyList<AuthoredUnitInstrumentCandidateV1> BuildAuthoredUnitInstrumentCandidates(string prompt)
+    {
+        if (_instrumentRegistry is null) return [];
+
+        var selectedIds = ChartPatternSelections
+            .Select(static item => item.Match.InstrumentId)
+            .ToHashSet();
+        var normalizedPrompt = NormalizeInstrumentText(prompt);
+        var brokers = Enum.GetValues<BrokerKind>();
+
+        return _instrumentRegistry.All()
+            .Select(instrument => new
+            {
+                Instrument = instrument,
+                Brokers = brokers.Where(broker =>
+                    !string.IsNullOrWhiteSpace(_instrumentRegistry.ToBrokerSymbol(instrument.Id, broker))).ToArray(),
+            })
+            .Where(static item => item.Brokers.Length > 0)
+            .OrderBy(item => selectedIds.Contains(item.Instrument.Id) ? 0 :
+                normalizedPrompt.Contains(NormalizeInstrumentText(item.Instrument.CanonicalSymbol), StringComparison.Ordinal)
+                    ? 1
+                    : 2)
+            .ThenBy(static item => item.Instrument.CanonicalSymbol, StringComparer.OrdinalIgnoreCase)
+            .Take(AuthoredUnitSpecificationGeneratorV1.MaxAvailableInstruments)
+            .Select(static item => new AuthoredUnitInstrumentCandidateV1(
+                item.Instrument.Id,
+                item.Instrument.CanonicalSymbol,
+                item.Instrument.AssetClass,
+                item.Instrument.Exchange,
+                item.Instrument.Currency,
+                item.Brokers))
+            .ToArray();
+    }
+
+    private static string NormalizeInstrumentText(string value) =>
+        new(value.Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
+
     private async Task SendCandidateTurnAsync(AiProviderChoice choice, string prompt)
     {
         var turnStrategyId = StrategyId.Trim();
@@ -1991,7 +2628,13 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         try
         {
             var session = EnsureGenerationSession(choice);
-            var result = await session.SendAsync(prompt, turnCts.Token);
+            var result = await session.SendAsync(
+                prompt,
+                turnCts.Token,
+                ChartReferences.Select(static item => item.Reference).ToArray(),
+                ChartReferenceInspections.ToArray(),
+                AuthoredUnitSpecification?.ReferenceResolutions,
+                ChartPatternSelections.ToArray());
             if (!IsGenerationContextCurrent(turnEpoch, turnStrategyId)) return;
             InputTokens += result.Usage.InputTokens;
             OutputTokens += result.Usage.OutputTokens;
@@ -2307,6 +2950,18 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             StrategyId = DefaultStrategyId;
             DisplayName = DefaultDisplayName;
             GenerateCandidateFirst = true;
+            ChartReferences.Clear();
+            ChartReferenceInspections.Clear();
+            ChartPatternSearchResult = null;
+            ChartPatternSelections.Clear();
+            AuthoredUnitSpecification = null;
+            OnPropertyChanged(nameof(HasChartReferences));
+            OnPropertyChanged(nameof(HasChartReferenceInspections));
+            OnPropertyChanged(nameof(HasUninspectedChartReferences));
+            OnPropertyChanged(nameof(HasSelectedChartPattern));
+            OnPropertyChanged(nameof(SelectedChartPatternText));
+            OnPropertyChanged(nameof(HasSearchableChartReference));
+            OnPropertyChanged(nameof(ChartReferenceSummary));
             Composer = string.Empty;
             StarterSearchText = string.Empty;
             SelectedStarterFamily = AllStarterFamilies;
@@ -2440,6 +3095,54 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             if (session.Registered)
                 restoreWarning = "The chat was restored, but historical registration was cleared because no live, file-hash-bound registration proof exists.";
             GenerateCandidateFirst = session.FourLaneGenerationEnabled;
+            ChartReferences.Clear();
+            foreach (var reference in session.ChartReferences ?? [])
+            {
+                if (_chartReferenceRepository.Exists(reference))
+                {
+                    ChartReferences.Add(reference);
+                }
+                else
+                {
+                    restoreWarning =
+                        $"The session was restored, but reference chart '{reference.OriginalFileName}' " +
+                        "is missing or no longer matches its saved SHA-256 hash. It was detached.";
+                    _logger.LogWarning(
+                        "Detached missing or modified reference chart {ReferenceId} from {Id}",
+                        reference.Reference.ReferenceId,
+                        session.StrategyId);
+                }
+            }
+            OnPropertyChanged(nameof(HasChartReferences));
+            OnPropertyChanged(nameof(ChartReferenceSummary));
+            ChartReferenceInspections.Clear();
+            foreach (var inspection in session.ChartReferenceInspections ?? [])
+            {
+                if (ChartReferences.Any(reference =>
+                        string.Equals(reference.Reference.ReferenceId, inspection.ReferenceId, StringComparison.Ordinal) &&
+                        string.Equals(reference.Reference.ContentHashSha256, inspection.ContentHashSha256, StringComparison.Ordinal)))
+                    ChartReferenceInspections.Add(inspection);
+            }
+            OnPropertyChanged(nameof(HasChartReferenceInspections));
+            OnPropertyChanged(nameof(HasUninspectedChartReferences));
+            ChartPatternSearchResult = session.ChartPatternSearchResult is { } savedSearch &&
+                ChartReferences.Any(reference =>
+                    string.Equals(reference.Reference.ReferenceId, savedSearch.ReferenceId, StringComparison.Ordinal) &&
+                    string.Equals(reference.Reference.ContentHashSha256, savedSearch.ReferenceContentHashSha256, StringComparison.Ordinal))
+                    ? savedSearch
+                    : null;
+            ChartPatternSelections.Clear();
+            foreach (var selection in session.ChartPatternSelections ?? [])
+            {
+                if (ChartPatternSearchResult is { } restoredSearch &&
+                    string.Equals(selection.ReferenceId, restoredSearch.ReferenceId, StringComparison.Ordinal) &&
+                    string.Equals(selection.ReferenceContentHashSha256, restoredSearch.ReferenceContentHashSha256, StringComparison.Ordinal) &&
+                    restoredSearch.Matches.Contains(selection.Match))
+                    ChartPatternSelections.Add(selection);
+            }
+            OnPropertyChanged(nameof(HasSelectedChartPattern));
+            OnPropertyChanged(nameof(SelectedChartPatternText));
+            AuthoredUnitSpecification = RestoreAuthoredUnitSpecification(session, ChartReferences, ref restoreWarning);
             ClearCandidate();
             _fourLaneStrategyBrief = !string.IsNullOrWhiteSpace(session.FourLaneStrategyBrief) ||
                                      !string.IsNullOrWhiteSpace(session.ParallelCandidateBatchJson)
@@ -2604,6 +3307,45 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     private static string? RecoverParallelCandidatePrompt(AuthoringSessionSnapshot session) =>
         RecoverFourLaneStrategyBrief(session);
 
+    private AuthoredUnitSpecificationV1? RestoreAuthoredUnitSpecification(
+        AuthoringSessionSnapshot session,
+        IReadOnlyCollection<AuthoringChartReferenceSnapshot> restoredReferences,
+        ref string? restoreWarning)
+    {
+        if (string.IsNullOrWhiteSpace(session.AuthoredUnitSpecificationJson)) return null;
+
+        try
+        {
+            var specification = AuthoredUnitSpecificationCanonicalJsonV1.Deserialize(
+                session.AuthoredUnitSpecificationJson);
+            var issues = AuthoredUnitSpecificationValidatorV1.Validate(specification);
+            if (issues.Count > 0)
+                throw new InvalidOperationException(string.Join("; ", issues.Select(static issue => issue.Message)));
+
+            var attached = restoredReferences
+                .Select(static item => item.Reference.ContentHashSha256)
+                .OrderBy(static hash => hash, StringComparer.Ordinal)
+                .ToArray();
+            var specified = specification.References
+                .Select(static item => item.ContentHashSha256)
+                .OrderBy(static hash => hash, StringComparer.Ordinal)
+                .ToArray();
+            if (!attached.SequenceEqual(specified, StringComparer.Ordinal))
+                throw new InvalidOperationException(
+                    "The authored-unit specification is not bound to the session's exact reference artifacts.");
+
+            return specification;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
+        {
+            _logger.LogWarning(exception, "Could not restore authored-unit specification for {Id}", session.StrategyId);
+            restoreWarning =
+                "The chat and valid reference artifacts were restored, but the authored-unit specification " +
+                "failed validation and must be generated again.";
+            return null;
+        }
+    }
+
     private static string? RecoverFourLaneStrategyBrief(AuthoringSessionSnapshot session)
     {
         if (!string.IsNullOrWhiteSpace(session.FourLaneStrategyBrief))
@@ -2703,7 +3445,8 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     private void Save()
     {
         if (_restoring || !_ready || string.IsNullOrWhiteSpace(StrategyId)) return;
-        if (Messages.Count == 0 && !_filesEditedByUser && StrategyIntentDraft is null)
+        if (Messages.Count == 0 && !_filesEditedByUser && StrategyIntentDraft is null &&
+            ChartReferences.Count == 0 && AuthoredUnitSpecification is null)
             return;   // nothing worth a file yet
 
         var snapshot = new AuthoringSessionSnapshot(
@@ -2746,7 +3489,14 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             ActiveScreen: ActiveScreen,
             HasDetachedImplementationSource: HasDetachedImplementationSource,
             EditorOriginatedFromCombinedTradeIr: EditorOriginatedFromCombinedTradeIr,
-            AuthoringUxVersion: AuthoringSessionSnapshot.CurrentAuthoringUxVersion);
+            AuthoringUxVersion: AuthoringSessionSnapshot.CurrentAuthoringUxVersion,
+            ChartReferences: [.. ChartReferences],
+            AuthoredUnitSpecificationJson: AuthoredUnitSpecification is null
+                ? null
+                : AuthoredUnitSpecificationCanonicalJsonV1.Serialize(AuthoredUnitSpecification),
+            ChartReferenceInspections: [.. ChartReferenceInspections],
+            ChartPatternSearchResult: ChartPatternSearchResult,
+            ChartPatternSelections: [.. ChartPatternSelections]);
 
         if (!_sessionRepository.Save(snapshot))
         {
@@ -2770,6 +3520,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     /// <summary>Held between a clean compile and the Register click, so registering never re-compiles
     /// different code than the user just reviewed.</summary>
     private StrategyCompileResult? _pendingCompile;
+    private AuthoredUnitCompilationResultV1? _pendingAuthoredUnitCompile;
     private StrategyScript? _pendingScript;
 
     /// <summary>File contents as of the last successful register (per process). Keys are file names.</summary>
@@ -2788,7 +3539,8 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         Parameters = null;
         CloseReview();
 
-        if (GenerateCandidateFirst)
+        var authoredSpecification = AuthoredUnitSpecification;
+        if (GenerateCandidateFirst && authoredSpecification is null)
         {
             Status = "Compile and Register is available only after explicitly switching to Expert C#. Strategy Builder artifacts keep their confirmed-request binding and use their own admission paths.";
             return;
@@ -2813,6 +3565,13 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         }
 
         var script = CurrentScript();
+
+        if (authoredSpecification is not null)
+        {
+            CompileAuthoredUnitForReview(authoredSpecification, script);
+            return;
+        }
+
         StrategyCompileResult result;
         try
         {
@@ -2862,6 +3621,62 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         Status = "Compiled clean — review the code, then press Register.";
     }
 
+    private void CompileAuthoredUnitForReview(
+        AuthoredUnitSpecificationV1 specification,
+        StrategyScript script)
+    {
+        if (_authoredUnitCompiler is null)
+        {
+            Status = "The canonical authored-unit compiler is not registered. The generated source was not loaded.";
+            return;
+        }
+
+        AuthoredUnitCompilationResultV1 result;
+        try
+        {
+            result = _authoredUnitCompiler.Compile(specification, script);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Authored-unit compile threw for {Id}", specification.UnitId);
+            Status = $"Compiler error: {exception.Message}";
+            return;
+        }
+
+        foreach (var diagnostic in result.Diagnostics)
+            Diagnostics.Add(diagnostic);
+        if (!result.Success || result.Unit is null)
+        {
+            Status = $"Compile failed — {result.Errors.Count()} error(s). The authored unit was not loaded.";
+            return;
+        }
+
+        CompiledOk = true;
+        if (!result.Unit.Schema.IsEmpty)
+            Parameters = StrategyParametersViewModel.FromSchema(result.Unit.Schema);
+
+        ReviewFiles.Clear();
+        foreach (var file in script.Files)
+        {
+            var baseline = _registeredBaseline.GetValueOrDefault(file.Name, string.Empty);
+            ReviewFiles.Add(new ReviewFileEntry(file.Name, LineDiff.Build(baseline, file.Content)));
+        }
+        SelectedReviewFile = ReviewFiles.FirstOrDefault();
+
+        var warnings = result.Diagnostics.Count(diagnostic =>
+            diagnostic.Severity == StrategyDiagnosticSeverity.Warning);
+        ReviewSummary =
+            $"{script.Files.Count} file(s), exact {specification.Kind} contract verified" +
+            (warnings > 0 ? $" with {warnings} warning(s)" : string.Empty) +
+            $". Bound to specification {result.Unit.SpecificationHashSha256[..12]}…; registration runs it in-process.";
+
+        _pendingAuthoredUnitCompile = result;
+        _pendingScript = script;
+        ReviewOpen = true;
+        ConfirmRegisterCommand.NotifyCanExecuteChanged();
+        Status = "Compiled and specification-verified — review the code, then press Register.";
+    }
+
     private bool CanCompileCurrentSourceAction() => CanCompileCurrentSource;
 
     /// <summary>Step 2 of consent: the actual registration, only reachable from the review overlay.
@@ -2870,12 +3685,23 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     [RelayCommand(CanExecute = nameof(CanConfirmRegisterAction))]
     private void ConfirmRegister()
     {
-        if (!CanConfirmRegisterAction() ||
-            _pendingCompile is not { Option: not null } result ||
-            _pendingScript is not { } script)
+        if (!CanConfirmRegisterAction() || _pendingScript is not { } script)
         {
             CloseReview();
-            Status = "Registration review expired because the authoring mode or reviewed source changed. Compile and review the current Expert C# source again.";
+            Status = "Registration review expired because the authored specification or reviewed source changed. Compile and review the current source again.";
+            return;
+        }
+
+        if (_pendingAuthoredUnitCompile is { Success: true, Unit: not null } authored)
+        {
+            ConfirmAuthoredUnitRegistration(script, authored.Unit);
+            return;
+        }
+
+        if (_pendingCompile is not { Option: not null } result)
+        {
+            CloseReview();
+            Status = "Registration review expired because the reviewed source changed. Compile it again.";
             return;
         }
 
@@ -2905,6 +3731,99 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         Save();
     }
 
+    private void ConfirmAuthoredUnitRegistration(
+        StrategyScript script,
+        CompiledAuthoredUnitV1 unit)
+    {
+        var specification = AuthoredUnitSpecification;
+        if (specification is null ||
+            !string.Equals(
+                AuthoredUnitSpecificationCanonicalJsonV1.Hash(specification),
+                unit.SpecificationHashSha256,
+                StringComparison.Ordinal))
+        {
+            CloseReview();
+            Status = "The reviewed specification changed after compilation. Nothing was registered.";
+            return;
+        }
+
+        if (unit.Kind == AuthoredUnitKindV1.Visualizer)
+        {
+            if (_visualizerRegistry is null)
+            {
+                CloseReview();
+                Status = "The visualizer registry is unavailable. Nothing was registered.";
+                return;
+            }
+
+            var discovered = VisualizerDescriptors.FromType(unit.RuntimeType, specification.UnitId);
+            _visualizerRegistry.Register(discovered with
+            {
+                Descriptor = discovered.Descriptor with
+                {
+                    DisplayName = specification.Name,
+                    Description = specification.RawRequest,
+                },
+                AuthoredSpecification = specification,
+            });
+
+            CompleteAuthoredUnitRegistration(
+                script,
+                unit,
+                specification,
+                "Visualizer registered",
+                "Open Visualizers and choose Add to chart; it cannot submit orders.");
+            return;
+        }
+
+        if (_strategyKernelRegistry is null)
+        {
+            CloseReview();
+            Status = "The canonical strategy registry is unavailable. Nothing was registered.";
+            return;
+        }
+
+        _strategyKernelRegistry.Register(new StrategyKernelRegistration(
+            specification.UnitId,
+            specification.Name,
+            specification.RawRequest,
+            () => (DaxAlgo.Sdk.IStrategyKernel)Activator.CreateInstance(unit.RuntimeType)!,
+            specification,
+            unit.Schema));
+
+        CompleteAuthoredUnitRegistration(
+            script,
+            unit,
+            specification,
+            "Paper strategy registered",
+            "Open it from the Catalog or Paper Strategy Runner. Real-money routing remains unavailable.");
+    }
+
+    private void CompleteAuthoredUnitRegistration(
+        StrategyScript script,
+        CompiledAuthoredUnitV1 unit,
+        AuthoredUnitSpecificationV1 specification,
+        string activityTitle,
+        string nextAction)
+    {
+
+        var persistence = _installer?.PersistAuthoredUnit(script, unit);
+        Status = persistence?.Message ??
+            $"'{specification.Name}' is registered for this session.";
+
+        _registeredBaseline.Clear();
+        foreach (var file in script.Files)
+            _registeredBaseline[file.Name] = file.Content;
+
+        IsRegistered = true;
+        Append(AuthoringMessage.Tool(
+            "Ok",
+            activityTitle,
+            $"{Status} {nextAction}"));
+        CloseReview();
+        Save();
+    }
+
     /// <summary>Backs out of the review — nothing was registered, the compile result is discarded.</summary>
     [RelayCommand]
     private void CancelReview()
@@ -2920,14 +3839,15 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         SelectedReviewFile = null;
         ReviewSummary = null;
         _pendingCompile = null;
+        _pendingAuthoredUnitCompile = null;
         _pendingScript = null;
         ConfirmRegisterCommand.NotifyCanExecuteChanged();
     }
 
     private bool CanConfirmRegisterAction() =>
-        !GenerateCandidateFirst &&
         ReviewOpen &&
-        _pendingCompile is { Success: true, Option: not null } &&
+        (_pendingCompile is { Success: true, Option: not null } ||
+         _pendingAuthoredUnitCompile is { Success: true, Unit: not null }) &&
         _pendingScript is { } pendingScript &&
         ScriptMatchesCurrentSource(pendingScript);
 
@@ -3182,6 +4102,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     private void NotifyEditorFileModeChanged()
     {
         OnPropertyChanged(nameof(HasExpertCSharpFiles));
+        OnPropertyChanged(nameof(HasAuthoredUnitCSharpFiles));
         OnPropertyChanged(nameof(HasNonCSharpExpertArtifact));
         OnPropertyChanged(nameof(AuthoringBoundaryText));
         OnPropertyChanged(nameof(CanCompileCurrentSource));

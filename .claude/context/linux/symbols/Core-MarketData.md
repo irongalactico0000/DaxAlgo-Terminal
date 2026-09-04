@@ -1,6 +1,6 @@
 # TradingTerminal.Core / MarketData — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `330db91800ba`. Declaration lines only;
+Generated from source fingerprint `e91d50e75733`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Core/TradingTerminal.Core/MarketData/AdvancedRegime/AdvancedRegimeBarIndicators.cs
@@ -217,36 +217,37 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 ```cs
    16: public interface IBrokerClient : IAsyncDisposable
    18:     BrokerKind Kind { get; }
-   20:     IObservable<ConnectionState> ConnectionState { get; }
-   22:     Task ConnectAsync(CancellationToken ct = default);
-   31:     Task<IReadOnlyList<TradableInstrument>> ListInstrumentsAsync(CancellationToken ct = default);
-   33:     Task DisconnectAsync(CancellationToken ct = default);
-   35:     Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
-   36:     Contract contract,
-   37:     BarSize barSize,
-   38:     TimeSpan duration,
-   39:     CancellationToken ct = default);
-   41:     IAsyncEnumerable<Bar> SubscribeBarsAsync(
+   24:     MarketDataCapabilities MarketDataCapabilities => BrokerCapabilityCatalog.MarketDataFor(Kind);
+   26:     IObservable<ConnectionState> ConnectionState { get; }
+   28:     Task ConnectAsync(CancellationToken ct = default);
+   37:     Task<IReadOnlyList<TradableInstrument>> ListInstrumentsAsync(CancellationToken ct = default);
+   39:     Task DisconnectAsync(CancellationToken ct = default);
+   41:     Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
    42:     Contract contract,
    43:     BarSize barSize,
-   44:     CancellationToken ct = default);
-   51:     IAsyncEnumerable<Tick> SubscribeTicksAsync(
-   52:     Contract contract,
-   53:     CancellationToken ct = default);
-   67:     IAsyncEnumerable<DepthSnapshot> SubscribeDepthAsync(
-   68:     Contract contract,
-   69:     int levels = 10,
-   70:     CancellationToken ct = default);
-   83:     IAsyncEnumerable<TradeTick> SubscribeTradesAsync(
-   84:     Contract contract,
-   85:     CancellationToken ct = default);
-   97:     Task<IReadOnlyList<TradeTick>> RequestHistoricalTradesAsync(
-   98:     Contract contract,
-   99:     DateTime fromUtc,
-  100:     DateTime toUtc,
-  101:     int maxTrades,
-  102:     CancellationToken ct = default) =>
-  103:     throw new NotSupportedException($"{Kind} does not provide historical trades.");
+   44:     TimeSpan duration,
+   45:     CancellationToken ct = default);
+   47:     IAsyncEnumerable<Bar> SubscribeBarsAsync(
+   48:     Contract contract,
+   49:     BarSize barSize,
+   50:     CancellationToken ct = default);
+   57:     IAsyncEnumerable<Tick> SubscribeTicksAsync(
+   58:     Contract contract,
+   59:     CancellationToken ct = default);
+   73:     IAsyncEnumerable<DepthSnapshot> SubscribeDepthAsync(
+   74:     Contract contract,
+   75:     int levels = 10,
+   76:     CancellationToken ct = default);
+   89:     IAsyncEnumerable<TradeTick> SubscribeTradesAsync(
+   90:     Contract contract,
+   91:     CancellationToken ct = default);
+  103:     Task<IReadOnlyList<TradeTick>> RequestHistoricalTradesAsync(
+  104:     Contract contract,
+  105:     DateTime fromUtc,
+  106:     DateTime toUtc,
+  107:     int maxTrades,
+  108:     CancellationToken ct = default) =>
+  109:     throw new NotSupportedException($"{Kind} does not provide historical trades.");
 ```
 
 ## src/linux/Core/TradingTerminal.Core/MarketData/IInstrumentRegistry.cs
@@ -277,35 +278,35 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 ```cs
    14: public interface IMarketDataIngest
    17:     InstrumentId Resolve(Contract contract, BrokerKind broker);
-   21:     IDisposable Subscribe(Contract contract, BrokerKind broker);
-   24:     IDisposable SubscribeBars(Contract contract, BrokerKind broker, BarSize size);
-   31:     IDisposable SubscribeTrades(Contract contract, BrokerKind broker);
+   23:     IDisposable Subscribe(Contract contract, BrokerKind broker);
+   28:     IDisposable SubscribeBars(Contract contract, BrokerKind broker, BarSize size);
+   36:     IDisposable SubscribeTrades(Contract contract, BrokerKind broker);
 ```
 
 ## src/linux/Core/TradingTerminal.Core/MarketData/IMarketDataRepository.cs
 ```cs
    17: public interface IMarketDataRepository
    24:     Task<IReadOnlyList<TradableInstrument>> ListInstrumentsAsync(CancellationToken ct = default);
-   26:     Task<IReadOnlyList<Bar>> GetHistoricalBarsAsync(
-   27:     Contract contract,
-   28:     BrokerKind broker,
-   29:     BarSize barSize,
-   30:     TimeSpan duration,
-   31:     CancellationToken ct = default);
-   38:     IAsyncEnumerable<Bar> SubscribeBarsAsync(
-   39:     Contract contract,
-   40:     BrokerKind broker,
-   41:     BarSize barSize,
-   42:     CancellationToken ct = default);
-   49:     IAsyncEnumerable<Tick> SubscribeTicksAsync(
-   50:     Contract contract,
-   51:     BrokerKind broker,
-   52:     CancellationToken ct = default);
-   60:     IAsyncEnumerable<DepthSnapshot> SubscribeDepthAsync(
-   61:     Contract contract,
-   62:     BrokerKind broker,
-   63:     int levels = 10,
-   64:     CancellationToken ct = default);
+   31:     Task<IReadOnlyList<Bar>> GetHistoricalBarsAsync(
+   32:     Contract contract,
+   33:     BrokerKind broker,
+   34:     BarSize barSize,
+   35:     TimeSpan duration,
+   36:     CancellationToken ct = default);
+   45:     IAsyncEnumerable<Bar> SubscribeBarsAsync(
+   46:     Contract contract,
+   47:     BrokerKind broker,
+   48:     BarSize barSize,
+   49:     CancellationToken ct = default);
+   57:     IAsyncEnumerable<Tick> SubscribeTicksAsync(
+   58:     Contract contract,
+   59:     BrokerKind broker,
+   60:     CancellationToken ct = default);
+   68:     IAsyncEnumerable<DepthSnapshot> SubscribeDepthAsync(
+   69:     Contract contract,
+   70:     BrokerKind broker,
+   71:     int levels = 10,
+   72:     CancellationToken ct = default);
 ```
 
 ## src/linux/Core/TradingTerminal.Core/MarketData/IMarketDataStore.cs

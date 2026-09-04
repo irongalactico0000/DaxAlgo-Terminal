@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TradingTerminal.Core.Strategies;
 using TradingTerminal.Core.Strategies.Authoring;
+using TradingTerminal.Core.Strategies.Generation;
 using TradingTerminal.Infrastructure.Backtest;
 using TradingTerminal.Infrastructure.Plugins;
 
@@ -22,6 +23,11 @@ public sealed record AuthoredStrategyInstall(
     bool Registered,
     bool InCatalog,
     string? Persisted,
+    string Message);
+
+public sealed record AuthoredUnitPersistence(
+    bool Persisted,
+    string? Path,
     string Message);
 
 /// <summary>
@@ -50,6 +56,28 @@ public sealed class AuthoredStrategyInstaller(
     ILogger<AuthoredStrategyInstaller>? logger = null,
     IAuthoredStrategyViewComposer? composer = null)
 {
+    /// <summary>
+    /// Persists a compiler-verified canonical SDK unit through the same plugin directory and manifest
+    /// used by legacy authored strategies. Runtime catalog registration remains host-owned.
+    /// </summary>
+    public AuthoredUnitPersistence PersistAuthoredUnit(
+        StrategyScript script,
+        CompiledAuthoredUnitV1 compiled)
+    {
+        ArgumentNullException.ThrowIfNull(script);
+        ArgumentNullException.ThrowIfNull(compiled);
+
+        var path = PersistImage(
+            script,
+            compiled.Image,
+            [compiled.RuntimeType.FullName ?? compiled.RuntimeType.Name]);
+        return path is null
+            ? new AuthoredUnitPersistence(false, null,
+                $"'{script.DisplayName}' is registered for this session, but could not be written to the plugins folder.")
+            : new AuthoredUnitPersistence(true, path,
+                $"'{script.DisplayName}' is registered and persisted as a DEV (unsigned) authored unit.");
+    }
+
     public AuthoredStrategyInstall Install(StrategyScript script, StrategyCompileResult compiled)
     {
         ArgumentNullException.ThrowIfNull(compiled);
@@ -138,13 +166,26 @@ public sealed class AuthoredStrategyInstaller(
     {
         if (plugins is null || compiled.Authored is null) return null;
 
+        var implementationTypes = compiled.Authored.DescriptorType is { FullName: { } fullName }
+            ? new[] { fullName }
+            : [];
+        return PersistImage(script, compiled.Authored.Image, implementationTypes);
+    }
+
+    private string? PersistImage(
+        StrategyScript script,
+        byte[] image,
+        IReadOnlyList<string> implementationTypes)
+    {
+        if (plugins is null) return null;
+
         var folderName = Sanitize(script.Id);
         var directory = Path.Combine(plugins.PluginsRoot, folderName);
 
         try
         {
             Directory.CreateDirectory(directory);
-            File.WriteAllBytes(Path.Combine(directory, $"{folderName}.dll"), compiled.Authored.Image);
+            File.WriteAllBytes(Path.Combine(directory, $"{folderName}.dll"), image);
 
             var manifest = new PluginManifest(
                 Id: script.Id,
@@ -164,7 +205,7 @@ public sealed class AuthoredStrategyInstaller(
                 AssemblyPath: Path.Combine(directory, $"{folderName}.dll"),
                 Scan: null,
                 Unsigned: true,
-                StrategyImplementationTypes: compiled.Authored.DescriptorType is { } d && d.FullName is { } n ? [n] : []));
+                StrategyImplementationTypes: implementationTypes));
 
             return directory;
         }

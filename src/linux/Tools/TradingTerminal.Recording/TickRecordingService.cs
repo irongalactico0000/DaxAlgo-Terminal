@@ -21,7 +21,8 @@ namespace TradingTerminal.Recording;
 /// it takes ref-counted <see cref="IMarketDataIngest"/> subscriptions, and the pipeline's own store
 /// writer persists every stream — L1 quotes + L2 depth (<see cref="IMarketDataIngest.Subscribe"/>),
 /// 1-minute bars (<see cref="IMarketDataIngest.SubscribeBars"/>) and the trade tape
-/// (<see cref="IMarketDataIngest.SubscribeTrades"/>, where the broker has one). Nothing here writes
+/// (<see cref="IMarketDataIngest.SubscribeTrades"/>), only when the selected client declares each
+/// channel. Nothing here writes
 /// files; the recorder decides *what* is captured and the store decides *how*. The per-broker SQLite
 /// backend (the default) keeps each stream in its own <c>marketdata-{broker}-{bars|l1|trades|l2}.db</c>.</para>
 ///
@@ -213,24 +214,37 @@ public sealed partial class TickRecordingService : ObservableObject, IHostedServ
             return;
         }
 
-        entry.ActiveBroker = broker;
         var contract = entry.Instrument.Contract;
 
         try
         {
+            var capabilities = _selector.Get(broker.Value).MarketDataCapabilities;
+            entry.SetActiveSource(broker.Value, capabilities);
+
+            if (!entry.SupportsQuotes && !entry.SupportsBars &&
+                !entry.SupportsDepth && !entry.SupportsTape)
+            {
+                entry.Status = DescribeStreams(entry);
+                return;
+            }
+
             entry.Id = _ingest.Resolve(contract, broker.Value);
 
-            // L1 + L2 depth (one ingest handle drives both pumps), and 1-minute bars.
-            entry.Subscriptions.Add(_ingest.Subscribe(contract, broker.Value));
-            entry.Subscriptions.Add(_ingest.SubscribeBars(contract, broker.Value, RecordedBarSize));
+            // L1 + L2 share one ingest handle. Open it only when at least one channel exists.
+            if (entry.SupportsQuotes || entry.SupportsDepth)
+                entry.Subscriptions.Add(_ingest.Subscribe(contract, broker.Value));
 
-            // Tape is opt-in per broker — the others throw NotSupportedException rather than stream.
+            if (entry.SupportsBars)
+                entry.Subscriptions.Add(_ingest.SubscribeBars(contract, broker.Value, RecordedBarSize));
+
             if (entry.SupportsTape)
                 entry.Subscriptions.Add(_ingest.SubscribeTrades(contract, broker.Value));
 
             // Counters. Interlocked off the feed thread; the panel timer publishes them.
-            entry.Subscriptions.Add(_hub.Quotes(entry.Id).Subscribe(_ => Interlocked.Increment(ref entry.QuotesRaw)));
-            entry.Subscriptions.Add(_hub.Bars(entry.Id, RecordedBarSize).Subscribe(_ => Interlocked.Increment(ref entry.BarsRaw)));
+            if (entry.SupportsQuotes)
+                entry.Subscriptions.Add(_hub.Quotes(entry.Id).Subscribe(_ => Interlocked.Increment(ref entry.QuotesRaw)));
+            if (entry.SupportsBars)
+                entry.Subscriptions.Add(_hub.Bars(entry.Id, RecordedBarSize).Subscribe(_ => Interlocked.Increment(ref entry.BarsRaw)));
             if (entry.SupportsDepth)
                 entry.Subscriptions.Add(_hub.Depth(entry.Id).Subscribe(_ => Interlocked.Increment(ref entry.DepthRaw)));
             if (entry.SupportsTape)
@@ -250,12 +264,28 @@ public sealed partial class TickRecordingService : ObservableObject, IHostedServ
 
     private static string DescribeStreams(RecorderEntry entry)
     {
-        var streams = new List<string> { "L1", "bars" };
+        var streams = new List<string>();
+        var unavailable = new List<string>();
+
+        AddStream(entry.SupportsQuotes, "L1");
+        AddStream(entry.SupportsBars, "bars");
         if (entry.SupportsDepth) streams.Add("L2");
+        else unavailable.Add("L2");
         if (entry.SupportsTape) streams.Add("tape");
-        var text = $"Recording {string.Join(" · ", streams)}";
-        if (!entry.SupportsTape) text += " — no tape on this broker";
+        else unavailable.Add("tape");
+
+        var text = streams.Count == 0
+            ? "No supported live streams"
+            : $"Recording {string.Join(" · ", streams)}";
+        if (unavailable.Count > 0)
+            text += $" — unavailable: {string.Join(" · ", unavailable)}";
         return text;
+
+        void AddStream(bool supported, string name)
+        {
+            if (supported) streams.Add(name);
+            else unavailable.Add(name);
+        }
     }
 
     /// <summary>The pinned broker when it's connected, else any connected broker.</summary>

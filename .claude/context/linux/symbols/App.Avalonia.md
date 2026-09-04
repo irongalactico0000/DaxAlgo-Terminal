@@ -1,6 +1,6 @@
 # TradingTerminal.App.Avalonia — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `330db91800ba`. Declaration lines only;
+Generated from source fingerprint `e91d50e75733`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Shell/TradingTerminal.App.Avalonia/App.axaml.cs
@@ -67,8 +67,8 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 
 ## src/linux/Shell/TradingTerminal.App.Avalonia/Composition/ServiceConfiguration.cs
 ```cs
-   61: public static class ServiceConfiguration
-   63: public static IHost BuildHost(IPluginConsentPrompt? pluginConsentPrompt = null)
+   63: public static class ServiceConfiguration
+   65: public static IHost BuildHost(IPluginConsentPrompt? pluginConsentPrompt = null)
 ```
 
 ## src/linux/Shell/TradingTerminal.App.Avalonia/Diagnostics/CrashGuard.cs
@@ -86,6 +86,166 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 ## src/linux/Shell/TradingTerminal.App.Avalonia/Diagnostics/StrategyWindowSmoke.cs
 ```cs
    12: public static async Task<int> RunAsync(
+```
+
+## src/linux/Shell/TradingTerminal.App.Avalonia/Execution/AuthenticatedPaperExecutionBookTargetIntake.cs
+```cs
+   15: public interface IPaperStrategyTargetOrderFactory
+   17:     bool TryCreateTargetSubmit(
+   18:     TradeIntent intent,
+   19:     ScaledPrice marketPrice,
+   20:     PaperExecutionClientSnapshot snapshot,
+   21:     StrategyId strategyId,
+   22:     StrategyVersion strategyVersion,
+   23:     out ExecutionSubmitRequest? request,
+   24:     out string? reason);
+   34: public sealed class AuthenticatedPaperExecutionBookTargetIntake : IExecutionBookTargetIntake, IDisposable
+   47: public AuthenticatedPaperExecutionBookTargetIntake(
+   74: public async ValueTask<ExecutionTargetSubmissionResult> SubmitTargetAsync(
+  202: public void Dispose()
+```
+
+## src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperExecutionBooks.cs
+```cs
+   21: public sealed record PaperExecutionBookDefinition(
+   30: public const string PaperAdapterId = "paper-simulator";
+   32: public string AdapterId => PaperAdapterId;
+   33: public string StrategySummary => Strategies.Count == 0
+   36: public string InstrumentSummary => string.IsNullOrWhiteSpace(PrimarySymbol)
+   39: public string StateText => IsPaused ? "Stopped" : "Running";
+   40: public string OpeningBalanceDisplay => $"{OpeningBalance:N2} SIM";
+   43: public sealed record PaperExecutionBookCatalog(
+   48: public interface IPaperExecutionBookStore
+   50:     PaperExecutionBookCatalog? Read();
+   51:     void Save(PaperExecutionBookCatalog catalog);
+   55: public sealed class JsonPaperExecutionBookStore : IPaperExecutionBookStore
+   57: public const int CurrentSchemaVersion = 1;
+   58: public const int MaximumBooks = 64;
+   71: public JsonPaperExecutionBookStore()
+   76: public JsonPaperExecutionBookStore(string path)
+   82: public static string ApplicationSupportRoot
+   93: public static string DefaultPath => Path.Combine(ApplicationSupportRoot, "books.json");
+   94: public string FilePath => _path;
+   96: public PaperExecutionBookCatalog? Read()
+  117: public void Save(PaperExecutionBookCatalog catalog)
+  198: public enum PaperExecutionBookFault : byte
+  211: public sealed record PaperExecutionBookResult(PaperExecutionBookFault Fault, string Message)
+  213: public bool IsSuccess => Fault == PaperExecutionBookFault.None;
+  214: public static PaperExecutionBookResult Success(string message) => new(PaperExecutionBookFault.None, message);
+  215: public static PaperExecutionBookResult Failure(PaperExecutionBookFault fault, string message) => new(fault, message);
+  223: public sealed class PaperExecutionBookManager : IDisposable
+  235: public PaperExecutionBookManager(IClock clock, IInstrumentRegistry registry)
+  241: public PaperExecutionBookManager(
+  250: public PaperExecutionBookManager(
+  268: public event EventHandler? Changed;
+  270: public IReadOnlyList<PaperExecutionBookDefinition> Books
+  275: public PaperExecutionBookDefinition SelectedBook
+  287: public int RunningCount
+  292: public PaperExecutionBookResult CreateBook(
+  330: public PaperExecutionBookResult SelectBook(string bookId)
+  343: public PaperExecutionBookResult RenameBook(string bookId, string name)
+  363: public async ValueTask<PaperExecutionBookResult> SetPausedAsync(string bookId, bool paused)
+  393: public PaperExecutionBookResult DeleteBook(string bookId)
+  430: public PaperExecutionBookSessionLease AcquireSelectedSession()
+  452: public bool IsBookOpen(string bookId)
+  457: public string LedgerPathFor(string bookId)
+  562: public void Dispose()
+  581: public PaperExecutionDesktopSession Session { get; } = session;
+  582: public EventHandler SnapshotHandler { get; } = snapshotHandler;
+  583: public int ActiveUsers { get; set; }
+  587: public sealed class PaperExecutionBookSessionLease : IDisposable
+  601: public PaperExecutionBookDefinition Book { get; }
+  602: public PaperExecutionDesktopSession Session { get; }
+  604: public void Dispose() => Interlocked.Exchange(ref _owner, null)?.Release(Book.Id);
+  608: public sealed partial class PaperExecutionBooksViewModel : ObservableObject, IDisposable
+  614: public PaperExecutionBooksViewModel(
+  644: public PaperExecutionBooksViewModel()
+  650: public ObservableCollection<PaperExecutionBookDefinition> Books { get; } = [];
+  651: public IReadOnlyList<PaperExecutionInstrumentChoice> Instruments { get; }
+  652: public IReadOnlyList<string> Strategies { get; }
+  665: public string SelectedStatus => SelectedBook is null
+  750: public void Dispose()
+```
+
+## src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperExecutionBooksWindow.axaml.cs
+```cs
+    5: public partial class PaperExecutionBooksWindow : Window
+    7: public PaperExecutionBooksWindow() => InitializeComponent();
+```
+
+## src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperExecutionConsoleWindow.axaml.cs
+```cs
+    7: public partial class PaperExecutionConsoleWindow : Window
+    9: public PaperExecutionConsoleWindow()
+```
+
+## src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperExecutionDesktopSession.cs
+```cs
+   18: public sealed class PaperExecutionDesktopSession :
+   45: public PaperExecutionDesktopSession(IClock clock, IInstrumentRegistry registry)
+   58: public static PaperExecutionDesktopSession CreateForLedger(
+   66: public static PaperExecutionDesktopSession CreateForBook(
+  158: public static string LedgerPath
+  171: public PaperExecutionServiceRuntime Runtime { get; }
+  172: public PaperExecutionClient Client { get; }
+  173: public IReadOnlyList<PaperExecutionInstrumentChoice> Instruments { get; }
+  174: public string BookId { get; }
+  175: public string BookName { get; }
+  176: public ExecutionResource Resource => _resource;
+  181: public bool TryCreateSubmit(
+  237: public bool TryCreateReplacementTerms(
+  247: public RiskEvaluationContext CreateReplacementRisk(
+  282: public bool TryCreateTargetSubmit(
+  407: public bool TryCreateFlattenOrder(
+  737: public void Dispose()
+```
+
+## src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperExecutionUnavailableWindow.axaml.cs
+```cs
+    6: public partial class PaperExecutionUnavailableWindow : Window
+    8: public PaperExecutionUnavailableWindow()
+   13: public PaperExecutionUnavailableWindow(string reason)
+```
+
+## src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperStrategyRunnerViewModel.cs
+```cs
+   26: public sealed record PaperStrategyChoice(
+   35: public string DisplayName => $"{Name} · {Id}";
+   38: public sealed partial class PaperStrategyParameterRow : ObservableObject
+   40: public PaperStrategyParameterRow(StrategyParameter parameter)
+   46: public StrategyParameter Parameter { get; }
+   47: public string Key => Parameter.Key;
+   48: public string DisplayName => Parameter.DisplayName;
+   49: public string KindText => Parameter.Kind.ToString();
+   50: public string Hint => Parameter.Description ??
+   59: public sealed partial class PaperStrategyLegRow : ObservableObject
+   61: public PaperStrategyLegRow(InstrumentId instrument, string symbol)
+   67: public InstrumentId Instrument { get; }
+   68: public string Symbol { get; }
+   84: public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDisposable
+  104: public PaperStrategyRunnerViewModel(
+  187: public IReadOnlyList<PaperStrategyChoice> Strategies { get; }
+  188: public IReadOnlyList<PaperExecutionInstrumentChoice> Instruments { get; }
+  189: public int UnsupportedMultiAssetStrategyCount { get; }
+  190: public string StrategyEligibilitySummary => UnsupportedMultiAssetStrategyCount == 0
+  193: public ObservableCollection<PaperStrategyParameterRow> Parameters { get; } = [];
+  194: public ObservableCollection<PaperStrategyLegRow> StrategyLegs { get; } = [];
+  195: public Action<IRenderSurface> Draw => DrawFrame;
+  197: public bool HasEligibleStrategies => Strategies.Count != 0;
+  198: public bool SelectionLocked => _runtime is not null;
+  199: public bool IsRunning => _runtime?.State == SandboxStrategyRuntimeState.Running;
+  200: public bool IsPaused => _runtime?.State == SandboxStrategyRuntimeState.Paused;
+  201: public bool IsStopped => _runtime is null;
+  202: public bool CanSelectInstrument => IsStopped && SelectedStrategy?.CanonicalRegistration is null;
+  203: public bool IsMultiAssetStrategy => StrategyLegs.Count > 1;
+  205: public event EventHandler? FrameRequested;
+  692: public void Dispose()
+```
+
+## src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperStrategyRunnerWindow.axaml.cs
+```cs
+    6: public partial class PaperStrategyRunnerWindow : Window
+   14: public PaperStrategyRunnerWindow()
 ```
 
 ## src/linux/Shell/TradingTerminal.App.Avalonia/MachineLearning/ArimaGarchViewModel.cs
@@ -148,14 +308,14 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 
 ## src/linux/Shell/TradingTerminal.App.Avalonia/Plugins/PluginManagerViewModel.cs
 ```cs
-   21: public sealed record PluginRow(
-   45: public sealed partial class PluginManagerViewModel : ViewModelBase
-   54: public PluginManagerViewModel(
-   89: public string PluginsRoot { get; }
-   90: public string TrustPolicySummary { get; }
-   91: public ObservableCollection<PluginRow> Rows { get; } = new();
-  102: public ObservableCollection<PluginCatalogItem> CatalogItems { get; } = new();
-  105: public bool FeedConfigured => _feed.IsConfigured;
+   22: public sealed record PluginRow(
+   46: public sealed partial class PluginManagerViewModel : ViewModelBase
+   55: public PluginManagerViewModel(
+   90: public string PluginsRoot { get; }
+   91: public string TrustPolicySummary { get; }
+   92: public ObservableCollection<PluginRow> Rows { get; } = new();
+  103: public ObservableCollection<PluginCatalogItem> CatalogItems { get; } = new();
+  106: public bool FeedConfigured => _feed.IsConfigured;
 ```
 
 ## src/linux/Shell/TradingTerminal.App.Avalonia/Program.cs
@@ -236,45 +396,46 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 
 ## src/linux/Shell/TradingTerminal.App.Avalonia/Shell/MainWindow.axaml.cs
 ```cs
-   12: public partial class MainWindow : Window
-   16: public MainWindow()
+   13: public partial class MainWindow : Window
+   20: public MainWindow()
 ```
 
 ## src/linux/Shell/TradingTerminal.App.Avalonia/Shell/MainWindowViewModel.cs
 ```cs
-   29: public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
-   38: public MainWindowViewModel(
-   83: public MainWindowViewModel()
-  101: public ObservableCollection<ITradingStrategy> Strategies { get; }
-  103: public ObservableCollection<StrategyCatalogItemViewModel> CatalogItems { get; }
-  107: public ITradingStrategy? SelectedStrategy => SelectedCatalogItem?.Strategy;
-  108: public bool HasNoStrategies => CatalogItems.Count == 0;
-  109: public bool HasStrategies => CatalogItems.Count > 0;
-  111: public IReadOnlyList<CliLaunchChoice> CliLaunchChoices { get; }
-  113: public void LaunchCli(CliLaunchChoice? choice)
-  132: public string SelectedDetails => SelectedStrategy?.Description ?? "Select a strategy to see its description.";
-  166: public BrokerApiMeterViewModel? ApiMeter { get; }
-  167: public TickRecordingService? Recorder { get; }
-  169: public int PluginProblemCount { get; }
-  170: public bool HasPluginProblems => PluginProblemCount > 0;
-  174: public InMemoryLogSink ActivityLog { get; }
-  177: public ObservableCollection<LogEntry> VisibleLog { get; }
-  186: public void BeginBusy(string title, string message)
-  193: public void EndBusy() => IsBusy = false;
-  237: public bool IsDisconnected => ConnectionState is not ConnectionState.Connected;
-  238: public bool HasFeedDrops => FeedDropCount > 0;
-  239: public string DisconnectBannerText => "Disconnected — connect a broker to resume";
-  240: public int ConnectedBrokerCount => _brokerSelector?.Connected.Count ?? 0;
-  241: public bool IsAuthenticated => _session?.IsAuthenticated == true;
-  242: public string SessionUserDisplay => !IsAuthenticated
-  249: public string RuntimeInfo =>
-  289: public async Task ReconnectAllAsync()
-  316: public void Dispose()
-  328: public sealed class CliLaunchChoice(AgentCliAdapter adapter, bool isAvailable)
-  330: public AgentCliAdapter Adapter { get; } = adapter;
-  331: public bool IsAvailable { get; } = isAvailable;
-  332: public string DisplayName => Adapter.DisplayName;
-  333: public string MenuHeader => IsAvailable ? Adapter.DisplayName : $"{Adapter.DisplayName} - not installed";
+   30: public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
+   41: public MainWindowViewModel(
+   98: public MainWindowViewModel()
+  116: public ObservableCollection<ITradingStrategy> Strategies { get; }
+  118: public ObservableCollection<StrategyCatalogItemViewModel> CatalogItems { get; }
+  122: public ITradingStrategy? SelectedStrategy => SelectedCatalogItem?.Strategy;
+  123: public bool HasNoStrategies => CatalogItems.Count == 0;
+  124: public bool HasStrategies => CatalogItems.Count > 0;
+  126: public IReadOnlyList<CliLaunchChoice> CliLaunchChoices { get; }
+  129: public PaperExecutionBooksViewModel? ExecutionBooks { get; }
+  131: public void LaunchCli(CliLaunchChoice? choice)
+  150: public string SelectedDetails => SelectedCatalogItem?.Description ?? "Select a strategy or visualizer to see its description.";
+  222: public BrokerApiMeterViewModel? ApiMeter { get; }
+  223: public TickRecordingService? Recorder { get; }
+  225: public int PluginProblemCount { get; }
+  226: public bool HasPluginProblems => PluginProblemCount > 0;
+  230: public InMemoryLogSink ActivityLog { get; }
+  233: public ObservableCollection<LogEntry> VisibleLog { get; }
+  242: public void BeginBusy(string title, string message)
+  249: public void EndBusy() => IsBusy = false;
+  293: public bool IsDisconnected => ConnectionState is not ConnectionState.Connected;
+  294: public bool HasFeedDrops => FeedDropCount > 0;
+  295: public string DisconnectBannerText => "Disconnected — connect a broker to resume";
+  296: public int ConnectedBrokerCount => _brokerSelector?.Connected.Count ?? 0;
+  297: public bool IsAuthenticated => _session?.IsAuthenticated == true;
+  298: public string SessionUserDisplay => !IsAuthenticated
+  305: public string RuntimeInfo =>
+  345: public async Task ReconnectAllAsync()
+  372: public void Dispose()
+  386: public sealed class CliLaunchChoice(AgentCliAdapter adapter, bool isAvailable)
+  388: public AgentCliAdapter Adapter { get; } = adapter;
+  389: public bool IsAvailable { get; } = isAvailable;
+  390: public string DisplayName => Adapter.DisplayName;
+  391: public string MenuHeader => IsAvailable ? Adapter.DisplayName : $"{Adapter.DisplayName} - not installed";
 ```
 
 ## src/linux/Shell/TradingTerminal.App.Avalonia/Shell/ShellConverters.cs

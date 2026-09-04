@@ -28,11 +28,15 @@ public sealed class StrategyClassificationTests
     {
         ITradingStrategy s = new TapeStrategy();
 
-        s.SupportedBrokers.Should().BeEquivalentTo(StrategyBrokerCapability.TapeBrokers);
-        s.SupportedBrokers.Should().Contain(BrokerKind.InteractiveBrokers)
-            .And.Contain(BrokerKind.Binance)
-            .And.Contain(BrokerKind.IronBeam);
-        s.SupportedBrokers.Should().NotContain(BrokerKind.Alpaca);
+        s.SupportedBrokers.Should().Equal(
+            BrokerKind.InteractiveBrokers,
+            BrokerKind.Simulated,
+            BrokerKind.Binance,
+            BrokerKind.IronBeam,
+            BrokerKind.Coinbase,
+            BrokerKind.Bybit,
+            BrokerKind.Kraken,
+            BrokerKind.Okx);
     }
 
     [Fact]
@@ -40,9 +44,18 @@ public sealed class StrategyClassificationTests
     {
         ITradingStrategy s = new DepthStrategy();
 
-        s.SupportedBrokers.Should().BeEquivalentTo(StrategyBrokerCapability.DepthBrokers);
-        s.SupportedBrokers.Should().Contain(BrokerKind.CTrader);
-        s.SupportedBrokers.Should().NotContain(BrokerKind.NinjaTrader);
+        s.SupportedBrokers.Should().Equal(
+            BrokerKind.CTrader,
+            BrokerKind.Simulated,
+            BrokerKind.Binance,
+            BrokerKind.IronBeam,
+            BrokerKind.Upstox,
+            BrokerKind.Coinbase,
+            BrokerKind.Bybit,
+            BrokerKind.Kraken,
+            BrokerKind.Okx);
+        s.SupportedBrokers.Should().NotContain(BrokerKind.InteractiveBrokers,
+            because: "IB reqMktDepth is not wired in the Mac build");
     }
 
     [Fact]
@@ -56,10 +69,36 @@ public sealed class StrategyClassificationTests
 
     [Theory]
     [InlineData(StrategyDataRequirement.L1 | StrategyDataRequirement.Bars, 0)]
-    [InlineData(StrategyDataRequirement.L1 | StrategyDataRequirement.Bars | StrategyDataRequirement.TradeTape, 3)]
+    [InlineData(StrategyDataRequirement.L1 | StrategyDataRequirement.Bars | StrategyDataRequirement.TradeTape, 8)]
     [InlineData(StrategyDataRequirement.L1 | StrategyDataRequirement.Bars | StrategyDataRequirement.Depth, 9)]
+    [InlineData(StrategyDataRequirement.L1 | StrategyDataRequirement.Bars |
+                StrategyDataRequirement.Depth | StrategyDataRequirement.TradeTape, 7)]
     public void Capability_matrix_maps_requirement_to_broker_count(StrategyDataRequirement req, int expected)
         => StrategyBrokerCapability.ForRequirement(req).Should().HaveCount(expected);
+
+    [Fact]
+    public void Combined_depth_and_tape_requirement_uses_intersection()
+    {
+        var requirement = StrategyDataRequirement.L1 | StrategyDataRequirement.Bars |
+                          StrategyDataRequirement.Depth | StrategyDataRequirement.TradeTape;
+
+        StrategyBrokerCapability.ForRequirement(requirement).Should().Equal(
+            BrokerKind.Simulated,
+            BrokerKind.Binance,
+            BrokerKind.IronBeam,
+            BrokerKind.Coinbase,
+            BrokerKind.Bybit,
+            BrokerKind.Kraken,
+            BrokerKind.Okx);
+    }
+
+    [Fact]
+    public void Unknown_requirement_flags_fail_closed()
+    {
+        var act = () => StrategyBrokerCapability.ForRequirement((StrategyDataRequirement)(1 << 20));
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
 
     // ── Fakes ────────────────────────────────────────────────────────────────────────────────
     private sealed class BaselineStrategy : ITradingStrategy

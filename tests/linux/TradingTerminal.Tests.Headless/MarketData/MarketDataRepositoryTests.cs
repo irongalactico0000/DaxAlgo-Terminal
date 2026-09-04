@@ -16,6 +16,23 @@ public sealed class MarketDataRepositoryTests
     private const BrokerKind TestBroker = BrokerKind.InteractiveBrokers;
 
     [Fact]
+    public async Task ListInstruments_skips_broker_with_unsupported_catalog()
+    {
+        var client = Substitute.For<IBrokerClient>();
+        var selector = new StubBrokerSelector(client, BrokerKind.IronBeam);
+        var repo = new MarketDataRepository(
+            selector, new ImmediateDispatcher(), Substitute.For<IMarketDataIngest>(),
+            new MarketDataHub(), Substitute.For<IMarketDataStore>(),
+            NullLogger<MarketDataRepository>.Instance);
+
+        var instruments = await repo.ListInstrumentsAsync();
+
+        instruments.Should().BeEmpty();
+        client.ReceivedCalls().Should().NotContain(call =>
+            call.GetMethodInfo().Name == nameof(IBrokerClient.ListInstrumentsAsync));
+    }
+
+    [Fact]
     public async Task Subscribe_routes_through_canonical_pipeline()
     {
         var contract = Contract.UsStock("NVDA");
@@ -204,23 +221,94 @@ public sealed class MarketDataRepositoryTests
         await client.Received(1).RequestHistoricalBarsAsync(contract, size, duration, Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task Unsupported_history_fails_before_cache_or_broker_work()
+    {
+        var contract = Contract.UsStock("AAPL");
+        var ingest = Substitute.For<IMarketDataIngest>();
+        var store = Substitute.For<IMarketDataStore>();
+        var client = Substitute.For<IBrokerClient>();
+        var selector = new StubBrokerSelector(client, BrokerKind.IronBeam);
+        var repo = new MarketDataRepository(
+            selector, new ImmediateDispatcher(), ingest, new MarketDataHub(), store,
+            NullLogger<MarketDataRepository>.Instance);
+
+        var act = () => repo.GetHistoricalBarsAsync(
+            contract, BrokerKind.IronBeam, BarSize.OneMinute, TimeSpan.FromMinutes(3));
+
+        await act.Should().ThrowAsync<NotSupportedException>()
+            .WithMessage("*IronBeam*historical bars*this build*");
+        ingest.DidNotReceiveWithAnyArgs().Resolve(default!, default);
+        await store.DidNotReceiveWithAnyArgs()
+            .GetRecentBarsAsync(default, default, default, default, default);
+        await client.DidNotReceiveWithAnyArgs()
+            .RequestHistoricalBarsAsync(default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task Unsupported_live_bars_fail_before_hub_or_ingest_subscription()
+    {
+        var contract = Contract.UsStock("AAPL");
+        var ingest = Substitute.For<IMarketDataIngest>();
+        var client = Substitute.For<IBrokerClient>();
+        var selector = new StubBrokerSelector(client, BrokerKind.LondonStrategicEdge);
+        var repo = new MarketDataRepository(
+            selector, new ImmediateDispatcher(), ingest, new MarketDataHub(),
+            Substitute.For<IMarketDataStore>(), NullLogger<MarketDataRepository>.Instance);
+
+        await using var enumerator = repo.SubscribeBarsAsync(
+            contract, BrokerKind.LondonStrategicEdge, BarSize.OneMinute).GetAsyncEnumerator();
+        var act = async () => await enumerator.MoveNextAsync().AsTask();
+
+        await act.Should().ThrowAsync<NotSupportedException>()
+            .WithMessage("*LondonStrategicEdge*live bars*this build*");
+        ingest.DidNotReceiveWithAnyArgs().Resolve(default!, default);
+        ingest.DidNotReceiveWithAnyArgs().SubscribeBars(default!, default, default);
+        client.ReceivedCalls().Should().NotContain(call =>
+            call.GetMethodInfo().Name == nameof(IBrokerClient.SubscribeBarsAsync));
+    }
+
+    [Fact]
+    public async Task Unsupported_depth_fails_before_broker_subscription()
+    {
+        var contract = Contract.UsStock("AAPL");
+        var ingest = Substitute.For<IMarketDataIngest>();
+        var client = Substitute.For<IBrokerClient>();
+        var selector = new StubBrokerSelector(client, BrokerKind.InteractiveBrokers);
+        var repo = new MarketDataRepository(
+            selector, new ImmediateDispatcher(), ingest, new MarketDataHub(),
+            Substitute.For<IMarketDataStore>(), NullLogger<MarketDataRepository>.Instance);
+
+        await using var enumerator = repo.SubscribeDepthAsync(
+            contract, BrokerKind.InteractiveBrokers).GetAsyncEnumerator();
+        var act = async () => await enumerator.MoveNextAsync().AsTask();
+
+        await act.Should().ThrowAsync<NotSupportedException>()
+            .WithMessage("*InteractiveBrokers*level-two depth*this build*");
+        client.ReceivedCalls().Should().NotContain(call =>
+            call.GetMethodInfo().Name == nameof(IBrokerClient.SubscribeDepthAsync));
+    }
+
     /// <summary>Test selector that returns the single supplied client for whichever broker is requested.</summary>
     private sealed class StubBrokerSelector : IBrokerSelector
     {
         private readonly IBrokerClient _client;
+        private readonly BrokerKind _broker;
         private readonly BehaviorSubject<ConnectionState> _state = new(ConnectionState.Connected);
 
-        public StubBrokerSelector(IBrokerClient client)
+        public StubBrokerSelector(IBrokerClient client, BrokerKind broker = TestBroker)
         {
             _client = client;
-            client.Kind.Returns(TestBroker);
+            _broker = broker;
+            client.Kind.Returns(broker);
+            client.MarketDataCapabilities.Returns(BrokerCapabilityCatalog.MarketDataFor(broker));
             client.ConnectionState.Returns(_state);
         }
 
-        public IReadOnlyList<BrokerKind> AvailableKinds => new[] { TestBroker };
-        public bool IsAvailable(BrokerKind kind) => kind == TestBroker;
-        public IReadOnlyList<BrokerKind> Connected => new[] { TestBroker };
-        public bool IsConnected(BrokerKind kind) => kind == TestBroker;
+        public IReadOnlyList<BrokerKind> AvailableKinds => new[] { _broker };
+        public bool IsAvailable(BrokerKind kind) => kind == _broker;
+        public IReadOnlyList<BrokerKind> Connected => new[] { _broker };
+        public bool IsConnected(BrokerKind kind) => kind == _broker;
         public IBrokerClient Get(BrokerKind kind) => _client;
         public BrokerConnectionMode ModeOf(BrokerKind kind) => new(kind, false, "Test", "Test");
         public IObservable<ConnectionState> StateOf(BrokerKind kind) => _state;

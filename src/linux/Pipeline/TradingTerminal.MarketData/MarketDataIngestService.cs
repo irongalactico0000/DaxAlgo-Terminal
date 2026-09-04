@@ -85,11 +85,26 @@ internal sealed class MarketDataIngestService : IMarketDataIngest
     public IDisposable Subscribe(Contract contract, BrokerKind broker)
     {
         var id = _registry.ResolveOrCreate(contract, broker);
+        var client = _selector.Get(broker);
+        var capabilities = client.MarketDataCapabilities;
         var key = (id.Value, broker, "L1");
         var entry = Acquire(key, entry =>
         {
-            _ = PumpQuotesAsync(contract, id, broker, entry, entry.Cts.Token);
-            _ = PumpDepthAsync(contract, id, broker, entry.Cts.Token);
+            if (capabilities.SupportsLevel1Quotes)
+                _ = PumpQuotesAsync(client, contract, id, broker, entry, entry.Cts.Token);
+            else
+                _logger.LogDebug(
+                    "Quote ingest skipped for {Symbol} on {Broker}: source capability declares no L1 quotes",
+                    contract.Symbol,
+                    broker);
+
+            if (capabilities.SupportsLevel2Depth)
+                _ = PumpDepthAsync(client, contract, id, broker, entry.Cts.Token);
+            else
+                _logger.LogDebug(
+                    "Depth ingest skipped for {Symbol} on {Broker}: source capability declares no L2 depth",
+                    contract.Symbol,
+                    broker);
         });
         return new Handle(this, key, entry);
     }
@@ -97,18 +112,38 @@ internal sealed class MarketDataIngestService : IMarketDataIngest
     public IDisposable SubscribeBars(Contract contract, BrokerKind broker, BarSize size)
     {
         var id = _registry.ResolveOrCreate(contract, broker);
+        var client = _selector.Get(broker);
+        var capabilities = client.MarketDataCapabilities;
         var key = (id.Value, broker, $"B{(int)size}");
         var entry = Acquire(key, entry =>
-            _ = PumpBarsAsync(contract, id, size, broker, entry.Cts.Token));
+        {
+            if (capabilities.SupportsLiveBars)
+                _ = PumpBarsAsync(client, contract, id, size, broker, entry.Cts.Token);
+            else
+                _logger.LogDebug(
+                    "Bar ingest skipped for {Symbol} on {Broker}: source capability declares no live bars",
+                    contract.Symbol,
+                    broker);
+        });
         return new Handle(this, key, entry);
     }
 
     public IDisposable SubscribeTrades(Contract contract, BrokerKind broker)
     {
         var id = _registry.ResolveOrCreate(contract, broker);
+        var client = _selector.Get(broker);
+        var capabilities = client.MarketDataCapabilities;
         var key = (id.Value, broker, "T");
         var entry = Acquire(key, entry =>
-            _ = PumpTradesAsync(contract, id, broker, entry, entry.Cts.Token));
+        {
+            if (capabilities.SupportsLiveTrades)
+                _ = PumpTradesAsync(client, contract, id, broker, entry, entry.Cts.Token);
+            else
+                _logger.LogDebug(
+                    "Trade ingest skipped for {Symbol} on {Broker}: source capability declares no live trade tape",
+                    contract.Symbol,
+                    broker);
+        });
         return new Handle(this, key, entry);
     }
 
@@ -140,12 +175,18 @@ internal sealed class MarketDataIngestService : IMarketDataIngest
         }
     }
 
-    private async Task PumpQuotesAsync(Contract contract, InstrumentId id, BrokerKind broker, Entry entry, CancellationToken ct)
+    private async Task PumpQuotesAsync(
+        IBrokerClient client,
+        Contract contract,
+        InstrumentId id,
+        BrokerKind broker,
+        Entry entry,
+        CancellationToken ct)
     {
         var approx = StampsArrivalTime(broker);
         try
         {
-            await foreach (var tick in _selector.Get(broker).SubscribeTicksAsync(contract, ct).ConfigureAwait(false))
+            await foreach (var tick in client.SubscribeTicksAsync(contract, ct).ConfigureAwait(false))
             {
                 var seq = Interlocked.Increment(ref entry.Sequence);
                 var quote = new Quote(
@@ -167,12 +208,18 @@ internal sealed class MarketDataIngestService : IMarketDataIngest
         catch (Exception ex) { _logger.LogWarning(ex, "Quote ingest ended for {Symbol} on {Broker}", contract.Symbol, broker); }
     }
 
-    private async Task PumpTradesAsync(Contract contract, InstrumentId id, BrokerKind broker, Entry entry, CancellationToken ct)
+    private async Task PumpTradesAsync(
+        IBrokerClient client,
+        Contract contract,
+        InstrumentId id,
+        BrokerKind broker,
+        Entry entry,
+        CancellationToken ct)
     {
         var approx = StampsArrivalTime(broker);
         try
         {
-            await foreach (var trade in _selector.Get(broker).SubscribeTradesAsync(contract, ct).ConfigureAwait(false))
+            await foreach (var trade in client.SubscribeTradesAsync(contract, ct).ConfigureAwait(false))
             {
                 var ctx = _tradeContexts.GetOrAdd(id.Value, _ => new TradeContext());
                 var aggressor = trade.Aggressor != AggressorSide.Unknown
@@ -195,11 +242,16 @@ internal sealed class MarketDataIngestService : IMarketDataIngest
         catch (Exception ex) { _logger.LogWarning(ex, "Trade ingest ended for {Symbol} on {Broker}", contract.Symbol, broker); }
     }
 
-    private async Task PumpDepthAsync(Contract contract, InstrumentId id, BrokerKind broker, CancellationToken ct)
+    private async Task PumpDepthAsync(
+        IBrokerClient client,
+        Contract contract,
+        InstrumentId id,
+        BrokerKind broker,
+        CancellationToken ct)
     {
         try
         {
-            await foreach (var snapshot in _selector.Get(broker).SubscribeDepthAsync(contract, 10, ct).ConfigureAwait(false))
+            await foreach (var snapshot in client.SubscribeDepthAsync(contract, 10, ct).ConfigureAwait(false))
             {
                 _hub.PublishDepth(id, snapshot);
                 // Depth (L2) is persisted only by backends built for its volume (QuestDB). The
@@ -212,14 +264,20 @@ internal sealed class MarketDataIngestService : IMarketDataIngest
         catch (Exception ex) { _logger.LogDebug(ex, "Depth ingest ended for {Symbol} on {Broker}", contract.Symbol, broker); }
     }
 
-    private async Task PumpBarsAsync(Contract contract, InstrumentId id, BarSize size, BrokerKind broker, CancellationToken ct)
+    private async Task PumpBarsAsync(
+        IBrokerClient client,
+        Contract contract,
+        InstrumentId id,
+        BarSize size,
+        BrokerKind broker,
+        CancellationToken ct)
     {
         try
         {
             // Live bars fan out to the hub only — not persisted. Strategies that need bars on a
             // historical range that ticks don't cover go through MarketDataRepository.GetHistoricalBarsAsync,
             // which caches the broker's response via _store.EnqueueBar. See the class summary.
-            await foreach (var bar in _selector.Get(broker).SubscribeBarsAsync(contract, size, ct).ConfigureAwait(false))
+            await foreach (var bar in client.SubscribeBarsAsync(contract, size, ct).ConfigureAwait(false))
             {
                 var canonical = OhlcvBar.FromBar(bar, id, size, broker, isFinal: true);
                 _hub.PublishBar(canonical);

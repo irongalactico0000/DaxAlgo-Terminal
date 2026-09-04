@@ -180,9 +180,11 @@ public sealed class OpenAiCompatibleCodegenClient : IStrategyCodegenClient
 
     private HttpRequestMessage BuildRequest(StrategyCodegenRequest request, bool stream)
     {
-        var messages = new List<WireMessage> { new("system", request.SystemContext) };
+        var messages = new List<WireRequestMessage> { new("system", request.SystemContext) };
         foreach (var m in request.Messages)
-            messages.Add(new(m.Role == CodegenRole.Assistant ? "assistant" : "user", m.Content));
+            messages.Add(new(
+                m.Role == CodegenRole.Assistant ? "assistant" : "user",
+                BuildContent(m)));
 
         var body = new ChatRequest(
             _model, messages, Temperature: 0.2, ReasoningEffort: ReasoningEffort(),
@@ -196,6 +198,16 @@ public sealed class OpenAiCompatibleCodegenClient : IStrategyCodegenClient
         if (!string.IsNullOrWhiteSpace(_apiKey))
             httpReq.Headers.TryAddWithoutValidation("Authorization", $"Bearer {_apiKey}");
         return httpReq;
+    }
+
+    private static object BuildContent(CodegenMessage message)
+    {
+        if (message.Images is not { Count: > 0 }) return message.Content;
+
+        var blocks = new List<object> { new WireTextContent(message.Content) };
+        blocks.AddRange(message.Images.Select(static image => (object)new WireImageContent(
+            new WireImageUrl($"data:{image.MediaType};base64,{image.Base64Data}"))));
+        return blocks;
     }
 
     private string TransportFailure(Exception ex) => ex is TaskCanceledException
@@ -253,11 +265,22 @@ public sealed class OpenAiCompatibleCodegenClient : IStrategyCodegenClient
     }
 
     // ── wire shapes ───────────────────────────────────────────────────────────────────────────────
-    private sealed record WireMessage([property: JsonPropertyName("role")] string Role,
-                                      [property: JsonPropertyName("content")] string Content);
+    private sealed record WireRequestMessage([property: JsonPropertyName("role")] string Role,
+                                             [property: JsonPropertyName("content")] object Content);
+    private sealed record WireResponseMessage([property: JsonPropertyName("role")] string Role,
+                                              [property: JsonPropertyName("content")] string? Content);
+    private sealed record WireTextContent([property: JsonPropertyName("text")] string Text)
+    {
+        [JsonPropertyName("type")] public string Type => "text";
+    }
+    private sealed record WireImageContent([property: JsonPropertyName("image_url")] WireImageUrl ImageUrl)
+    {
+        [JsonPropertyName("type")] public string Type => "image_url";
+    }
+    private sealed record WireImageUrl([property: JsonPropertyName("url")] string Url);
     private sealed record ChatRequest(
         [property: JsonPropertyName("model")] string Model,
-        [property: JsonPropertyName("messages")] IReadOnlyList<WireMessage> Messages,
+        [property: JsonPropertyName("messages")] IReadOnlyList<WireRequestMessage> Messages,
         [property: JsonPropertyName("temperature")] double Temperature,
         [property: JsonPropertyName("reasoning_effort"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ReasoningEffort = null,
         [property: JsonPropertyName("stream"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Stream = null,
@@ -266,7 +289,7 @@ public sealed class OpenAiCompatibleCodegenClient : IStrategyCodegenClient
     private sealed record ChatResponse(
         [property: JsonPropertyName("choices")] IReadOnlyList<Choice>? Choices,
         [property: JsonPropertyName("usage")] WireUsage? Usage);
-    private sealed record Choice([property: JsonPropertyName("message")] WireMessage? Message);
+    private sealed record Choice([property: JsonPropertyName("message")] WireResponseMessage? Message);
     private sealed record WireUsage(
         [property: JsonPropertyName("prompt_tokens")] int PromptTokens,
         [property: JsonPropertyName("completion_tokens")] int CompletionTokens);

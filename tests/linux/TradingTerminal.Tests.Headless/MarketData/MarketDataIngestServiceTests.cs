@@ -28,6 +28,7 @@ public sealed class MarketDataIngestServiceTests
 
         var client = Substitute.For<IBrokerClient>();
         client.Kind.Returns(broker);
+        client.MarketDataCapabilities.Returns(BrokerCapabilityCatalog.MarketDataFor(broker));
         client.SubscribeTicksAsync(Arg.Any<Contract>(), Arg.Any<CancellationToken>()).Returns(TwoTicks());
         client.SubscribeDepthAsync(Arg.Any<Contract>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(NoDepth());
 
@@ -60,6 +61,8 @@ public sealed class MarketDataIngestServiceTests
 
         var client = Substitute.For<IBrokerClient>();
         client.Kind.Returns(BrokerKind.Alpaca);
+        client.MarketDataCapabilities.Returns(
+            BrokerCapabilityCatalog.MarketDataFor(BrokerKind.Alpaca));
         client.SubscribeTicksAsync(Arg.Any<Contract>(), Arg.Any<CancellationToken>()).Returns(_ => TwoTicks());
         client.SubscribeDepthAsync(Arg.Any<Contract>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(_ => NoDepth());
 
@@ -76,6 +79,48 @@ public sealed class MarketDataIngestServiceTests
         }
     }
 
+    [Fact]
+    public void Unsupported_channels_are_not_opened_while_supported_l1_still_starts()
+    {
+        var broker = BrokerKind.LondonStrategicEdge;
+        var id = new InstrumentId(11);
+        var registry = Substitute.For<IInstrumentRegistry>();
+        registry.ResolveOrCreate(Arg.Any<Contract>(), broker).Returns(id);
+        var store = Substitute.For<IMarketDataStore>();
+
+        var client = Substitute.For<IBrokerClient>();
+        client.Kind.Returns(broker);
+        client.MarketDataCapabilities.Returns(BrokerCapabilityCatalog.MarketDataFor(broker));
+        client.SubscribeTicksAsync(Arg.Any<Contract>(), Arg.Any<CancellationToken>())
+            .Returns(EmptyAsync<Tick>());
+
+        var selector = new FakeSelector(client, broker);
+        var ingest = new MarketDataIngestService(
+            selector,
+            registry,
+            new MarketDataHub(),
+            store,
+            NullLogger<MarketDataIngestService>.Instance);
+        var contract = Contract.UsStock("AAPL");
+
+        using var l1 = ingest.Subscribe(contract, broker);
+        using var bars = ingest.SubscribeBars(contract, broker, BarSize.OneMinute);
+        using var trades = ingest.SubscribeTrades(contract, broker);
+
+        client.Received(1).SubscribeTicksAsync(contract, Arg.Any<CancellationToken>());
+        client.DidNotReceive().SubscribeDepthAsync(
+            Arg.Any<Contract>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+        client.DidNotReceive().SubscribeBarsAsync(
+            Arg.Any<Contract>(),
+            Arg.Any<BarSize>(),
+            Arg.Any<CancellationToken>());
+        client.DidNotReceive().SubscribeTradesAsync(
+            Arg.Any<Contract>(),
+            Arg.Any<CancellationToken>());
+    }
+
     private static async IAsyncEnumerable<Tick> TwoTicks([EnumeratorCancellation] CancellationToken ct = default)
     {
         yield return new Tick(DateTime.UtcNow, 100, 101, 1, 2);
@@ -84,6 +129,12 @@ public sealed class MarketDataIngestServiceTests
     }
 
     private static async IAsyncEnumerable<DepthSnapshot> NoDepth([EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await Task.CompletedTask;
+        yield break;
+    }
+
+    private static async IAsyncEnumerable<T> EmptyAsync<T>()
     {
         await Task.CompletedTask;
         yield break;

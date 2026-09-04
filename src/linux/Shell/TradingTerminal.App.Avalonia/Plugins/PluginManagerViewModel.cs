@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DaxAlgo.Daxq.Host;
+using DaxAlgo.Package;
 using TradingTerminal.Infrastructure.Plugins;
 using TradingTerminal.Infrastructure.Plugins.Feed;
 using TradingTerminal.UI;
@@ -113,17 +114,24 @@ public sealed partial class PluginManagerViewModel : ViewModelBase
 
     partial void OnCatalogSearchChanged(string value) => ApplySearch();
 
-    /// <summary>Pick a managed plugin package/raw assembly or a protected DAXQ package. Managed
-    /// artifacts activate on restart; a verified DAXQ package activates immediately and is also
-    /// persisted for restart discovery.</summary>
+    /// <summary>
+    /// Pick a DaxAlgo open artifact and verify it. Accepted Extensions formats match public Windows:
+    /// <see cref="DaxPackage.AcceptedExtensions"/> (<c>.daxalgostrategy</c> /
+    /// <c>.daxalgovisualizer</c>). Installation of open packages stays gated.
+    ///
+    /// <para>Mac-only sealed <c>.daxq</c> packages remain installable here as a separate lane; raw
+    /// <c>.dll</c> and legacy <c>.daxplugin</c> are refused by name via
+    /// <see cref="ExtensionsPackageInspection"/>.</para>
+    /// </summary>
     [RelayCommand]
     private async Task InstallPluginAsync()
     {
         var fileName = await UiFile.OpenAsync(
-            "Strategy package or assembly",
-            ["daxplugin", "daxq", "dll"]);
+            "Select a DaxAlgo artifact",
+            ["daxalgostrategy", "daxalgovisualizer", "daxq"]);
         if (string.IsNullOrWhiteSpace(fileName)) return;
 
+        // Sealed Mac runtime packages are outside the open submission contract.
         if (fileName.EndsWith(".daxq", StringComparison.OrdinalIgnoreCase))
         {
             var daxq = _daxqInstaller.Install(fileName);
@@ -134,17 +142,8 @@ public sealed partial class PluginManagerViewModel : ViewModelBase
             return;
         }
 
-        // Packages are sha256-verified and carry private deps; a raw .dll is the dev drop-in path.
-        // Both go through the same manifest/SDK/trust gates.
-        var result = fileName.EndsWith(DaxPluginPackage.Extension, StringComparison.OrdinalIgnoreCase)
-            ? PluginInstaller.InstallFromPackage(
-                fileName, _context.PluginsRoot, _context.TrustPolicy, Inspector(), _state)
-            : PluginInstaller.InstallFromDll(
-                fileName, _context.PluginsRoot, _context.TrustPolicy, Inspector(), _state);
-        Status = result.Message;
-        if (result.Success) RestartRequired = true;
-        Rebuild();
-        RebuildCatalog();
+        _ = ExtensionsPackageInspection.TryVerify(fileName, out var status);
+        Status = status;
     }
 
     /// <summary>Re-enable a disabled or quarantined plugin — it loads again on the next start.</summary>

@@ -1,0 +1,220 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:render="clr-namespace:TradingTerminal.UI.Avalonia.Controls.Render;assembly=TradingTerminal.UI.Avalonia"
+        x:Class="TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerWindow"
+        Title="DaxAlgo Paper Strategy Runner"
+        Width="1320" Height="840" MinWidth="1040" MinHeight="680"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Background.Primary}"
+        Foreground="{DynamicResource Text.Primary}"
+        FontFamily="{DynamicResource Font.Base}"
+        FontSize="12">
+  <Window.Styles>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource Background.Surface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border.Brush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="TextBlock.eyebrow">
+      <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.metric">
+      <Setter Property="Foreground" Value="{DynamicResource Text.Header}" />
+      <Setter Property="FontFamily" Value="{DynamicResource Font.Data}" />
+      <Setter Property="FontSize" Value="17" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.warning">
+      <Setter Property="Foreground" Value="{DynamicResource Warning.Brush}" />
+      <Setter Property="Background" Value="{DynamicResource Warning.Soft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Warning.Brush}" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*">
+    <Border Grid.Row="0" Background="{DynamicResource Gradient.Chrome}"
+            BorderBrush="{DynamicResource Border.Brush}" BorderThickness="0,0,0,1" Padding="18,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Spacing="4">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="PAPER STRATEGY RUNNER" FontSize="18" FontWeight="Bold"
+                       Foreground="{DynamicResource Text.Header}" />
+            <Border Background="{DynamicResource Warning.Soft}" BorderBrush="{DynamicResource Warning.Brush}"
+                    BorderThickness="1" CornerRadius="10" Padding="9,2">
+              <TextBlock Text="PAPER ONLY · AUTHENTICATED IPC" Foreground="{DynamicResource Warning.Brush}"
+                         FontSize="10" FontWeight="Bold" />
+            </Border>
+          </StackPanel>
+          <TextBlock Text="IStrategyKernel → private virtual book → target replicator → authenticated service → durable Paper OMS"
+                     Foreground="{DynamicResource Text.Secondary}" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Content="Run" Command="{Binding StartCommand}" Classes="accent" />
+          <Button Content="Pause" Command="{Binding PauseCommand}" />
+          <Button Content="Resume" Command="{Binding ResumeCommand}" />
+          <Button Content="Stop" Command="{Binding StopCommand}" Classes="warning" />
+          <Button Content="Retry target" Command="{Binding RetryTargetCommand}" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Border Grid.Row="1" Background="{DynamicResource Background.Surface}"
+            BorderBrush="{DynamicResource Border.Brush}" BorderThickness="0,0,0,1" Padding="16,9">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" />
+        <TextBlock Grid.Column="1" Text="No live broker order adapter is loaded"
+                   Foreground="{DynamicResource Text.Muted}" Margin="18,0,0,0" />
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="2" ColumnDefinitions="360,*" Margin="14">
+      <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="12">
+          <Border Classes="card">
+            <StackPanel Spacing="9">
+              <TextBlock Text="1 · STRATEGY" Classes="eyebrow" />
+              <ComboBox ItemsSource="{Binding Strategies}" SelectedItem="{Binding SelectedStrategy}"
+                        IsEnabled="{Binding IsStopped}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate><TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" /></DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBlock Text="{Binding SelectedStrategy.Description}" Foreground="{DynamicResource Text.Secondary}"
+                         TextWrapping="Wrap" />
+              <TextBlock Text="Installed and in-session authored backtest strategies are adapted to the canonical SDK runtime at launch."
+                         Foreground="{DynamicResource Text.Muted}" FontSize="10" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding StrategyEligibilitySummary}"
+                         Foreground="{DynamicResource Warning.Brush}" FontSize="10" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+
+          <Border Classes="card">
+            <StackPanel Spacing="9">
+              <TextBlock Text="2 · CANONICAL ASSET SET" Classes="eyebrow" />
+              <ComboBox ItemsSource="{Binding Instruments}" SelectedItem="{Binding SelectedInstrument}"
+                        IsEnabled="{Binding CanSelectInstrument}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate><TextBlock Text="{Binding DisplayName}" /></DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBlock Text="{Binding AssetSummary}" FontFamily="{DynamicResource Font.Data}"
+                         Foreground="{DynamicResource Text.Header}" TextWrapping="Wrap" />
+              <Border Background="{DynamicResource Warning.Soft}" BorderBrush="{DynamicResource Warning.Brush}"
+                      BorderThickness="1" CornerRadius="4" Padding="9">
+                <TextBlock Text="Canonical authored strategies lock every reviewed leg and feed. Pair/basket legs are submitted separately through risk and the Paper OMS; they are not represented as an atomic exchange order."
+                           Foreground="{DynamicResource Warning.Brush}" TextWrapping="Wrap" FontSize="10.5" />
+              </Border>
+            </StackPanel>
+          </Border>
+
+          <Border Classes="card">
+            <StackPanel Spacing="8">
+              <TextBlock Text="3 · LAUNCH PARAMETERS" Classes="eyebrow" />
+              <TextBlock Text="Values lock at Run. The canonical asset set is bound separately above."
+                         Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" />
+              <ItemsControl ItemsSource="{Binding Parameters}" IsEnabled="{Binding IsStopped}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Spacing="3" Margin="0,3,0,6">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{Binding DisplayName}" />
+                        <TextBlock Grid.Column="1" Text="{Binding KindText}" Classes="eyebrow" />
+                      </Grid>
+                      <TextBox Text="{Binding Value}" />
+                      <TextBlock Text="{Binding Hint}" Foreground="{DynamicResource Text.Muted}"
+                                 FontSize="9.5" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+
+      <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*,Auto" Margin="14,0,0,0">
+        <UniformGrid Grid.Row="0" Columns="5">
+          <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="RUNTIME" Classes="eyebrow" /><TextBlock Text="{Binding RuntimeState}" Classes="metric" /></StackPanel></Border>
+          <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="MODEL TARGET" Classes="eyebrow" /><TextBlock Text="{Binding ModelTarget}" Classes="metric" /></StackPanel></Border>
+          <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="MODEL POSITION" Classes="eyebrow" /><TextBlock Text="{Binding ModelPosition}" Classes="metric" /></StackPanel></Border>
+          <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="AVERAGE ENTRY" Classes="eyebrow" /><TextBlock Text="{Binding AverageEntry}" Classes="metric" /></StackPanel></Border>
+          <Border Classes="card"><StackPanel><TextBlock Text="MODEL EQUITY" Classes="eyebrow" /><TextBlock Text="{Binding ModelEquity}" Classes="metric" /></StackPanel></Border>
+        </UniformGrid>
+
+        <Border Grid.Row="1" Classes="card" Margin="0,12,0,0">
+          <StackPanel Spacing="7">
+            <TextBlock Text="STRATEGY LEGS · MODEL TARGETS" Classes="eyebrow" />
+            <ItemsControl ItemsSource="{Binding StrategyLegs}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid ColumnDefinitions="2*,*,*,*" Margin="0,2">
+                    <TextBlock Text="{Binding Symbol}" FontFamily="{DynamicResource Font.Data}" />
+                    <TextBlock Grid.Column="1" Text="{Binding Target, StringFormat='target {0}'}"
+                               Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBlock Grid.Column="2" Text="{Binding Position, StringFormat='model {0}'}"
+                               Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBlock Grid.Column="3" Text="{Binding AverageEntry, StringFormat='avg {0}'}"
+                               Foreground="{DynamicResource Text.Secondary}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="Shared cash, equity and P&amp;L are authoritative in the durable Paper Execution Console."
+                       Foreground="{DynamicResource Text.Muted}" FontSize="9.5" />
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Classes="card" Margin="0,12,0,12" Padding="0">
+          <Grid RowDefinitions="Auto,*">
+            <Grid Margin="14,10" ColumnDefinitions="*,Auto">
+              <StackPanel>
+                <TextBlock Text="STRATEGY-ASSET VISUALIZATION" Classes="eyebrow" />
+                <TextBlock Text="{Binding AssetSummary}" Foreground="{DynamicResource Text.Secondary}" />
+              </StackPanel>
+              <TextBlock Grid.Column="1" Text="SDK IRenderSurface · bounded frame"
+                         Foreground="{DynamicResource Text.Muted}" VerticalAlignment="Center" />
+            </Grid>
+            <Border Grid.Row="1" Background="{DynamicResource Background.Primary}">
+              <Grid>
+                <render:RenderSurfaceView x:Name="Surface" Draw="{Binding Draw}" MinHeight="360" />
+                <Border IsVisible="{Binding IsStopped}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        MaxWidth="520" Padding="22" CornerRadius="8"
+                        Background="{DynamicResource Background.Surface}"
+                        BorderBrush="{DynamicResource Border.Brush}" BorderThickness="1">
+                  <StackPanel Spacing="9">
+                    <TextBlock Text="ASSET BINDING READY" Classes="eyebrow" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding AssetSummary}" Foreground="{DynamicResource Text.Header}"
+                               FontFamily="{DynamicResource Font.Data}" FontSize="16" FontWeight="SemiBold"
+                               TextAlignment="Center" TextWrapping="Wrap" />
+                    <TextBlock Text="The authored strategy frame starts after Run locks the reviewed canonical asset set and launch parameters. Asset identity is never inferred from a strategy name or typed prose."
+                               Foreground="{DynamicResource Text.Secondary}" TextAlignment="Center"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="For a pair or basket, the authored Draw() implementation controls whether one pane, normalized overlays, spread/z-score, or multiple panes are rendered."
+                               Foreground="{DynamicResource Warning.Brush}" TextAlignment="Center"
+                               TextWrapping="Wrap" FontSize="10.5" />
+                  </StackPanel>
+                </Border>
+              </Grid>
+            </Border>
+          </Grid>
+        </Border>
+
+        <Border Grid.Row="3" Classes="card">
+          <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+            <TextBlock Text="LATEST ROUTE RESULT" Classes="eyebrow" />
+            <TextBlock Grid.Column="1" Text="{Binding DroppedEvents, StringFormat='Dropped events: {0}'}"
+                       Foreground="{DynamicResource Text.Muted}" />
+            <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding LastMessage}"
+                       Foreground="{DynamicResource Text.Header}" TextWrapping="Wrap" Margin="0,7,0,0" />
+            <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding LastAlert}"
+                       Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" Margin="0,5,0,0" />
+          </Grid>
+        </Border>
+      </Grid>
+    </Grid>
+  </Grid>
+</Window>

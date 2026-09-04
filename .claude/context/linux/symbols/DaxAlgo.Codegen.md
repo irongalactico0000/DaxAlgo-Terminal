@@ -1,6 +1,6 @@
 # DaxAlgo.Codegen — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `330db91800ba`. Declaration lines only;
+Generated from source fingerprint `e91d50e75733`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Tools/DaxAlgo.Codegen/AgentCliCodegenClient.cs
@@ -20,7 +20,7 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
   130: public CodegenEffort Effort => _effort;
   131: public IReadOnlyList<string> KnownModels => AiModelCatalog.Offer(ProviderId, _model);
   139: public async IAsyncEnumerable<CodegenEvent> StreamAsync(
-  279: public async Task<StrategyCodegenResponse> GenerateAsync(StrategyCodegenRequest request, CancellationToken ct = default)
+  287: public async Task<StrategyCodegenResponse> GenerateAsync(StrategyCodegenRequest request, CancellationToken ct = default)
 ```
 
 ## src/linux/Tools/DaxAlgo.Codegen/AiModelCatalog.cs
@@ -69,8 +69,8 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
    45: public async Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken ct = default)
    72: public async IAsyncEnumerable<CodegenEvent> StreamAsync(
   145: public async Task<StrategyCodegenResponse> GenerateAsync(StrategyCodegenRequest request, CancellationToken ct = default)
-  258: public WireCacheControl? CacheControl { get; init; }
-  263: public static WireCacheControl Ephemeral { get; } = new("ephemeral");
+  272: public WireCacheControl? CacheControl { get; init; }
+  289: public static WireCacheControl Ephemeral { get; } = new("ephemeral");
 ```
 
 ## src/linux/Tools/DaxAlgo.Codegen/AnthropicStreamParser.cs
@@ -79,6 +79,43 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
    23: public CodegenUsage Usage => new(_input, _output, _cached);
    29: public IEnumerable<CodegenEvent> Consume(JsonElement evt)
    81: public static async IAsyncEnumerable<JsonElement> ReadAsync(
+```
+
+## src/linux/Tools/DaxAlgo.Codegen/AuthoredUnitIntentClassifierV1.cs
+```cs
+   11: public sealed class AuthoredUnitIntentClassifierV1 : IAuthoredUnitIntentClassifierV1
+   13: public async Task<AuthoredUnitIntentClassificationResultV1> ClassifyAsync(
+```
+
+## src/linux/Tools/DaxAlgo.Codegen/AuthoredUnitSourceGeneratorV1.cs
+```cs
+   12: public sealed class AuthoredUnitSourceGeneratorV1 : IAuthoredUnitSourceGeneratorV1
+   14: public const int MaxFiles = 8;
+   15: public const int MaxSourceCharacters = 500_000;
+   17: public async Task<AuthoredUnitSourceGenerationResultV1> GenerateAsync(
+```
+
+## src/linux/Tools/DaxAlgo.Codegen/AuthoredUnitSpecificationGeneratorV1.cs
+```cs
+   14: public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecificationGeneratorV1
+   16: public const int MaxInputCharacters = 100_000;
+   17: public const int MaxResponseCharacters = 500_000;
+   18: public const int MaxAvailableInstruments = 512;
+   20: public async Task<AuthoredUnitSpecificationGenerationResultV1> GenerateAsync(
+```
+
+## src/linux/Tools/DaxAlgo.Codegen/ChartReferenceInspectorV1.cs
+```cs
+    8: public sealed record ChartReferenceInspectionRequestV1(
+   12: public sealed record ChartReferenceInspectionResultV1(
+   17: public bool Success => Inspection is not null && string.IsNullOrWhiteSpace(Error);
+   20: public interface IChartReferenceInspectorV1
+   22:     Task<ChartReferenceInspectionResultV1> InspectAsync(
+   23:     IStrategyCodegenClient provider,
+   24:     ChartReferenceInspectionRequestV1 request,
+   25:     CancellationToken cancellationToken = default);
+   32: public sealed class ChartReferenceInspectorV1 : IChartReferenceInspectorV1
+   37: public async Task<ChartReferenceInspectionResultV1> InspectAsync(
 ```
 
 ## src/linux/Tools/DaxAlgo.Codegen/CliWorkspaceLauncher.cs
@@ -140,7 +177,7 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
    54: public IReadOnlyList<string> KnownModels => AiModelCatalog.Offer(ProviderId, _model);
    58: public async Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken ct = default)
    86: public async IAsyncEnumerable<CodegenEvent> StreamAsync(
-  206: public async Task<StrategyCodegenResponse> GenerateAsync(StrategyCodegenRequest request, CancellationToken ct = default)
+  218: public async Task<StrategyCodegenResponse> GenerateAsync(StrategyCodegenRequest request, CancellationToken ct = default)
 ```
 
 ## src/linux/Tools/DaxAlgo.Codegen/ParallelStrategyCandidateGeneratorV1.cs
@@ -277,34 +314,34 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
    15: public sealed record StrategyCandidateGenerationIssueV1(
    21: public sealed record StrategyGenerationAgentRunV1(
    34: public sealed record StrategyCandidateGenerationRequestV1(
-   40: public sealed record StrategyCandidateGenerationResultV1(
-   48: public bool Success => Candidate is not null && Assessment is not null &&
-   52: public interface IStrategyCandidateGeneratorV1
-   54:     Task<StrategyCandidateGenerationResultV1> GenerateAsync(
-   55:     IStrategyCodegenClient provider,
-   56:     StrategyCandidateGenerationRequestV1 request,
-   57:     CancellationToken ct = default);
-   65: public interface IStrategyGenerationAgentRouterV1
-   67:     IStrategyCodegenClient ResolveSpecialist(
-   68:     StrategySpecialistRequestV1 request,
-   69:     IStrategyCodegenClient selectedProvider);
-   72: public sealed class SameProviderStrategyGenerationAgentRouterV1 : IStrategyGenerationAgentRouterV1
-   74: public IStrategyCodegenClient ResolveSpecialist(
-   85: public sealed class StrategyCandidateGenerationOrchestratorV1(
-   89: public const int MaxSpecialists = 4;
-   90: public const int MaxUserInputCharacters = 100_000;
-   91: public const int MaxModelResponseCharacters = 1_000_000;
-   97: public async Task<StrategyCandidateGenerationResultV1> GenerateAsync(
-  557: public static bool TryDeserialize<T>(
+   44: public sealed record StrategyCandidateGenerationResultV1(
+   52: public bool Success => Candidate is not null && Assessment is not null &&
+   56: public interface IStrategyCandidateGeneratorV1
+   58:     Task<StrategyCandidateGenerationResultV1> GenerateAsync(
+   59:     IStrategyCodegenClient provider,
+   60:     StrategyCandidateGenerationRequestV1 request,
+   61:     CancellationToken ct = default);
+   69: public interface IStrategyGenerationAgentRouterV1
+   71:     IStrategyCodegenClient ResolveSpecialist(
+   72:     StrategySpecialistRequestV1 request,
+   73:     IStrategyCodegenClient selectedProvider);
+   76: public sealed class SameProviderStrategyGenerationAgentRouterV1 : IStrategyGenerationAgentRouterV1
+   78: public IStrategyCodegenClient ResolveSpecialist(
+   89: public sealed class StrategyCandidateGenerationOrchestratorV1(
+   93: public const int MaxSpecialists = 4;
+   94: public const int MaxUserInputCharacters = 100_000;
+   95: public const int MaxModelResponseCharacters = 1_000_000;
+  101: public async Task<StrategyCandidateGenerationResultV1> GenerateAsync(
+  642: public static bool TryDeserialize<T>(
 ```
 
 ## src/linux/Tools/DaxAlgo.Codegen/StrategyCandidateGenerationPromptV1.cs
 ```cs
     8: public const string IntakeAgentId = "strategy.intake@1";
    10: public static string IntakeSystemContext => """
-   97: public static string CreateIntakeUserMessage(
-  113: public static string SpecialistSystemContext() => """
-  143: public static string CreateSpecialistUserMessage(
+  112: public static string CreateIntakeUserMessage(
+  132: public static string SpecialistSystemContext() => """
+  162: public static string CreateSpecialistUserMessage(
 ```
 
 ## src/linux/Tools/DaxAlgo.Codegen/StrategyCodegenClientFactory.cs
@@ -361,7 +398,7 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
    55: public IReadOnlyList<StrategyCandidateV1> Revisions => _revisions;
    57: public StrategyGenerationWorkspaceV1 Workspace => new(
    65: public async Task<StrategyCandidateGenerationResultV1> SendAsync(
-   87: public StrategyCandidateConfirmationResultV1 Confirm(string expectedContentHashSha256)
+  101: public StrategyCandidateConfirmationResultV1 Confirm(string expectedContentHashSha256)
 ```
 
 ## src/linux/Tools/DaxAlgo.Codegen/StrategySkillLibrary.cs

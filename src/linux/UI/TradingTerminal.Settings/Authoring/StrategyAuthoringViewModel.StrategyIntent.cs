@@ -958,11 +958,15 @@ public sealed partial class StrategyAuthoringViewModel
         OnPropertyChanged(nameof(CanConfirmStrategyIntentReview));
         OnPropertyChanged(nameof(CanEnterFourLaneConformance));
         OnPropertyChanged(nameof(CanGenerateStrategyImplementations));
+        OnPropertyChanged(nameof(CanonicalPaperStrategyIntentSupported));
+        OnPropertyChanged(nameof(CanonicalPaperStrategyAvailabilityText));
+        OnPropertyChanged(nameof(CanGenerateCanonicalPaperStrategy));
         OnPropertyChanged(nameof(CanGenerateFourCandidates));
         OnPropertyChanged(nameof(CanChooseGeneratedCandidate));
         OnPropertyChanged(nameof(CanRevalidateGeneratedCandidate));
         OnPropertyChanged(nameof(StrategyIntentFamilyText));
         ConfirmStrategyIntentReviewCommand.NotifyCanExecuteChanged();
+        GenerateCanonicalPaperStrategyCommand.NotifyCanExecuteChanged();
         GenerateFourCandidatesCommand.NotifyCanExecuteChanged();
         RegenerateFourCandidatesCommand.NotifyCanExecuteChanged();
         ChooseGeneratedCandidateCommand.NotifyCanExecuteChanged();

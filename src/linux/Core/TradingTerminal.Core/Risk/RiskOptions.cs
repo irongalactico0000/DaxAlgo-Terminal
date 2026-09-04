@@ -21,4 +21,11 @@ public sealed class RiskOptions
     /// in by broker code that knows the contract's tick value.
     /// </summary>
     public double DefaultContractMultiplier { get; set; } = 1.0;
+
+    /// <summary>
+    /// Optional per-symbol overrides used by multi-instrument replays. Missing symbols use
+    /// <see cref="DefaultContractMultiplier"/>. Hosts must provide broker-normalized unique symbols.
+    /// </summary>
+    public IReadOnlyDictionary<string, double> ContractMultipliersBySymbol { get; set; } =
+        new Dictionary<string, double>(StringComparer.Ordinal);
 }

@@ -1,6 +1,6 @@
 # DaxAlgo.Daxq.Compiler — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `330db91800ba`. Declaration lines only;
+Generated from source fingerprint `e91d50e75733`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Tools/DaxAlgo.Daxq.Compiler/Authoring/DaxqAuthoringContracts.cs

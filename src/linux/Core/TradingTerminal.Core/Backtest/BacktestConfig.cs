@@ -33,6 +33,13 @@ public enum BacktestDataSource
 /// <see cref="Broker"/> scopes <see cref="BacktestDataSource.LocalStore"/> reads to a single broker's
 /// data when the store is split per broker; <c>null</c> reads every broker's data merged (the legacy
 /// behaviour, and the only sensible default for the single-file backend).
+///
+/// <see cref="ReplayBars"/> bypasses the file/store source and replays the supplied completed OHLCV
+/// bars using <see cref="ReplayBarSize"/>. The engine preserves each bar callback and derives only
+/// the deterministic L1 observations required by its existing fill model.
+/// <see cref="ReplayBarSeries"/> is the canonical multi-instrument form. Every series retains its
+/// reviewed instrument and contract identity; the engine merges them on one UTC timeline without
+/// forward-filling a missing bar.
 /// </summary>
 public sealed record BacktestConfig(
     Contract Contract,
@@ -47,4 +54,20 @@ public sealed record BacktestConfig(
     BacktestDataSource Source = BacktestDataSource.ParquetFile,
     InstrumentId InstrumentId = default,
     BrokerKind? Broker = null,
-    string? TradeDataPath = null);
+    string? TradeDataPath = null,
+    IReadOnlyList<Bar>? ReplayBars = null,
+    BarSize? ReplayBarSize = null,
+    IReadOnlyList<BacktestBarSeries>? ReplayBarSeries = null);
+
+/// <summary>
+/// One reviewed instrument's completed-bar history in a multi-series replay. Tick size and contract
+/// multiplier are carried per instrument so fills and account valuation cannot borrow another leg's
+/// market conventions.
+/// </summary>
+public sealed record BacktestBarSeries(
+    InstrumentId InstrumentId,
+    Contract Contract,
+    BarSize BarSize,
+    IReadOnlyList<Bar> Bars,
+    double TickSize,
+    double ContractMultiplier = 1d);

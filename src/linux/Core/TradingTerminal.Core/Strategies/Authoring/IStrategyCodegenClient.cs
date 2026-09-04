@@ -55,8 +55,21 @@ public static class CodegenEfforts
     };
 }
 
-/// <summary>One turn of the codegen conversation.</summary>
-public sealed record CodegenMessage(CodegenRole Role, string Content);
+/// <summary>One exact image supplied to a multimodal model.</summary>
+public sealed record CodegenImageInput(
+    string MediaType,
+    string ContentHashSha256,
+    string Base64Data);
+
+/// <summary>
+/// One turn of the codegen conversation. Images are optional so all established text-only callers
+/// retain the same wire shape. A provider that cannot preserve them must reject the request rather
+/// than silently generate from text alone.
+/// </summary>
+public sealed record CodegenMessage(
+    CodegenRole Role,
+    string Content,
+    IReadOnlyList<CodegenImageInput>? Images = null);
 
 /// <summary>
 /// Tokens billed for one generation, as reported by the provider (both the OpenAI and Anthropic wire

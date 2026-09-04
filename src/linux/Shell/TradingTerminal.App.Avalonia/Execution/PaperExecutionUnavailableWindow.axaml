@@ -1,0 +1,34 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="TradingTerminal.App.Avalonia.Execution.PaperExecutionUnavailableWindow"
+        Title="Paper Execution Unavailable"
+        Width="560" Height="330" CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Background.Primary}"
+        Foreground="{DynamicResource Text.Primary}"
+        FontFamily="{DynamicResource Font.Base}">
+  <Border Margin="20" Padding="20"
+          Background="{DynamicResource Background.Surface}"
+          BorderBrush="{DynamicResource Bearish.Brush}"
+          BorderThickness="1" CornerRadius="7">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+      <TextBlock Text="PAPER EXECUTION UNAVAILABLE"
+                 Foreground="{DynamicResource Bearish.Brush}"
+                 FontSize="18" FontWeight="Bold" />
+      <TextBlock Grid.Row="1" Margin="0,10,0,0"
+                 Text="No order was sent. The execution service stayed fail-closed."
+                 Foreground="{DynamicResource Text.Header}" />
+      <TextBlock Grid.Row="2" Margin="0,10,0,0"
+                 Text="Check Keychain access, the local service endpoint, and the Paper ledger before retrying. Market-data connectivity does not bypass this gate."
+                 TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+      <Border Grid.Row="3" Margin="0,14,0,14" Padding="12"
+              Background="{DynamicResource Background.Secondary}"
+              BorderBrush="{DynamicResource Border.Brush}" BorderThickness="1" CornerRadius="4">
+        <TextBlock x:Name="ReasonText" TextWrapping="Wrap"
+                   FontFamily="{DynamicResource Font.Data}"
+                   Foreground="{DynamicResource Text.Secondary}" />
+      </Border>
+      <Button Grid.Row="4" Content="Close" HorizontalAlignment="Right" Click="OnClose" />
+    </Grid>
+  </Border>
+</Window>

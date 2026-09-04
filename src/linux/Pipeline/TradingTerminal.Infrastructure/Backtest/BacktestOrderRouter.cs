@@ -1,5 +1,6 @@
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using TradingTerminal.Core.Domain;
 using TradingTerminal.Core.Risk;
 using TradingTerminal.Core.Strategies;
 using TradingTerminal.Core.Time;
@@ -24,6 +25,7 @@ public sealed class BacktestOrderRouter : IOrderRouter, IStrategySignalSink
     private readonly IRiskManager? _risk;
     private readonly Subject<OrderEvent> _localEvents = new();
     private readonly Dictionary<string, string> _symbolByClientId = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Contract> _contractByClientId = new(StringComparer.Ordinal);
     private readonly IClock? _clock;
     private readonly List<StrategySignalEvent> _signals = [];
 
@@ -49,6 +51,15 @@ public sealed class BacktestOrderRouter : IOrderRouter, IStrategySignalSink
 
     public IReadOnlyList<StrategySignalEvent> Signals => _signals;
 
+    /// <summary>Resolves the original contract for fill accounting and canonical callbacks.</summary>
+    public bool TryGetContract(string clientOrderId, out Contract? contract)
+    {
+        contract = null;
+        if (!_contractByClientId.TryGetValue(clientOrderId, out var value)) return false;
+        contract = value;
+        return true;
+    }
+
     public Task EmitSignalAsync(StrategySignal signal, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -59,6 +70,7 @@ public sealed class BacktestOrderRouter : IOrderRouter, IStrategySignalSink
 
     public Task<OrderResult> PlaceOrderAsync(OrderRequest request, CancellationToken ct = default)
     {
+        _contractByClientId.TryAdd(request.ClientOrderId, request.Contract);
         if (_risk is not null)
         {
             var (allowed, reason) = _risk.Evaluate(request);

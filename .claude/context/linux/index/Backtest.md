@@ -1,6 +1,6 @@
 # macOS index / Backtest
 
-Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
+Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 
 | File | LOC | Tree | Project | Role | Public surface | Purpose |
 |---|---:|---|---|---|---|---|
@@ -44,7 +44,7 @@ Generated from source fingerprint `330db91800ba`. macOS/Avalonia source only.
 | `src/linux/Backtest/TradingTerminal.Backtest.Engine/StrategyContext.cs` | 41 | linux | TradingTerminal.Backtest.Engine | product | Y | The engine's |
 | `src/linux/Backtest/TradingTerminal.Backtest.Engine/TradeIr/BacktestTradeIrTargetV1.cs` | 248 | linux | TradingTerminal.Backtest.Engine | product | Y | An immutable content identity for one installed target artifact. |
 | `src/linux/Backtest/TradingTerminal.Backtest.Engine/TradeIr/TradeIrExecutionPlanCompilerV1.cs` | 572 | linux | TradingTerminal.Backtest.Engine | product | Y | Lowers the Engine-owned quote/EMA target into the dependency-free runtime plan. Target, |
-| `src/linux/Backtest/TradingTerminal.Backtest.Engine/TradeIr/TradeIrRiskGatewayV1.cs` | 652 | linux | TradingTerminal.Backtest.Engine | product | Y | Product-owned risk settings for the closed TradeIR backtest lane. Strategy definitions and |
+| `src/linux/Backtest/TradingTerminal.Backtest.Engine/TradeIr/TradeIrRiskGatewayV1.cs` | 710 | linux | TradingTerminal.Backtest.Engine | product | Y | Product-owned risk settings for the closed TradeIR backtest lane. Strategy definitions and |
 | `src/linux/Backtest/TradingTerminal.Backtest.Engine/TradeIr/TradeIrSimulatedBacktestRunnerV1.cs` | 703 | linux | TradingTerminal.Backtest.Engine | product | Y | Minimum honest product runner for a package-valid typed graph. It materializes one |
 | `src/linux/Backtest/TradingTerminal.Backtest.Protocol/BacktestJobContracts.cs` | 373 | linux | TradingTerminal.Backtest.Protocol | product | Y | Publisher evidence accepted by the host for one exact installed archive. |
 | `src/linux/Backtest/TradingTerminal.Backtest.Protocol/BacktestProtocolJson.cs` | 133 | linux | TradingTerminal.Backtest.Protocol | product | Y | Canonical JSON settings shared by request files, NDJSON progress, and result artifacts. |

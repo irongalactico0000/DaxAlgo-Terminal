@@ -64,16 +64,30 @@ public sealed class StrategyGenerationSessionV1
 
     public async Task<StrategyCandidateGenerationResultV1> SendAsync(
         string userMessage,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        IReadOnlyList<AuthoredChartReferenceV1>? chartReferences = null,
+        IReadOnlyList<AuthoredChartReferenceInspectionV1>? chartReferenceInspections = null,
+        IReadOnlyList<AuthoredChartReferenceResolutionV1>? chartReferenceResolutions = null,
+        IReadOnlyList<ChartPatternSelectionV1>? chartPatternSelections = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userMessage);
         var request = CurrentCandidate is null
-            ? new StrategyCandidateGenerationRequestV1(CandidateId, userMessage)
+            ? new StrategyCandidateGenerationRequestV1(
+                CandidateId,
+                userMessage,
+                ChartReferences: chartReferences,
+                ChartReferenceInspections: chartReferenceInspections,
+                ChartReferenceResolutions: chartReferenceResolutions,
+                ChartPatternSelections: chartPatternSelections)
             : new StrategyCandidateGenerationRequestV1(
                 CandidateId,
                 _rawIntent!,
                 CurrentCandidate,
-                userMessage);
+                userMessage,
+                chartReferences,
+                chartReferenceInspections,
+                chartReferenceResolutions,
+                chartPatternSelections);
 
         var result = await _generator.GenerateAsync(_provider, request, ct).ConfigureAwait(false);
         if (!result.Success) return result;
