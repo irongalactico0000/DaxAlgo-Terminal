@@ -39,6 +39,17 @@ public enum QuickBacktestDataMode
 }
 
 /// <summary>
+/// Exact canonical strategy and parameter snapshot that completed a Quick Backtest and can be handed
+/// to the Paper runner. Paper still performs its own account/risk admission; this receipt only prevents
+/// the desktop workflow from silently reverting to different strategy parameters between the two windows.
+/// </summary>
+public sealed record QuickBacktestPaperLaunchRequest(
+    StrategyKernelRegistration Registration,
+    IReadOnlyDictionary<string, object?> TestedParameters,
+    DateTime CompletedUtc,
+    string ResultSummary);
+
+/// <summary>
 /// One-click backtest launched from the Strategy-catalog "Quick backtest" item. Customised so a
 /// tape-primary strategy (SigmaIcFlow) can be backtested <em>properly</em>: with
 /// <see cref="QuickBacktestDataMode.FullTapeRealTrades"/> + Binance it pulls the real historical tape
@@ -60,6 +71,7 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
     private BacktestStrategyOption? _option;
     private StrategyKernelRegistration? _kernelOption;
     private IReadOnlyList<CanonicalBacktestSelection> _canonicalSelections = [];
+    private QuickBacktestPaperLaunchRequest? _paperLaunchRequest;
 
     public QuickBacktestViewModel(
         IBacktestStrategyRegistry registry,
@@ -159,6 +171,7 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
         .ToArray() ?? [];
     public bool HasStrategyParameters => EditableParameters.Count != 0;
     public bool CanEditParameters => HasStrategyParameters && !IsRunning;
+    public bool CanRunTestedStrategyInPaper => _paperLaunchRequest is not null && !IsRunning;
     public string ReviewedInstrumentSummary => _canonicalSelections.Count == 0
         ? SelectedInstrument?.DisplayName ?? "No instrument selected"
         : string.Join(" · ", _canonicalSelections.Select(item => item.Instrument.CanonicalSymbol));
@@ -189,6 +202,7 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
 
     /// <summary>Raised after a run completes so the view can redraw the ScottPlot equity curve.</summary>
     public event EventHandler? EquityCurveUpdated;
+    public event Action<QuickBacktestPaperLaunchRequest>? PaperLaunchRequested;
 
     /// <summary>
     /// Binds this window to a live strategy by its engine-side backtest id and kicks off the first run.
@@ -198,6 +212,7 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
     /// </summary>
     public bool Initialize(string? backtestStrategyId, string displayName, bool preferFullTape)
     {
+        ClearPaperLaunchRequest();
         _kernelOption = null;
         _canonicalSelections = [];
         Parameters = null;
@@ -238,6 +253,7 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
     public bool Initialize(StrategyKernelRegistration registration)
     {
         ArgumentNullException.ThrowIfNull(registration);
+        ClearPaperLaunchRequest();
         StrategyDisplayName = registration.DisplayName;
         _option = null;
         _kernelOption = _kernelRegistry.Find(registration.Id);
@@ -353,6 +369,8 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(CanSelectInstrument));
         OnPropertyChanged(nameof(CanSelectBarSize));
         OnPropertyChanged(nameof(CanEditParameters));
+        OnPropertyChanged(nameof(CanRunTestedStrategyInPaper));
+        RunTestedStrategyInPaperCommand.NotifyCanExecuteChanged();
     }
 
     private static bool TryResolveBarSize(TimeSpan interval, out BarSize size)
@@ -406,6 +424,10 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
             Status = $"Strategy parameters are invalid: {string.Join(" ", parameterErrors)}";
             return;
         }
+
+        ClearPaperLaunchRequest();
+        var testedParameters = Parameters?.Parameters.ToDictionary()
+            ?? new Dictionary<string, object?>(StringComparer.Ordinal);
         if (_kernelOption is not null && IsFullTape &&
             _kernelOption.DataRequirement.HasFlag(StrategyDataRequirement.Bars))
         {
@@ -577,6 +599,16 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
                      $"(fees {result.TotalFees.ToString("C2", CultureInfo.CurrentCulture)}; " +
                      $"risk max {MaxPositionPerSymbol:N0} units / " +
                      $"{MaxDailyLoss.ToString("C0", CultureInfo.CurrentCulture)} daily loss).";
+            if (_kernelOption is { } canonical)
+            {
+                _paperLaunchRequest = new QuickBacktestPaperLaunchRequest(
+                    canonical,
+                    testedParameters,
+                    DateTime.UtcNow,
+                    Status);
+                OnPropertyChanged(nameof(CanRunTestedStrategyInPaper));
+                RunTestedStrategyInPaperCommand.NotifyCanExecuteChanged();
+            }
             EquityCurveUpdated?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException)
@@ -604,11 +636,26 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     public void Cancel() => _runCts?.Cancel();
 
+    [RelayCommand(CanExecute = nameof(CanRunTestedStrategyInPaper))]
+    private void RunTestedStrategyInPaper()
+    {
+        if (_paperLaunchRequest is { } request)
+            PaperLaunchRequested?.Invoke(request);
+    }
+
+    private void ClearPaperLaunchRequest()
+    {
+        _paperLaunchRequest = null;
+        OnPropertyChanged(nameof(CanRunTestedStrategyInPaper));
+        RunTestedStrategyInPaperCommand.NotifyCanExecuteChanged();
+    }
+
     /// <summary>Cancels any in-flight run when the window closes so a long backtest doesn't outlive it.</summary>
     public void Dispose()
     {
         try { _runCts?.Cancel(); }
         catch (ObjectDisposedException) { /* run already completed and disposed the CTS */ }
+        PaperLaunchRequested = null;
     }
 
     /// <summary>

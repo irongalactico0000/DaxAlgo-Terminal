@@ -180,15 +180,24 @@ public partial class MainWindow : Window
         await OpenPaperStrategyRunnerAsync(initialStrategy: null);
 
     private async Task OpenPaperStrategyRunnerAsync(
-        TradingTerminal.UI.Strategies.StrategyKernelRegistration? initialStrategy)
+        TradingTerminal.UI.Strategies.StrategyKernelRegistration? initialStrategy,
+        IReadOnlyDictionary<string, object?>? initialParameters = null)
     {
         if (_paperStrategyRunnerWindow is { } existing)
         {
             if (initialStrategy is not null && existing.DataContext is
                 TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerViewModel existingViewModel)
             {
-                existingViewModel.SelectedStrategy = existingViewModel.Strategies.FirstOrDefault(choice =>
-                    string.Equals(choice.Id, initialStrategy.Id, StringComparison.Ordinal));
+                if (initialParameters is not null &&
+                    !existingViewModel.TryPrepareTestedStrategy(initialStrategy, initialParameters, out var reason))
+                {
+                    Vm?.ActivityLog.Append("Backtest", "WARN", reason);
+                }
+                else if (initialParameters is null)
+                {
+                    existingViewModel.SelectedStrategy = existingViewModel.Strategies.FirstOrDefault(choice =>
+                        string.Equals(choice.Id, initialStrategy.Id, StringComparison.Ordinal));
+                }
             }
             existing.Activate();
             return;
@@ -211,7 +220,8 @@ public partial class MainWindow : Window
                 services.GetRequiredService<TradingTerminal.UI.Strategies.IStrategyKernelRegistry>(),
                 services.GetRequiredService<TradingTerminal.Core.MarketData.IMarketDataIngest>(),
                 services.GetRequiredService<TradingTerminal.Core.Brokers.IBrokerSelector>(),
-                initialStrategy);
+                initialStrategy,
+                initialParameters);
             var window = services.GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerWindow>();
             window.Title = $"Paper Strategy Runner — {bookLease.Book.Name}";
             window.DataContext = viewModel;
@@ -714,6 +724,10 @@ public partial class MainWindow : Window
                 strategy.DataRequirement.HasFlag(StrategyDataRequirement.TradeTape));
         else
             return;
+        void OpenTestedInPaper(TradingTerminal.Backtest.QuickBacktestPaperLaunchRequest request) =>
+            _ = OpenPaperStrategyRunnerAsync(request.Registration, request.TestedParameters);
+        vm.PaperLaunchRequested += OpenTestedInPaper;
+        window.Closed += (_, _) => vm.PaperLaunchRequested -= OpenTestedInPaper;
         Vm.ActivityLog.Append("Backtest", "INFO", $"Opened quick backtest for '{item.Name}'.");
     }
 

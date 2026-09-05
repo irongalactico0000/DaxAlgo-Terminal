@@ -60,6 +60,14 @@ public sealed class CanonicalQuickBacktestTests
         Assert.IsType<SdkStrategyBacktestAdapter>(invocation.Strategy);
         Assert.NotNull(invocation.Risk);
         Assert.Equal(21, kernel.FastPeriodAtStart);
+
+        QuickBacktestPaperLaunchRequest? launch = null;
+        viewModel.PaperLaunchRequested += request => launch = request;
+        Assert.True(viewModel.CanRunTestedStrategyInPaper);
+        viewModel.RunTestedStrategyInPaperCommand.Execute(null);
+        Assert.Same(registration, launch?.Registration);
+        Assert.Equal(21L, launch?.TestedParameters["fastPeriod"]);
+        Assert.Contains("Done.", launch?.ResultSummary, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -26,6 +26,67 @@ namespace TradingTerminal.App.Avalonia.Tests;
 public sealed class PaperStrategyRunnerTests
 {
     [AvaloniaFact]
+    public void Completed_backtest_parameters_are_loaded_into_the_existing_Paper_runner()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "daxalgo-paper-handoff-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var clock = new MutableClock(new DateTime(2026, 9, 5, 0, 0, 0, DateTimeKind.Utc));
+            var instruments = new MemoryRegistry();
+            using var paper = PaperExecutionDesktopSession.CreateForLedger(
+                Path.Combine(directory, "orders.db"),
+                clock,
+                instruments,
+                new FixedSecretStore());
+            var selected = paper.Instruments.Last();
+            var specification = AuthoredStrategySpecification(selected);
+            var registration = new StrategyKernelRegistration(
+                specification.UnitId,
+                specification.Name,
+                specification.RawRequest,
+                () => new ParameterizedKernel(),
+                specification,
+                ParameterizedKernel.Parameters);
+            var registry = new StrategyKernelRegistry();
+            registry.Register(registration);
+
+            using var viewModel = new PaperStrategyRunnerViewModel(
+                new TestStrategyRegistry(),
+                new TestMarketDataHub(),
+                clock,
+                new InMemoryLogSink(),
+                paper,
+                instruments,
+                strategyKernelRegistry: registry,
+                initialStrategy: registration,
+                initialParameters: new Dictionary<string, object?> { ["fastPeriod"] = 21L });
+
+            Assert.Equal("21", Assert.Single(viewModel.Parameters).Value);
+            Assert.Contains("Backtest-tested parameters loaded", viewModel.StatusText, StringComparison.Ordinal);
+
+            Assert.True(viewModel.TryPrepareTestedStrategy(
+                registration,
+                new Dictionary<string, object?> { ["fastPeriod"] = 34L },
+                out var reason), reason);
+            Assert.Equal("34", Assert.Single(viewModel.Parameters).Value);
+            Assert.Contains("Backtest-tested parameters loaded", viewModel.StatusText, StringComparison.Ordinal);
+
+            var replacedArtifact = registration with { Description = "A newly registered build with the same id." };
+            Assert.False(viewModel.TryPrepareTestedStrategy(
+                replacedArtifact,
+                new Dictionary<string, object?> { ["fastPeriod"] = 55L },
+                out var staleReason));
+            Assert.Contains("exact tested strategy artifact", staleReason, StringComparison.Ordinal);
+            Assert.Equal("34", Assert.Single(viewModel.Parameters).Value);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [AvaloniaFact]
     public async Task Compiler_verified_authored_strategy_owns_feed_fills_paper_oms_and_restores_account()
     {
         var directory = Path.Combine(Path.GetTempPath(), "daxalgo-compiled-paper-tests", Guid.NewGuid().ToString("N"));
@@ -514,6 +575,16 @@ public sealed class PaperStrategyRunnerTests
             }
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class ParameterizedKernel : DaxAlgo.Sdk.IStrategyKernel
+    {
+        public static StrategyParameterSchema Parameters { get; } = new(
+            StrategyParameter.Int("fastPeriod", "Fast period", 9, min: 2, max: 100));
+        public StrategyParameterSchema Schema => Parameters;
+        public StrategyDataRequirement DataRequirement => StrategyDataRequirement.Bars;
+        public Task OnStartAsync(DaxAlgo.Sdk.IStrategyRuntimeContext context, CancellationToken ct) =>
+            Task.CompletedTask;
     }
 
     private static AuthoredUnitSpecificationV1 AuthoredStrategySpecification(

@@ -189,6 +189,32 @@ silently guess what "make a chart like this" means.
 | “Trade a SPY/QQQ pair and show normalized lines/spread” | Typed canonical Strategy locks both reviewed instruments → synchronized multi-series Quick Backtest → owns both live feeds → kernel can draw both → both targets survive coalescing → each leg passes risk/authenticated IPC/Paper OMS → durable positions appear in the Console | Legs route separately, not atomically; sparse historical boundaries fail closed |
 | Restart after Paper fills | Existing durable Paper ledger restores orders, fills, positions, cash, equity, P&amp;L, risk, and reconciliation UI | Real broker account recovery is not implemented |
 
+## Quick Backtest to Paper handoff closure — 2026-09-05
+
+The canonical backtest and Paper runtime previously existed as two independent Catalog actions. A
+successful Quick Backtest ended at its result window; opening the Paper runner required navigating
+back to the Catalog and re-entering parameters. That allowed the Paper run to differ silently from
+the parameter set the user had just tested.
+
+The native Mac workflow now keeps the exact successful run boundary:
+
+```text
+canonical strategy + reviewed instruments + tested parameters
+  -> successful risk-gated Quick Backtest
+  -> Run tested strategy in Paper
+  -> same StrategyKernelRegistration
+  -> normalized tested parameters loaded into Paper Strategy Runner
+  -> explicit user Start
+  -> Paper book risk evaluated again
+  -> authenticated Paper OMS
+```
+
+The handoff is available only for a successful canonical SDK backtest. Starting another backtest
+invalidates the prior handoff, failed/cancelled runs do not expose it, legacy strategies do not claim
+canonical handoff, and an already-running Paper strategy cannot be replaced underneath its feed and
+OMS route. The receipt is a desktop transition aid, not authorization: Paper account risk remains the
+execution authority and is evaluated again before each order.
+
 ## Why the completed-bar gap existed
 
 The strategy calculation was never the missing algorithm. `IStrategyKernel.OnBarAsync` could already

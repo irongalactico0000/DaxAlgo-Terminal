@@ -84,6 +84,11 @@
     <StackPanel Grid.Row="2" Margin="2,7,0,7" Spacing="2">
       <TextBlock Text="{Binding Status}" Foreground="{StaticResource Text.Secondary}" TextWrapping="Wrap" />
       <TextBlock Text="{Binding FeedQuality}" Foreground="{StaticResource Accent.Brush}" TextWrapping="Wrap" />
+      <Button HorizontalAlignment="Right" Classes="accent"
+              Content="Run tested strategy in Paper"
+              Command="{Binding RunTestedStrategyInPaperCommand}"
+              IsVisible="{Binding IsAuthoredStrategy}"
+              ToolTip.Tip="Available after this exact canonical strategy and parameter set completes successfully. Paper account risk is checked again before any order." />
     </StackPanel>
 
     <Border Grid.Row="3" BorderBrush="{StaticResource Border.Brush}" BorderThickness="1">

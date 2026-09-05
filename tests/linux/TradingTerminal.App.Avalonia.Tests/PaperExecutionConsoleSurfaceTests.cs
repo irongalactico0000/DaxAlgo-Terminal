@@ -91,6 +91,16 @@ public sealed class PaperExecutionConsoleSurfaceTests
     }
 
     [Fact]
+    public void Quick_backtest_exposes_the_tested_parameter_handoff_to_Paper()
+    {
+        var text = File.ReadAllText(Fixture("QuickBacktestAvaloniaWindow.axaml"));
+
+        text.Should().Contain("Run tested strategy in Paper");
+        text.Should().Contain("RunTestedStrategyInPaperCommand");
+        text.Should().Contain("Paper account risk is checked again before any order");
+    }
+
+    [Fact]
     public void Unavailable_surface_says_no_order_was_sent_and_remains_fail_closed()
     {
         var text = File.ReadAllText(Fixture("PaperExecutionUnavailableWindow.axaml"));

@@ -51,6 +51,9 @@
     <None Include="..\..\..\src\linux\Shell\TradingTerminal.App.Avalonia\Execution\PaperStrategyRunnerWindow.axaml"
           Link="Fixtures\PaperStrategyRunnerWindow.axaml"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\src\linux\Tools\TradingTerminal.Backtest\AvaloniaUi\QuickBacktestAvaloniaWindow.axaml"
+          Link="Fixtures\QuickBacktestAvaloniaWindow.axaml"
+          CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\src\linux\Shell\TradingTerminal.App.Avalonia\Settings\StrategyAuthoringWindow.axaml"
           Link="Fixtures\StrategyAuthoringWindow.axaml"
           CopyToOutputDirectory="PreserveNewest" />

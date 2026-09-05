@@ -112,7 +112,8 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
         IStrategyKernelRegistry? strategyKernelRegistry = null,
         IMarketDataIngest? marketDataIngest = null,
         IBrokerSelector? brokerSelector = null,
-        StrategyKernelRegistration? initialStrategy = null)
+        StrategyKernelRegistration? initialStrategy = null,
+        IReadOnlyDictionary<string, object?>? initialParameters = null)
     {
         ArgumentNullException.ThrowIfNull(strategyRegistry);
         _hub = hub ?? throw new ArgumentNullException(nameof(hub));
@@ -181,6 +182,12 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
         UpdateAssetSummary();
         RebuildStrategyLegs();
         RebuildParameters();
+        ApplyParameterValues(initialParameters);
+        if (initialParameters is not null)
+        {
+            StatusText = "Backtest-tested parameters loaded. Paper account risk will be evaluated again before every order.";
+            LastMessage = "Review the selected Paper book and press Start when ready.";
+        }
         RefreshCommandState();
     }
 
@@ -203,6 +210,40 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
     public bool IsMultiAssetStrategy => StrategyLegs.Count > 1;
 
     public event EventHandler? FrameRequested;
+
+    /// <summary>
+    /// Selects an installed canonical strategy and copies the exact normalized parameter values from a
+    /// completed Quick Backtest. A running strategy is never replaced underneath its live feed/OMS route.
+    /// </summary>
+    public bool TryPrepareTestedStrategy(
+        StrategyKernelRegistration registration,
+        IReadOnlyDictionary<string, object?> testedParameters,
+        out string reason)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        ArgumentNullException.ThrowIfNull(testedParameters);
+        if (_runtime is not null)
+        {
+            reason = "Stop the current Paper strategy before loading another tested strategy.";
+            return false;
+        }
+
+        var choice = Strategies.FirstOrDefault(item =>
+            string.Equals(item.Id, registration.Id, StringComparison.Ordinal));
+        if (choice is null || choice.CanonicalRegistration is null ||
+            !ReferenceEquals(choice.CanonicalRegistration, registration))
+        {
+            reason = "The exact tested strategy artifact is no longer registered or eligible for the selected Paper book. Run Quick Backtest again.";
+            return false;
+        }
+
+        SelectedStrategy = choice;
+        ApplyParameterValues(testedParameters);
+        StatusText = "Backtest-tested parameters loaded. Paper account risk will be evaluated again before every order.";
+        LastMessage = "Review the selected Paper book and press Start when ready.";
+        reason = string.Empty;
+        return true;
+    }
 
     [ObservableProperty]
     private PaperStrategyChoice? _selectedStrategy;
@@ -550,6 +591,23 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
                      .Where(parameter => parameter.Kind != ParameterKind.Instrument))
         {
             Parameters.Add(new PaperStrategyParameterRow(parameter));
+        }
+    }
+
+    private void ApplyParameterValues(IReadOnlyDictionary<string, object?>? values)
+    {
+        if (values is null || SelectedStrategy is null) return;
+        var normalized = new StrategyParameters(SelectedStrategy.RuntimeSchema, values);
+        foreach (var row in Parameters)
+        {
+            var value = normalized.GetRaw(row.Key);
+            row.Value = value switch
+            {
+                double number => number.ToString("R", CultureInfo.InvariantCulture),
+                float number => number.ToString("R", CultureInfo.InvariantCulture),
+                IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+                _ => value?.ToString() ?? string.Empty,
+            };
         }
     }
 
