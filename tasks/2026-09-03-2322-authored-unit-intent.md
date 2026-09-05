@@ -44,7 +44,8 @@ silently guess what "make a chart like this" means.
 - UI Core catalog/registry suite: 31/31 passed.
 - SDK completed-bar backtest adapter: 3/3 passed.
 - Catalog SDK strategy → Quick Backtest composition: 1/1 passed.
-- Full Avalonia test project: 151/151 passed.
+- Full Avalonia test project: 153/153 passed.
+- Focused Quick Backtest/Paper Runner/Execution surface handoff suite: 18/18 passed.
 - Full Sandbox Runtime test project: 53/53 passed.
 - Full headless test project with `TMPDIR=/private/tmp`: 1016 passed, 6 explicitly skipped, 0 failed.
 - Focused multi-instrument model/replication/runtime tests: 4/4 passed.
