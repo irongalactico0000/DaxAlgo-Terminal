@@ -250,7 +250,8 @@ public sealed record StrategyGenerationCandidateV1(
 public sealed record StrategyGenerationConfirmedIntentContextV1(
     string CandidateCanonicalJson,
     string ResearchCaseCanonicalJson,
-    string ClassificationCanonicalJson);
+    string ClassificationCanonicalJson,
+    string? ResearchExperimentCanonicalJson = null);
 
 public sealed record ParallelStrategyGenerationRequestV1(
     string StrategyId,
@@ -629,7 +630,9 @@ internal static class StrategyGenerationConfirmedIntentBindingV1
 
         if (!HasBoundedCanonicalPayload(context.CandidateCanonicalJson) ||
             !HasBoundedCanonicalPayload(context.ResearchCaseCanonicalJson) ||
-            !HasBoundedCanonicalPayload(context.ClassificationCanonicalJson))
+            !HasBoundedCanonicalPayload(context.ClassificationCanonicalJson) ||
+            context.ResearchExperimentCanonicalJson is not null &&
+            !HasBoundedCanonicalPayload(context.ResearchExperimentCanonicalJson))
         {
             error = "Every confirmed-intent context payload must be present and within the canonical size limit.";
             return false;
@@ -640,6 +643,9 @@ internal static class StrategyGenerationConfirmedIntentBindingV1
             var candidate = StrategyCandidateCanonicalJsonV1.Deserialize(context.CandidateCanonicalJson);
             var researchCase = ResearchCaseCanonicalJsonV1.Deserialize(context.ResearchCaseCanonicalJson);
             var classification = StrategySpecCanonicalJsonV1.Deserialize(context.ClassificationCanonicalJson);
+            var researchExperiment = context.ResearchExperimentCanonicalJson is null
+                ? null
+                : ResearchExperimentCanonicalJsonV1.Deserialize(context.ResearchExperimentCanonicalJson);
             if (!string.Equals(
                     context.CandidateCanonicalJson,
                     StrategyCandidateCanonicalJsonV1.Serialize(candidate),
@@ -651,6 +657,10 @@ internal static class StrategyGenerationConfirmedIntentBindingV1
                 !string.Equals(
                     context.ClassificationCanonicalJson,
                     StrategySpecCanonicalJsonV1.Serialize(classification),
+                    StringComparison.Ordinal) ||
+                researchExperiment is not null && !string.Equals(
+                    context.ResearchExperimentCanonicalJson,
+                    ResearchExperimentCanonicalJsonV1.Serialize(researchExperiment),
                     StringComparison.Ordinal))
             {
                 error = "The confirmed-intent validation context is not canonical JSON.";

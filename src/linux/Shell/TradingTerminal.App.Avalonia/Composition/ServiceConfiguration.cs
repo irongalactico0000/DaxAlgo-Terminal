@@ -189,6 +189,8 @@ public static class ServiceConfiguration
         services.AddStrategyCodegen(configuration);
         services.AddSingleton<TradingTerminal.Core.Strategies.Authoring.ITradeIrSimulatedBacktestRunnerV1,
             TradeIrSimulatedBacktestRunnerV1>();
+        services.AddSingleton<TradingTerminal.Core.Strategies.Generation.IResearchExperimentRunnerV1,
+            StrategyResearchExperimentRunnerV1>();
 
         var pluginsRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

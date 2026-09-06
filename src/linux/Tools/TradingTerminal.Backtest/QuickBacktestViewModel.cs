@@ -47,7 +47,8 @@ public sealed record QuickBacktestPaperLaunchRequest(
     StrategyKernelRegistration Registration,
     IReadOnlyDictionary<string, object?> TestedParameters,
     DateTime CompletedUtc,
-    string ResultSummary);
+    string ResultSummary,
+    HistoricalValidationEvidenceV1? ValidationEvidence = null);
 
 /// <summary>
 /// One-click backtest launched from the Strategy-catalog "Quick backtest" item. Customised so a
@@ -72,6 +73,7 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
     private StrategyKernelRegistration? _kernelOption;
     private IReadOnlyList<CanonicalBacktestSelection> _canonicalSelections = [];
     private QuickBacktestPaperLaunchRequest? _paperLaunchRequest;
+    private HistoricalValidationContextV1? _validationContext;
 
     public QuickBacktestViewModel(
         IBacktestStrategyRegistry registry,
@@ -203,6 +205,7 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
     /// <summary>Raised after a run completes so the view can redraw the ScottPlot equity curve.</summary>
     public event EventHandler? EquityCurveUpdated;
     public event Action<QuickBacktestPaperLaunchRequest>? PaperLaunchRequested;
+    public event Action<QuickBacktestPaperLaunchRequest>? HistoricalValidationCompleted;
 
     /// <summary>
     /// Binds this window to a live strategy by its engine-side backtest id and kicks off the first run.
@@ -213,6 +216,7 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
     public bool Initialize(string? backtestStrategyId, string displayName, bool preferFullTape)
     {
         ClearPaperLaunchRequest();
+        _validationContext = null;
         _kernelOption = null;
         _canonicalSelections = [];
         Parameters = null;
@@ -250,10 +254,13 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
     /// Binds Quick Backtest to one installed canonical SDK strategy. The reviewed instrument and
     /// timeframe remain fixed so the historical run cannot silently test a different artifact.
     /// </summary>
-    public bool Initialize(StrategyKernelRegistration registration)
+    public bool Initialize(
+        StrategyKernelRegistration registration,
+        HistoricalValidationContextV1? validationContext = null)
     {
         ArgumentNullException.ThrowIfNull(registration);
         ClearPaperLaunchRequest();
+        _validationContext = validationContext;
         StrategyDisplayName = registration.DisplayName;
         _option = null;
         _kernelOption = _kernelRegistry.Find(registration.Id);
@@ -601,11 +608,36 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
                      $"{MaxDailyLoss.ToString("C0", CultureInfo.CurrentCulture)} daily loss).";
             if (_kernelOption is { } canonical)
             {
+                var completedUtc = DateTime.UtcNow;
+                HistoricalValidationEvidenceV1? validationEvidence = null;
+                if (_validationContext is { } validationContext)
+                {
+                    validationEvidence = new HistoricalValidationEvidenceV1(
+                        HistoricalValidationEvidenceV1.CurrentSchemaVersion,
+                        validationContext,
+                        StrategyWorkspaceCanonicalJsonV1.HashArtifact(testedParameters
+                            .OrderBy(item => item.Key, StringComparer.Ordinal)
+                            .Select(item => new TestedParameterBinding(item.Key, item.Value))
+                            .ToArray()),
+                        fromUtc,
+                        toUtc,
+                        SelectedDataMode.ToString(),
+                        FeedQuality ?? "Historical replay completed.",
+                        result.Trades.Count,
+                        result.StartingCash,
+                        result.EndingCash,
+                        result.TotalFees,
+                        completedUtc);
+                    HistoricalValidationEvidenceValidatorV1.RequireValid(validationEvidence);
+                }
                 _paperLaunchRequest = new QuickBacktestPaperLaunchRequest(
                     canonical,
                     testedParameters,
-                    DateTime.UtcNow,
-                    Status);
+                    completedUtc,
+                    Status,
+                    validationEvidence);
+                if (validationEvidence is not null)
+                    HistoricalValidationCompleted?.Invoke(_paperLaunchRequest);
                 OnPropertyChanged(nameof(CanRunTestedStrategyInPaper));
                 RunTestedStrategyInPaperCommand.NotifyCanExecuteChanged();
             }
@@ -656,7 +688,10 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
         try { _runCts?.Cancel(); }
         catch (ObjectDisposedException) { /* run already completed and disposed the CTS */ }
         PaperLaunchRequested = null;
+        HistoricalValidationCompleted = null;
     }
+
+    private sealed record TestedParameterBinding(string Key, object? Value);
 
     /// <summary>
     /// Writes the real tape as two time-aligned parquets the engine merges: the trades file carries the

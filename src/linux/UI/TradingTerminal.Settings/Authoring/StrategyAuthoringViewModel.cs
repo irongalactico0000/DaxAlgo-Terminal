@@ -66,6 +66,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     private readonly IVisualizerRegistry? _visualizerRegistry;
     private readonly IStrategyKernelRegistry? _strategyKernelRegistry;
     private readonly IInstrumentRegistry? _instrumentRegistry;
+    private readonly IResearchExperimentRunnerV1? _researchExperimentRunner;
 
     private CancellationTokenSource? _generateCts;
     private StrategyBuildSession? _session;
@@ -115,7 +116,8 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         IAuthoredUnitSourceGeneratorV1? authoredUnitSourceGenerator = null,
         IAuthoredUnitCompilerV1? authoredUnitCompiler = null,
         IVisualizerRegistry? visualizerRegistry = null,
-        IStrategyKernelRegistry? strategyKernelRegistry = null)
+        IStrategyKernelRegistry? strategyKernelRegistry = null,
+        IResearchExperimentRunnerV1? researchExperimentRunner = null)
     {
         _compiler = compiler;
         _registry = registry;
@@ -141,6 +143,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         _visualizerRegistry = visualizerRegistry;
         _strategyKernelRegistry = strategyKernelRegistry;
         _instrumentRegistry = instrumentRegistry;
+        _researchExperimentRunner = researchExperimentRunner;
 
         Diagnostics = [];
         Messages = [];
@@ -856,6 +859,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
 
     partial void OnCandidateContentHashChanged(string? value)
     {
+        InvalidateResearchDatasetForBriefChange();
         OnPropertyChanged(nameof(CanConfirmCandidate));
         ConfirmCandidateCommand.NotifyCanExecuteChanged();
     }
@@ -902,6 +906,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         ResetSession(null);
         ClearCandidate();
         InvalidateDerivedArtifactState(markUnregistered: true);
+        ResetStrategyWorkspace();
         AiStatus = "Strategy identity changed. Generate a fresh set of candidates for this id.";
         Status = "Strategy id changed; prior candidates and derived compile state were cleared.";
     }
@@ -1522,6 +1527,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
 
     public bool CanGenerateFourCandidates =>
         CanEnterFourLaneConformance &&
+        ResearchEvidenceReadyForGeneration &&
         GenerateCandidateFirst &&
         !HasUnresolvedChartReferences &&
         (!HasPendingFourLanePrompt || !HasGeneratedCandidates) &&
@@ -1810,7 +1816,10 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         var boundIntentContext = new StrategyGenerationConfirmedIntentContextV1(
             StrategyCandidateCanonicalJsonV1.Serialize(boundCandidate),
             ResearchCaseCanonicalJsonV1.Serialize(boundResearchCase),
-            StrategySpecCanonicalJsonV1.Serialize(boundClassification));
+            StrategySpecCanonicalJsonV1.Serialize(boundClassification),
+            ResearchExperimentEvidence is null
+                ? null
+                : ResearchExperimentCanonicalJsonV1.Serialize(ResearchExperimentEvidence));
         if (!string.Equals(
                 StrategyIntentCanonicalJsonV1.Hash(boundIntent),
                 boundIntentHash,
@@ -1987,6 +1996,18 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
                 .AppendLine(requirement.Disposition == StrategySemanticDispositionV1.Applicable
                     ? requirement.Value?.CanonicalValue ?? "missing"
                     : requirement.DispositionRationale ?? requirement.Disposition.ToString());
+        }
+        if (ResearchExperimentEvidence is { } evidence)
+        {
+            builder.AppendLine("Bound exploratory research evidence (not historical validation):")
+                .Append("- Evidence SHA-256: ").AppendLine(ResearchExperimentCanonicalJsonV1.Hash(evidence))
+                .Append("- Dataset SHA-256: ").AppendLine(evidence.DatasetHashSha256)
+                .Append("- Formula: ").AppendLine(evidence.Formula)
+                .Append("- Chronological split: ")
+                .Append(evidence.Split.TrainingCount).Append('/')
+                .Append(evidence.Split.ValidationCount).Append('/')
+                .AppendLine(evidence.Split.TestCount.ToString())
+                .AppendLine("- Treat this only as a feature hypothesis; exact historical validation remains mandatory.");
         }
         return builder.ToString().TrimEnd();
     }
@@ -2954,6 +2975,8 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             ChartReferenceInspections.Clear();
             ChartPatternSearchResult = null;
             ChartPatternSelections.Clear();
+            ResearchDatasetDefinition = null;
+            PendingResearchChartSelection = null;
             AuthoredUnitSpecification = null;
             OnPropertyChanged(nameof(HasChartReferences));
             OnPropertyChanged(nameof(HasChartReferenceInspections));
@@ -2980,7 +3003,8 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             AwaitingAnswer = false;
             IsRegistered = false;
             WorkbenchTab = 3;
-            ActiveScreen = StrategyAuthoringScreen.Design;
+            ActiveScreen = StrategyAuthoringScreen.Brief;
+            ResetStrategyWorkspace();
             SelectedSavedSession = null;
             CloseReview();
             _registeredBaseline.Clear();
@@ -3143,6 +3167,8 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             OnPropertyChanged(nameof(HasSelectedChartPattern));
             OnPropertyChanged(nameof(SelectedChartPatternText));
             AuthoredUnitSpecification = RestoreAuthoredUnitSpecification(session, ChartReferences, ref restoreWarning);
+            RestoreResearchDataset(session, ref restoreWarning);
+            RestoreResearchExperiment(session, ref restoreWarning);
             ClearCandidate();
             _fourLaneStrategyBrief = !string.IsNullOrWhiteSpace(session.FourLaneStrategyBrief) ||
                                      !string.IsNullOrWhiteSpace(session.ParallelCandidateBatchJson)
@@ -3287,7 +3313,11 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             ActiveScreen = GenerateCandidateFirst &&
                            session.ActiveScreen == StrategyAuthoringScreen.Build && CanEnterFourLaneConformance
                 ? StrategyAuthoringScreen.Build
-                : StrategyAuthoringScreen.Design;
+                : session.ActiveScreen is StrategyAuthoringScreen.Brief or
+                    StrategyAuthoringScreen.Research or StrategyAuthoringScreen.Design
+                    ? session.ActiveScreen
+                    : StrategyAuthoringScreen.Brief;
+            RestoreStrategyWorkspace(session, ref restoreWarning);
             WorkbenchTab = GenerateCandidateFirst ? 3 : 0;
             CloseReview();
             _registeredBaseline.Clear();   // the diff baseline is per-process; a restored review starts from "all new"
@@ -3446,8 +3476,10 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     {
         if (_restoring || !_ready || string.IsNullOrWhiteSpace(StrategyId)) return;
         if (Messages.Count == 0 && !_filesEditedByUser && StrategyIntentDraft is null &&
-            ChartReferences.Count == 0 && AuthoredUnitSpecification is null)
+            ChartReferences.Count == 0 && AuthoredUnitSpecification is null && ResearchDatasetDefinition is null)
             return;   // nothing worth a file yet
+
+        SynchronizeStrategyWorkspace();
 
         var snapshot = new AuthoringSessionSnapshot(
             StrategyId: StrategyId.Trim(),
@@ -3496,7 +3528,14 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
                 : AuthoredUnitSpecificationCanonicalJsonV1.Serialize(AuthoredUnitSpecification),
             ChartReferenceInspections: [.. ChartReferenceInspections],
             ChartPatternSearchResult: ChartPatternSearchResult,
-            ChartPatternSelections: [.. ChartPatternSelections]);
+            ChartPatternSelections: [.. ChartPatternSelections],
+            StrategyWorkspaceJson: StrategyWorkspaceCanonicalJsonV1.Serialize(StrategyWorkspace),
+            ResearchDatasetJson: ResearchDatasetDefinition is null
+                ? null
+                : ResearchDatasetCanonicalJsonV1.Serialize(ResearchDatasetDefinition),
+            ResearchExperimentJson: ResearchExperimentEvidence is null
+                ? null
+                : ResearchExperimentCanonicalJsonV1.Serialize(ResearchExperimentEvidence));
 
         if (!_sessionRepository.Save(snapshot))
         {

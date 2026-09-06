@@ -210,7 +210,8 @@ public sealed record AuthoredUnitSpecificationGenerationRequestV1(
     ConfirmedStrategyIntentV1? ConfirmedStrategyIntent = null,
     IReadOnlyList<AuthoredChartReferenceV1>? ChartReferences = null,
     IReadOnlyList<AuthoredChartReferenceInspectionV1>? ChartReferenceInspections = null,
-    IReadOnlyList<ChartPatternSelectionV1>? ChartPatternSelections = null);
+    IReadOnlyList<ChartPatternSelectionV1>? ChartPatternSelections = null,
+    ResearchExperimentEvidenceV1? ResearchExperiment = null);
 
 public sealed record AuthoredUnitSpecificationGenerationIssueV1(
     string Code,

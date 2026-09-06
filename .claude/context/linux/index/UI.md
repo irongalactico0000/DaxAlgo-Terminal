@@ -1,6 +1,6 @@
 # macOS index / UI
 
-Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
+Generated from source fingerprint `1ddf0170457d`. macOS/Avalonia source only.
 
 | File | LOC | Tree | Project | Role | Public surface | Purpose |
 |---|---:|---|---|---|---|---|
@@ -11,15 +11,18 @@ Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 | `src/linux/UI/TradingTerminal.Settings/Authoring/AiCodegenUserFile.cs` | 92 | linux | TradingTerminal.Settings | product | Y | Absolute path to |
 | `src/linux/UI/TradingTerminal.Settings/Authoring/AiProvidersSettingsViewModel.cs` | 100 | linux | TradingTerminal.Settings | product | Y | Store (or clear, when blank) the pasted key in the platform credential |
 | `src/linux/UI/TradingTerminal.Settings/Authoring/AuthoringChartReferenceStore.cs` | 133 | linux | TradingTerminal.Settings | product | Y | Durable host-owned copy of a chart supplied to Hyperion. Generated specifications carry |
-| `src/linux/UI/TradingTerminal.Settings/Authoring/AuthoringSessionStore.cs` | 217 | linux | TradingTerminal.Settings | product | Y | One bubble as the user saw it. Kept separately from the model |
+| `src/linux/UI/TradingTerminal.Settings/Authoring/AuthoringSessionStore.cs` | 220 | linux | TradingTerminal.Settings | product | Y | One bubble as the user saw it. Kept separately from the model |
 | `src/linux/UI/TradingTerminal.Settings/Authoring/LineDiff.cs` | 94 | linux | TradingTerminal.Settings | product | Y | One line of a rendered diff: |
-| `src/linux/UI/TradingTerminal.Settings/Authoring/StrategyAuthoringViewModel.AuthoredStrategy.cs` | 159 | linux | TradingTerminal.Settings | product | Y | True when the reviewed intent can be represented by the current SDK |
+| `src/linux/UI/TradingTerminal.Settings/Authoring/StrategyAuthoringViewModel.AuthoredStrategy.cs` | 163 | linux | TradingTerminal.Settings | product | Y | True when the reviewed intent can be represented by the current SDK |
 | `src/linux/UI/TradingTerminal.Settings/Authoring/StrategyAuthoringViewModel.NativeStrategyRun.cs` | 547 | linux | TradingTerminal.Settings | product | Y |  |
-| `src/linux/UI/TradingTerminal.Settings/Authoring/StrategyAuthoringViewModel.Navigation.cs` | 186 | linux | TradingTerminal.Settings | product | Y |  |
+| `src/linux/UI/TradingTerminal.Settings/Authoring/StrategyAuthoringViewModel.Navigation.cs` | 315 | linux | TradingTerminal.Settings | product | Y |  |
+| `src/linux/UI/TradingTerminal.Settings/Authoring/StrategyAuthoringViewModel.ResearchDataset.cs` | 315 | linux | TradingTerminal.Settings | product | Y | Called only by the trusted host chart overlay. Authored visualizer/strategy code never |
 | `src/linux/UI/TradingTerminal.Settings/Authoring/StrategyAuthoringViewModel.StrategyIntent.cs` | 1408 | linux | TradingTerminal.Settings | product | Y | Adds a host-owned strategy classification choice without selecting it. |
 | `src/linux/UI/TradingTerminal.Settings/Authoring/StrategyAuthoringViewModel.TradeIrBacktest.cs` | 524 | linux | TradingTerminal.Settings | product | Y | Exact-hash bridge from an active, package-valid TradeIR candidate to the deliberately narrow |
 | `src/linux/UI/TradingTerminal.Settings/Authoring/StrategyAuthoringViewModel.TradeIrSynthesis.cs` | 275 | linux | TradingTerminal.Settings | product | Y | Review-bound bridge from the four independently generated authoring drafts to one new |
-| `src/linux/UI/TradingTerminal.Settings/Authoring/StrategyAuthoringViewModel.cs` | 4811 | linux | TradingTerminal.Settings | product | Y | Keeps the activity strip and the chat from growing without bound over |
+| `src/linux/UI/TradingTerminal.Settings/Authoring/StrategyAuthoringViewModel.Validation.cs` | 146 | linux | TradingTerminal.Settings | product | Y |  |
+| `src/linux/UI/TradingTerminal.Settings/Authoring/StrategyAuthoringViewModel.Workspace.cs` | 208 | linux | TradingTerminal.Settings | product | Y |  |
+| `src/linux/UI/TradingTerminal.Settings/Authoring/StrategyAuthoringViewModel.cs` | 4850 | linux | TradingTerminal.Settings | product | Y | Keeps the activity strip and the chat from growing without bound over |
 | `src/linux/UI/TradingTerminal.Settings/Authoring/StrategyStarterCatalog.cs` | 1061 | linux | TradingTerminal.Settings | product | Y | Overlapping navigation lenses derived from the normalized specification. |
 | `src/linux/UI/TradingTerminal.Settings/Notifications/NotificationsSettingsViewModel.cs` | 226 | linux | TradingTerminal.Settings | product | Y | Per-provider default text/vision model ids, pre-filled when the user picks a provider |
 | `src/linux/UI/TradingTerminal.Settings/Notifications/NotificationsUserFile.cs` | 84 | linux | TradingTerminal.Settings | product | Y | Writes the notifications section, preserving any other keys that may exist. |

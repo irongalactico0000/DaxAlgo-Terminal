@@ -24,6 +24,11 @@ public sealed class StoreFeedAndPortfolioTests
     private static Quote Q(InstrumentId id, int second, double mid) =>
         new(id, Start.AddSeconds(second), Start.AddSeconds(second), mid - 0.01, mid + 0.01, 10, 10, BrokerKind.Simulated, second, false);
 
+    private static DepthSnapshot D(int second, double mid) => new(
+        Start.AddSeconds(second),
+        new[] { new DepthLevel(mid - 0.01, 12) },
+        new[] { new DepthLevel(mid + 0.01, 14) });
+
     private static async IAsyncEnumerable<T> ToAsync<T>(IEnumerable<T> items)
     {
         await Task.CompletedTask;
@@ -37,6 +42,8 @@ public sealed class StoreFeedAndPortfolioTests
             .Returns(ci => ToAsync(quotes.GetValueOrDefault((InstrumentId)ci[0], new List<Quote>())));
         store.ReadTradesAsync(Arg.Any<InstrumentId>(), Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<BrokerKind?>(), Arg.Any<CancellationToken>())
             .Returns(_ => ToAsync(Array.Empty<TradePrint>()));
+        store.ReadDepthAsync(Arg.Any<InstrumentId>(), Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ToAsync(Array.Empty<DepthSnapshot>()));
         return store;
     }
 
@@ -82,13 +89,64 @@ public sealed class StoreFeedAndPortfolioTests
         report.Trades.Select(t => t.Instrument).Distinct().Should().BeEquivalentTo(new[] { A, B });
     }
 
+    [Fact]
+    public async Task Store_feed_replays_depth_after_quote_and_trade_at_the_same_timestamp()
+    {
+        var store = StoreWith(new Dictionary<InstrumentId, List<Quote>>
+        {
+            [A] = new List<Quote> { Q(A, 5, 100) },
+        });
+        var trade = new TradePrint(
+            A, Start.AddSeconds(5), Start.AddSeconds(5), 100, 3,
+            AggressorSide.Buy, BrokerKind.Simulated, 2, false);
+        store.ReadTradesAsync(A, Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<BrokerKind?>(), Arg.Any<CancellationToken>())
+            .Returns(ToAsync(new[] { trade }));
+        store.ReadDepthAsync(A, Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(ToAsync(new[] { D(5, 100) }));
+
+        var recorder = new RecordingKernel();
+        var spec = new RunSpec(
+            Universe.Of(new InstrumentSpec(A, Contract.UsStock("AAA"), 0.01, 1.0)),
+            new DataSpec(BacktestDataSource.LocalStore, Start, Start.AddHours(1)),
+            Parameters: StrategyParameters.Empty);
+
+        await new BacktestEngine(new StoreMarketDataFeed(store)).RunAsync(spec, recorder);
+
+        recorder.Kinds.Should().Equal("quote", "trade", "depth");
+        recorder.LastDepth.Should().BeEquivalentTo(D(5, 100));
+    }
+
     private sealed class RecordingKernel : IStrategyKernel
     {
         public List<(InstrumentId id, DateTime ts)> Seen { get; } = new();
+        public List<string> Kinds { get; } = new();
+        public DepthSnapshot? LastDepth { get; private set; }
         public Task OnStartAsync(IStrategyContext ctx, CancellationToken ct) => Task.CompletedTask;
         public Task OnQuoteAsync(InstrumentId instrument, Tick quote, IStrategyContext ctx, CancellationToken ct)
         {
             Seen.Add((instrument, quote.TimestampUtc));
+            Kinds.Add("quote");
+            return Task.CompletedTask;
+        }
+
+        public Task OnTradeAsync(
+            InstrumentId instrument,
+            TradePrint trade,
+            IStrategyContext ctx,
+            CancellationToken ct)
+        {
+            Kinds.Add("trade");
+            return Task.CompletedTask;
+        }
+
+        public Task OnDepthAsync(
+            InstrumentId instrument,
+            DepthSnapshot depth,
+            IStrategyContext ctx,
+            CancellationToken ct)
+        {
+            Kinds.Add("depth");
+            LastDepth = depth;
             return Task.CompletedTask;
         }
     }

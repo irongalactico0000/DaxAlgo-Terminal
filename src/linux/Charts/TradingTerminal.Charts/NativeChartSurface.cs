@@ -25,6 +25,8 @@ public sealed class NativeChartSurface : Control
     private static readonly IBrush DownVolumeBrush = Brush("#60EF5350");
     private static readonly IBrush AreaBrush = Brush("#3842A5F5");
     private static readonly IBrush AmberBrush = Brush("#E0A000");
+    private static readonly IBrush ObservationSelectionBrush = Brush("#3342A5F5");
+    private static readonly IBrush OutcomeSelectionBrush = Brush("#33E0A000");
     private static readonly IPen UpPen = Pen("#26A69A", 1);
     private static readonly IPen DownPen = Pen("#EF5350", 1);
     private static readonly IPen GridPen = Pen("#161616", 1);
@@ -36,6 +38,8 @@ public sealed class NativeChartSurface : Control
     private static readonly IPen RsiPen = Pen("#AB47BC", 1.1);
     private static readonly IPen MacdPen = Pen("#42A5F5", 1.1);
     private static readonly IPen SignalPen = Pen("#E0A000", 1.1);
+    private static readonly IPen ObservationSelectionPen = Pen("#8042A5F5", 1);
+    private static readonly IPen OutcomeSelectionPen = Pen("#80E0A000", 1);
     private static readonly IPen RsiUpperPen = Pen("#80EF5350", 1, dash: true);
     private static readonly IPen RsiLowerPen = Pen("#8026A69A", 1, dash: true);
     private static readonly Typeface Mono = new("Cascadia Mono, SFMono-Regular, Menlo, Consolas, monospace");
@@ -48,12 +52,46 @@ public sealed class NativeChartSurface : Control
     private bool _dragging;
     private Point _dragOrigin;
     private int _dragOffset;
+    private bool _selecting;
+    private Point _selectionAnchor;
+    private Point _selectionCurrent;
+    private ChartInteractionMode _interactionMode;
+    private ChartTimeRange? _observationRange;
+    private ChartTimeRange? _outcomeRange;
 
     public NativeChartSurface()
     {
         ClipToBounds = true;
         DoubleTapped += (_, _) => FitContent();
     }
+
+    /// <summary>Controls only left-drag. Pan remains the default chart interaction.</summary>
+    public ChartInteractionMode InteractionMode
+    {
+        get => _interactionMode;
+        set
+        {
+            if (_interactionMode == value) return;
+            _interactionMode = value;
+            _dragging = false;
+            _selecting = false;
+            InvalidateVisual();
+        }
+    }
+
+    public ChartTimeRange? ObservationRange
+    {
+        get => _observationRange;
+        set { _observationRange = value; InvalidateVisual(); }
+    }
+
+    public ChartTimeRange? OutcomeRange
+    {
+        get => _outcomeRange;
+        set { _outcomeRange = value; InvalidateVisual(); }
+    }
+
+    public event EventHandler<ChartRangeSelectedEventArgs>? ResearchRangeSelected;
 
     public ChartSnapshot? Snapshot
     {
@@ -148,6 +186,9 @@ public sealed class NativeChartSurface : Control
             DrawMacd(context, snapshot.Macd, candles, macdPane.Value, start, end);
         }
 
+        DrawResearchRanges(context, snapshot, start, end,
+            macdPane?.Bottom ?? rsiPane?.Bottom ?? pricePane.Bottom);
+
         DrawCrosshairAndLegend(context, snapshot, candles, pricePane, rsiPane, macdPane,
             priceMin, priceMax, start, end);
 
@@ -160,7 +201,11 @@ public sealed class NativeChartSurface : Control
         base.OnPointerMoved(e);
         var point = e.GetPosition(this);
         _cursor = point;
-        if (_dragging && _snapshot is { Candles.Length: > 0 } snapshot)
+        if (_selecting)
+        {
+            _selectionCurrent = point;
+        }
+        else if (_dragging && _snapshot is { Candles.Length: > 0 } snapshot)
         {
             var width = Math.Max(1, Bounds.Width - AxisWidth);
             var bars = Math.Max(1, _visibleCount);
@@ -174,7 +219,7 @@ public sealed class NativeChartSurface : Control
     protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
-        if (!_dragging)
+        if (!_dragging && !_selecting)
             _cursor = null;
         InvalidateVisual();
     }
@@ -184,9 +229,20 @@ public sealed class NativeChartSurface : Control
         base.OnPointerPressed(e);
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             return;
-        _dragging = true;
-        _dragOrigin = e.GetPosition(this);
-        _dragOffset = _rightOffset;
+        var point = e.GetPosition(this);
+        if (InteractionMode == ChartInteractionMode.SelectResearchRange &&
+            _snapshot is { Candles.Length: > 0 })
+        {
+            _selecting = true;
+            _selectionAnchor = point;
+            _selectionCurrent = point;
+        }
+        else
+        {
+            _dragging = true;
+            _dragOrigin = point;
+            _dragOffset = _rightOffset;
+        }
         e.Pointer.Capture(this);
         e.Handled = true;
     }
@@ -194,6 +250,20 @@ public sealed class NativeChartSurface : Control
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        if (_selecting && _snapshot is { Candles.Length: > 0 } snapshot)
+        {
+            _selectionCurrent = e.GetPosition(this);
+            var (start, end) = VisibleRange(snapshot.Candles.Length);
+            var range = ChartRangeSelectionMapper.Map(
+                snapshot.Candles,
+                start,
+                end,
+                Math.Max(1, Bounds.Width - AxisWidth),
+                _selectionAnchor.X,
+                _selectionCurrent.X);
+            ResearchRangeSelected?.Invoke(this, new ChartRangeSelectedEventArgs(range));
+        }
+        _selecting = false;
         _dragging = false;
         e.Pointer.Capture(null);
         e.Handled = true;
@@ -227,6 +297,60 @@ public sealed class NativeChartSurface : Control
         var offset = Math.Clamp(_rightOffset, 0, Math.Max(0, total - count));
         var end = total - offset;
         return (Math.Max(0, end - count), end);
+    }
+
+    private void DrawResearchRanges(
+        DrawingContext context,
+        ChartSnapshot snapshot,
+        int visibleStart,
+        int visibleEndExclusive,
+        double bottom)
+    {
+        DrawRange(ObservationRange, ObservationSelectionBrush, ObservationSelectionPen);
+        DrawRange(OutcomeRange, OutcomeSelectionBrush, OutcomeSelectionPen);
+
+        if (_selecting)
+        {
+            ChartTimeRange preview;
+            try
+            {
+                preview = ChartRangeSelectionMapper.Map(
+                    snapshot.Candles,
+                    visibleStart,
+                    visibleEndExclusive,
+                    Math.Max(1, Bounds.Width - AxisWidth),
+                    _selectionAnchor.X,
+                    _selectionCurrent.X);
+            }
+            catch (ArgumentException)
+            {
+                return;
+            }
+
+            var selectingOutcome = ObservationRange is not null;
+            DrawRange(
+                preview,
+                selectingOutcome ? OutcomeSelectionBrush : ObservationSelectionBrush,
+                selectingOutcome ? OutcomeSelectionPen : ObservationSelectionPen);
+        }
+
+        void DrawRange(ChartTimeRange? range, IBrush fill, IPen border)
+        {
+            if (range is null) return;
+            var first = LowerBound(snapshot.Candles, range.StartUtc.ToUnixTimeSeconds());
+            var afterLast = LowerBound(snapshot.Candles, range.EndUtcExclusive.ToUnixTimeSeconds());
+            first = Math.Clamp(first, visibleStart, visibleEndExclusive);
+            afterLast = Math.Clamp(afterLast, visibleStart, visibleEndExclusive);
+            if (afterLast <= first) return;
+
+            var width = Math.Max(1, Bounds.Width - AxisWidth);
+            var count = visibleEndExclusive - visibleStart;
+            var left = (first - visibleStart) / (double)count * width;
+            var right = (afterLast - visibleStart) / (double)count * width;
+            var rect = new Rect(left, 0, Math.Max(1, right - left), Math.Max(1, bottom));
+            context.FillRectangle(fill, rect);
+            context.DrawRectangle(null, border, rect);
+        }
     }
 
     private static (double Min, double Max) PriceRange(ChartSnapshot snapshot, int start, int end)
@@ -551,6 +675,19 @@ public sealed class NativeChartSurface : Control
         pane.Bottom - (value - min) / Math.Max(double.Epsilon, max - min) * pane.Height;
 
     private static int LowerBound(ChartLinePoint[] points, long time)
+    {
+        var lo = 0;
+        var hi = points.Length;
+        while (lo < hi)
+        {
+            var mid = lo + (hi - lo) / 2;
+            if (points[mid].Time < time) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo;
+    }
+
+    private static int LowerBound(ChartCandle[] points, long time)
     {
         var lo = 0;
         var hi = points.Length;

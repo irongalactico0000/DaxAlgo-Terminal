@@ -14,6 +14,10 @@ public partial class StrategyAuthoringWindow : Window
 {
     private INotifyCollectionChanged? _messages;
 
+    public event EventHandler? ResearchChartRequested;
+    public event EventHandler? HistoricalValidationRequested;
+    public event EventHandler? PaperHandoffRequested;
+
     public StrategyAuthoringWindow()
     {
         InitializeComponent();
@@ -88,6 +92,15 @@ public partial class StrategyAuthoringWindow : Window
         if (sender is Button { Tag: { } adapter } && DataContext is StrategyAuthoringViewModel viewModel)
             viewModel.LaunchCliCommand.Execute(adapter);
     }
+
+    private void OnResearchChartRequested(object? sender, RoutedEventArgs e) =>
+        ResearchChartRequested?.Invoke(this, EventArgs.Empty);
+
+    private void OnHistoricalValidationRequested(object? sender, RoutedEventArgs e) =>
+        HistoricalValidationRequested?.Invoke(this, EventArgs.Empty);
+
+    private void OnPaperHandoffRequested(object? sender, RoutedEventArgs e) =>
+        PaperHandoffRequested?.Invoke(this, EventArgs.Empty);
 }
 
 /// <summary>Lets the Avalonia parameter workbench select the correct editor without UI-specific VM code.</summary>

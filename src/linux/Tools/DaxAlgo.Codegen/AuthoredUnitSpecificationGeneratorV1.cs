@@ -86,6 +86,23 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
         else if (request.RawRequest.Length > MaxInputCharacters)
             issues.Add(Issue("UNIT_REQUEST_TOO_LARGE", "rawRequest", $"The request exceeds {MaxInputCharacters:N0} characters."));
 
+        if (request.ResearchExperiment is not null)
+        {
+            if (request.ConfirmedStrategyIntent is null)
+            {
+                issues.Add(Issue("UNIT_RESEARCH_STRATEGY_REQUIRED", "researchExperiment",
+                    "Exploratory research evidence may only inform a confirmed strategy."));
+            }
+            else
+            {
+                try { ResearchExperimentValidatorV1.RequireValid(request.ResearchExperiment); }
+                catch (ArgumentException exception)
+                {
+                    issues.Add(Issue("UNIT_RESEARCH_EVIDENCE_INVALID", "researchExperiment", exception.Message));
+                }
+            }
+        }
+
         if (request.AvailableInstruments is null || request.AvailableInstruments.Count == 0)
         {
             issues.Add(Issue("UNIT_INSTRUMENT_CANDIDATES_REQUIRED", "availableInstruments",
@@ -293,7 +310,8 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
             BrokerCapabilityRows(request.AvailableInstruments),
             request.ChartReferences ?? [],
             request.ChartReferenceInspections ?? [],
-            request.ChartPatternSelections ?? []));
+            request.ChartPatternSelections ?? [],
+            request.ResearchExperiment));
 
     private const string SystemContext = """
         You translate a user's chart/strategy request into exactly one JSON object matching
@@ -306,6 +324,9 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
         - Only an input carrying confirmedStrategyIntent may produce kind "strategy"; then use
           executionIntent "paperTargets" and copy its classification exactly.
         - Similar historical shape is descriptive evidence, never a forecast or buy/sell signal.
+        - researchExperiment is exploratory labeled-event evidence. Use its formula and selected
+          features as a hypothesis only; never describe its holdout metric as a historical backtest
+          or permission for Paper execution.
 
         Reference handling:
         - Copy chartReferences exactly and use sourceKind "text" when empty, otherwise
@@ -408,7 +429,8 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
         IReadOnlyList<BrokerDataCapabilityV1> BrokerCapabilities,
         IReadOnlyList<AuthoredChartReferenceV1> ChartReferences,
         IReadOnlyList<AuthoredChartReferenceInspectionV1> ChartReferenceInspections,
-        IReadOnlyList<ChartPatternSelectionV1> ChartPatternSelections);
+        IReadOnlyList<ChartPatternSelectionV1> ChartPatternSelections,
+        ResearchExperimentEvidenceV1? ResearchExperiment);
 
     private sealed record BrokerDataCapabilityV1(
         BrokerKind Broker,

@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -45,6 +46,7 @@ public partial class ChartsPanel : UserControl
 
         Loaded += OnLoaded;
         DataContextChanged += OnDataContextChanged;
+        _surface.ResearchRangeSelected += OnResearchRangeSelected;
     }
 
     private void OnLoaded(object? sender, RoutedEventArgs e)
@@ -78,6 +80,8 @@ public partial class ChartsPanel : UserControl
 
         _viewModel.SnapshotReady += OnSnapshotReady;
         _viewModel.CandleUpdated += OnCandleUpdated;
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        ApplySurfaceInteractionState();
         ApplyFeatureGates();
 
         if (!ReferenceEquals(_readyViewModel, _viewModel))
@@ -124,6 +128,29 @@ public partial class ChartsPanel : UserControl
     {
         if (Dispatcher.UIThread.CheckAccess()) _surface.UpdateCandle(candle);
         else Dispatcher.UIThread.Post(() => _surface.UpdateCandle(candle));
+    }
+
+    private void OnResearchRangeSelected(object? sender, ChartRangeSelectedEventArgs e) =>
+        _viewModel?.SelectResearchRange(e.Range);
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(ChartsViewModel.IsResearchRangeSelectionEnabled) or
+            nameof(ChartsViewModel.ResearchObservationRange) or
+            nameof(ChartsViewModel.ResearchOutcomeRange))
+        {
+            if (Dispatcher.UIThread.CheckAccess()) ApplySurfaceInteractionState();
+            else Dispatcher.UIThread.Post(ApplySurfaceInteractionState);
+        }
+    }
+
+    private void ApplySurfaceInteractionState()
+    {
+        _surface.InteractionMode = _viewModel?.IsResearchRangeSelectionEnabled == true
+            ? ChartInteractionMode.SelectResearchRange
+            : ChartInteractionMode.Pan;
+        _surface.ObservationRange = _viewModel?.ResearchObservationRange;
+        _surface.OutcomeRange = _viewModel?.ResearchOutcomeRange;
     }
 
     private async void ExportPng_Click(object? sender, RoutedEventArgs e)
@@ -173,6 +200,7 @@ public partial class ChartsPanel : UserControl
             _host.Closed -= OnHostClosed;
         _host = null;
         Unbind();
+        _surface.ResearchRangeSelected -= OnResearchRangeSelected;
         Loaded -= OnLoaded;
         DataContextChanged -= OnDataContextChanged;
     }
@@ -183,7 +211,9 @@ public partial class ChartsPanel : UserControl
         {
             _viewModel.SnapshotReady -= OnSnapshotReady;
             _viewModel.CandleUpdated -= OnCandleUpdated;
+            _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         }
         _viewModel = null;
+        ApplySurfaceInteractionState();
     }
 }

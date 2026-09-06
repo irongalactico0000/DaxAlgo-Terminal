@@ -1,6 +1,6 @@
 # macOS index / Core
 
-Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
+Generated from source fingerprint `1ddf0170457d`. macOS/Avalonia source only.
 
 | File | LOC | Tree | Project | Role | Public surface | Purpose |
 |---|---:|---|---|---|---|---|
@@ -145,7 +145,7 @@ Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 | `src/linux/Core/TradingTerminal.Core/MarketData/IMarketDataHub.cs` | 27 | linux | TradingTerminal.Core | product | Y | The live, in-memory, broker-agnostic publish/subscribe bus for normalized market data. |
 | `src/linux/Core/TradingTerminal.Core/MarketData/IMarketDataIngest.cs` | 37 | linux | TradingTerminal.Core | product | Y | Resolve (creating if needed) the canonical id for a broker contract on |
 | `src/linux/Core/TradingTerminal.Core/MarketData/IMarketDataRepository.cs` | 73 | linux | TradingTerminal.Core | product | Y | The single facade for market data. Hides broker SDKs entirely — no |
-| `src/linux/Core/TradingTerminal.Core/MarketData/IMarketDataStore.cs` | 85 | linux | TradingTerminal.Core | product | Y | Queue a quote for batched persistence. Returns immediately. |
+| `src/linux/Core/TradingTerminal.Core/MarketData/IMarketDataStore.cs` | 84 | linux | TradingTerminal.Core | product | Y | Queue a quote for batched persistence. Returns immediately. |
 | `src/linux/Core/TradingTerminal.Core/MarketData/IQuestDbLauncher.cs` | 24 | linux | TradingTerminal.Core | product | Y | True only when the QuestDB backend is configured — otherwise there's nothing |
 | `src/linux/Core/TradingTerminal.Core/MarketData/Indicators.cs` | 145 | linux | TradingTerminal.Core | product | Y | EMA: y_t = α·x_t + (1-α)·y_{t-1}, with α = 2 / (period |
 | `src/linux/Core/TradingTerminal.Core/MarketData/InstrumentDataView.cs` | 71 | linux | TradingTerminal.Core | product | Y | The instrument this facade is scoped to. |
@@ -276,14 +276,18 @@ Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 | `src/linux/Core/TradingTerminal.Core/Strategies/Definition/TradeIrModuleValidatorV1.cs` | 193 | linux | TradingTerminal.Core | product | Y | Pure pre-compilation validation for module identity, interface, determinism, and requested |
 | `src/linux/Core/TradingTerminal.Core/Strategies/Definition/TradeIrModules.cs` | 156 | linux | TradingTerminal.Core | product | Y | A location-independent content identity for source, model, schema, or runtime bytes. |
 | `src/linux/Core/TradingTerminal.Core/Strategies/Generation/AuthoredUnitCompilationV1.cs` | 43 | linux | TradingTerminal.Core | product | Y | The verified emitted assembly for one exact authored-unit specification. |
-| `src/linux/Core/TradingTerminal.Core/Strategies/Generation/AuthoredUnitSpecificationV1.cs` | 774 | linux | TradingTerminal.Core | product | Y | The runnable product artifact Hyperion is being asked to author. |
+| `src/linux/Core/TradingTerminal.Core/Strategies/Generation/AuthoredUnitSpecificationV1.cs` | 775 | linux | TradingTerminal.Core | product | Y | The runnable product artifact Hyperion is being asked to author. |
 | `src/linux/Core/TradingTerminal.Core/Strategies/Generation/ChartPatternSimilarityV1.cs` | 232 | linux | TradingTerminal.Core | product | Y | The bounded request executed against real persisted OHLCV history. |
 | `src/linux/Core/TradingTerminal.Core/Strategies/Generation/ConfirmedStrategyIntentV1.cs` | 1327 | linux | TradingTerminal.Core | product | Y | The shape of decision output. Families remain classification lenses over these topologies. |
+| `src/linux/Core/TradingTerminal.Core/Strategies/Generation/HistoricalValidationEvidenceV1.cs` | 82 | linux | TradingTerminal.Core | product | Y | Immutable identity supplied to a historical runner. A completed run is admissible |
+| `src/linux/Core/TradingTerminal.Core/Strategies/Generation/ResearchDatasetV1.cs` | 206 | linux | TradingTerminal.Core | product | Y | Fail-closed policies required before a labeled dataset can drive feature research. |
+| `src/linux/Core/TradingTerminal.Core/Strategies/Generation/ResearchExperimentV1.cs` | 137 | linux | TradingTerminal.Core | product | Y | Reproducible exploratory evidence produced from labeled event observations. It is deliberately |
 | `src/linux/Core/TradingTerminal.Core/Strategies/Generation/StrategyCandidateCompositionV1.cs` | 370 | linux | TradingTerminal.Core | product | Y | The intake result: a user-visible candidate plus only the specialist work it |
 | `src/linux/Core/TradingTerminal.Core/Strategies/Generation/StrategyCandidateConfirmationV1.cs` | 124 | linux | TradingTerminal.Core | product | Y | Result of confirming the exact candidate revision the user reviewed. Confirmation accepts |
 | `src/linux/Core/TradingTerminal.Core/Strategies/Generation/StrategyCandidateLoweringRequestV1.cs` | 60 | linux | TradingTerminal.Core | product | Y | Immutable handoff from strategy generation to the separately owned executable-definition |
 | `src/linux/Core/TradingTerminal.Core/Strategies/Generation/StrategyCandidateV1.cs` | 189 | linux | TradingTerminal.Core | product | Y | The lifecycle of one conversationally generated strategy candidate. |
 | `src/linux/Core/TradingTerminal.Core/Strategies/Generation/StrategyCandidateValidatorV1.cs` | 518 | linux | TradingTerminal.Core | product | Y | Separates a well-formed draft from a confirmable meaning and an executable-ready candidate. |
+| `src/linux/Core/TradingTerminal.Core/Strategies/Generation/StrategyWorkspaceV1.cs` | 409 | linux | TradingTerminal.Core | product | Y | The six user-visible stages of one authored chart or strategy. |
 | `src/linux/Core/TradingTerminal.Core/Strategies/IPluginFaultAttribution.cs` | 10 | linux | TradingTerminal.Core | product | Y | Marker for an exception that can name the runtime plugin responsible for |
 | `src/linux/Core/TradingTerminal.Core/Strategies/IStrategyFactory.cs` | 36 | linux | TradingTerminal.Core | product | Y | Fires when a strategy is added after startup, so a bound catalog |
 | `src/linux/Core/TradingTerminal.Core/Strategies/ITradingStrategy.cs` | 80 | linux | TradingTerminal.Core | product | Y | Stable, unique identifier (e.g. "example.nvda.3m"). Used to dedupe tabs. |

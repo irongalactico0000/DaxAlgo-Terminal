@@ -1,6 +1,6 @@
 # DaxAlgo.Codegen — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `e91d50e75733`. Declaration lines only;
+Generated from source fingerprint `1ddf0170457d`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Tools/DaxAlgo.Codegen/AgentCliCodegenClient.cs
@@ -214,55 +214,55 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
   226: public sealed record StrategyGenerationCandidateV1(
   243: public const string CurrentSchemaVersion = "strategy-generation-candidate/v3";
   250: public sealed record StrategyGenerationConfirmedIntentContextV1(
-  255: public sealed record ParallelStrategyGenerationRequestV1(
-  262: public sealed record StrategyGenerationLaneResultV1(
-  270: public StrategyGenerationAutomaticRepairDispositionV1 AutomaticRepairDisposition =>
-  273: public bool Generated => Candidate is not null && CandidateHashSha256 is not null &&
-  281: public bool PackageValidationAvailable =>
-  289: public bool Selectable
-  329: public bool PackageValid
-  356: public sealed record ParallelStrategyGenerationResultV1(
-  365: public bool HasPackageValidCandidate =>
-  370: public interface IStrategyGenerationLaneAgentV1
-  372:     StrategyGenerationLaneV1 Lane { get; }
-  374:     Task<StrategyGenerationLaneResultV1> GenerateAsync(
-  375:     IStrategyCodegenClient provider,
-  376:     ParallelStrategyGenerationRequestV1 request,
-  377:     string expectedCandidateId,
-  378:     CancellationToken ct = default,
-  379:     IProgress<StrategyGenerationLaneProgressV1>? progress = null);
-  382: public interface IParallelStrategyCandidateGeneratorV1
-  384:     Task<ParallelStrategyGenerationResultV1> GenerateAsync(
-  385:     IStrategyCodegenClient provider,
-  386:     ParallelStrategyGenerationRequestV1 request,
-  387:     CancellationToken ct = default,
-  388:     IProgress<StrategyGenerationLaneProgressV1>? progress = null);
-  391: public static class StrategyGenerationCandidateCanonicalJsonV1
-  393: public static string Serialize(StrategyGenerationCandidateV1 candidate) =>
-  396: public static StrategyGenerationCandidateV1 Deserialize(string json) =>
-  399: public static string Hash(StrategyGenerationCandidateV1 candidate) =>
-  422: public static string SerializeBatch(ParallelStrategyGenerationResultV1 result) =>
-  425: public static ParallelStrategyGenerationResultV1 DeserializeBatch(string json) =>
-  428: public static string PromptHash(string strategyId, string userPrompt) =>
-  431: public static string PromptHash(
-  442: public static string RequestHash(
-  455: public static string RequestHash(
-  540: public const int MaxCanonicalJsonCharacters = 750_000;
-  542: public static bool TryValidate(
-  599: public static void ValidateOrThrow(
-  704: public sealed record StrategyGenerationSelectionResultV1(
-  709: public bool Success => Candidate is not null && CandidateHashSha256 is not null &&
-  714: public sealed record StrategyGenerationRevalidationResultV1(
-  719: public bool Applied => Batch is not null && LaneResult is not null && Issues is not null &&
-  725: public static class StrategyGenerationBatchValidationV1
-  727: public static IReadOnlyList<StrategyCandidateGenerationIssueV1> Validate(
-  907: public static StrategyGenerationSelectionResultV1 Select(
-  934: public static StrategyGenerationRevalidationResultV1 RevalidateArtifact(
- 1026: public static class StrategyGenerationLaneCatalogV1
- 1028: public static IReadOnlyList<StrategyGenerationLaneV1> Ordered { get; } = Array.AsReadOnly(
- 1037: public static string WireName(StrategyGenerationLaneV1 lane) => lane switch
- 1046: public static string DisplayName(StrategyGenerationLaneV1 lane) => lane switch
- 1055: public static StrategyGenerationArtifactKindV1 ArtifactKind(StrategyGenerationLaneV1 lane) => lane switch
+  256: public sealed record ParallelStrategyGenerationRequestV1(
+  263: public sealed record StrategyGenerationLaneResultV1(
+  271: public StrategyGenerationAutomaticRepairDispositionV1 AutomaticRepairDisposition =>
+  274: public bool Generated => Candidate is not null && CandidateHashSha256 is not null &&
+  282: public bool PackageValidationAvailable =>
+  290: public bool Selectable
+  330: public bool PackageValid
+  357: public sealed record ParallelStrategyGenerationResultV1(
+  366: public bool HasPackageValidCandidate =>
+  371: public interface IStrategyGenerationLaneAgentV1
+  373:     StrategyGenerationLaneV1 Lane { get; }
+  375:     Task<StrategyGenerationLaneResultV1> GenerateAsync(
+  376:     IStrategyCodegenClient provider,
+  377:     ParallelStrategyGenerationRequestV1 request,
+  378:     string expectedCandidateId,
+  379:     CancellationToken ct = default,
+  380:     IProgress<StrategyGenerationLaneProgressV1>? progress = null);
+  383: public interface IParallelStrategyCandidateGeneratorV1
+  385:     Task<ParallelStrategyGenerationResultV1> GenerateAsync(
+  386:     IStrategyCodegenClient provider,
+  387:     ParallelStrategyGenerationRequestV1 request,
+  388:     CancellationToken ct = default,
+  389:     IProgress<StrategyGenerationLaneProgressV1>? progress = null);
+  392: public static class StrategyGenerationCandidateCanonicalJsonV1
+  394: public static string Serialize(StrategyGenerationCandidateV1 candidate) =>
+  397: public static StrategyGenerationCandidateV1 Deserialize(string json) =>
+  400: public static string Hash(StrategyGenerationCandidateV1 candidate) =>
+  423: public static string SerializeBatch(ParallelStrategyGenerationResultV1 result) =>
+  426: public static ParallelStrategyGenerationResultV1 DeserializeBatch(string json) =>
+  429: public static string PromptHash(string strategyId, string userPrompt) =>
+  432: public static string PromptHash(
+  443: public static string RequestHash(
+  456: public static string RequestHash(
+  541: public const int MaxCanonicalJsonCharacters = 750_000;
+  543: public static bool TryValidate(
+  600: public static void ValidateOrThrow(
+  714: public sealed record StrategyGenerationSelectionResultV1(
+  719: public bool Success => Candidate is not null && CandidateHashSha256 is not null &&
+  724: public sealed record StrategyGenerationRevalidationResultV1(
+  729: public bool Applied => Batch is not null && LaneResult is not null && Issues is not null &&
+  735: public static class StrategyGenerationBatchValidationV1
+  737: public static IReadOnlyList<StrategyCandidateGenerationIssueV1> Validate(
+  917: public static StrategyGenerationSelectionResultV1 Select(
+  944: public static StrategyGenerationRevalidationResultV1 RevalidateArtifact(
+ 1036: public static class StrategyGenerationLaneCatalogV1
+ 1038: public static IReadOnlyList<StrategyGenerationLaneV1> Ordered { get; } = Array.AsReadOnly(
+ 1047: public static string WireName(StrategyGenerationLaneV1 lane) => lane switch
+ 1056: public static string DisplayName(StrategyGenerationLaneV1 lane) => lane switch
+ 1065: public static StrategyGenerationArtifactKindV1 ArtifactKind(StrategyGenerationLaneV1 lane) => lane switch
 ```
 
 ## src/linux/Tools/DaxAlgo.Codegen/ParallelStrategyGenerationPromptV1.cs

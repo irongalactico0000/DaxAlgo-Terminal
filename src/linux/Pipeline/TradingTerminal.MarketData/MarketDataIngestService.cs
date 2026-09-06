@@ -13,8 +13,8 @@ namespace TradingTerminal.Infrastructure.MarketData;
 /// ref-counted per (instrument, broker, stream) so multiple consumers share one broker feed.
 ///
 /// <para>Persistence is <b>tick-primary</b>: quotes and trades are written to the store; live bars
-/// are not. Depth (L2) is written too, but only lands when the configured store backend persists it
-/// (QuestDB) — the SQLite/Postgres stores no-op on depth. Bars at any cadence are derivable from
+    /// are not. Depth (L2) is written too; the per-broker SQLite and QuestDB backends persist it while
+    /// backends that do not implement depth retain their explicit no-op behavior. Bars at any cadence are derivable from
 /// ticks; live-bar persistence was redundant storage. The bars table is still populated by the
 /// historical-fetch caching path in
 /// <see cref="MarketDataRepository"/> — that route covers time ranges before we connected, which
@@ -254,8 +254,8 @@ internal sealed class MarketDataIngestService : IMarketDataIngest
             await foreach (var snapshot in client.SubscribeDepthAsync(contract, 10, ct).ConfigureAwait(false))
             {
                 _hub.PublishDepth(id, snapshot);
-                // Depth (L2) is persisted only by backends built for its volume (QuestDB). The
-                // SQLite/Postgres stores no-op on EnqueueDepth, so this stays a hub-only fan-out there.
+                // Depth persistence remains backend-specific. Per-broker SQLite and QuestDB retain
+                // snapshots; stores without depth support keep the hub fan-out without durable rows.
                 _store.EnqueueDepth(id, snapshot, broker);
             }
         }

@@ -21,6 +21,7 @@ public sealed class AuthoringSessionMigrationTests
 
         snapshot.GenerateCandidateFirst.Should().BeNull();
         snapshot.FourLaneGenerationEnabled.Should().BeTrue();
+        snapshot.StrategyWorkspaceJson.Should().BeNull();
     }
 
     [Fact]

@@ -181,26 +181,36 @@ public partial class MainWindow : Window
 
     private async Task OpenPaperStrategyRunnerAsync(
         TradingTerminal.UI.Strategies.StrategyKernelRegistration? initialStrategy,
-        IReadOnlyDictionary<string, object?>? initialParameters = null)
+        IReadOnlyDictionary<string, object?>? initialParameters = null,
+        string? requiredBookId = null)
     {
         if (_paperStrategyRunnerWindow is { } existing)
         {
-            if (initialStrategy is not null && existing.DataContext is
-                TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerViewModel existingViewModel)
+            if (requiredBookId is not null && existing.DataContext is
+                TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerViewModel bound &&
+                !string.Equals(bound.BookId, requiredBookId, StringComparison.Ordinal))
             {
-                if (initialParameters is not null &&
-                    !existingViewModel.TryPrepareTestedStrategy(initialStrategy, initialParameters, out var reason))
-                {
-                    Vm?.ActivityLog.Append("Backtest", "WARN", reason);
-                }
-                else if (initialParameters is null)
-                {
-                    existingViewModel.SelectedStrategy = existingViewModel.Strategies.FirstOrDefault(choice =>
-                        string.Equals(choice.Id, initialStrategy.Id, StringComparison.Ordinal));
-                }
+                existing.Close();
             }
-            existing.Activate();
-            return;
+            else
+            {
+                if (initialStrategy is not null && existing.DataContext is
+                    TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerViewModel existingViewModel)
+                {
+                    if (initialParameters is not null &&
+                        !existingViewModel.TryPrepareTestedStrategy(initialStrategy, initialParameters, out var reason))
+                    {
+                        Vm?.ActivityLog.Append("Backtest", "WARN", reason);
+                    }
+                    else if (initialParameters is null)
+                    {
+                        existingViewModel.SelectedStrategy = existingViewModel.Strategies.FirstOrDefault(choice =>
+                            string.Equals(choice.Id, initialStrategy.Id, StringComparison.Ordinal));
+                    }
+                }
+                existing.Activate();
+                return;
+            }
         }
         if ((Application.Current as App)?.Services is not { } services) return;
         TradingTerminal.App.Avalonia.Execution.PaperExecutionBookSessionLease? bookLease = null;
@@ -301,12 +311,161 @@ public partial class MainWindow : Window
 
     private void OnCharts(object? sender, RoutedEventArgs e)
     {
-        if ((Application.Current as App)?.Services is not { } sp) return;
-        var vm = sp.GetRequiredService<TradingTerminal.Charts.ChartsViewModel>();
-        var window = sp.GetRequiredService<TradingTerminal.Charts.ChartsWindow>();
-        window.DataContext = vm;
-        ShowDisposing(window, vm);
+        OpenResearchChart();
         Vm?.ActivityLog.Append("Charts", "INFO", "Opened Charts.");
+    }
+
+    private void OpenResearchChart(
+        TradingTerminal.App.Authoring.StrategyAuthoringViewModel? targetViewModel = null,
+        Settings.StrategyAuthoringWindow? targetWindow = null)
+    {
+        if ((Application.Current as App)?.Services is not { } services) return;
+
+        var chartViewModel = services.GetRequiredService<TradingTerminal.Charts.ChartsViewModel>();
+        var chartWindow = services.GetRequiredService<TradingTerminal.Charts.ChartsWindow>();
+        chartWindow.DataContext = chartViewModel;
+
+        EventHandler<TradingTerminal.Charts.ResearchChartSelectionRequestedEventArgs>? selectionHandler = null;
+        selectionHandler = (_, args) =>
+        {
+            var authoringViewModel = targetViewModel;
+            var authoringWindow = targetWindow;
+            if (authoringViewModel is null || authoringWindow is null || !authoringWindow.IsVisible)
+            {
+                authoringViewModel = services.GetRequiredService<TradingTerminal.App.Authoring.StrategyAuthoringViewModel>();
+                authoringWindow = CreateAuthoringWindow(authoringViewModel);
+                WireResearchChartRequest(authoringViewModel, authoringWindow);
+                ShowDisposing(authoringWindow, authoringViewModel);
+            }
+
+            authoringViewModel.SetResearchChartSelection(args.Selection);
+            authoringWindow.Activate();
+            chartWindow.Close();
+        };
+        chartViewModel.ResearchSelectionRequested += selectionHandler;
+        chartWindow.Closed += (_, _) => chartViewModel.ResearchSelectionRequested -= selectionHandler;
+        ShowDisposing(chartWindow, chartViewModel);
+    }
+
+    private Settings.StrategyAuthoringWindow CreateAuthoringWindow(
+        TradingTerminal.App.Authoring.StrategyAuthoringViewModel viewModel) => new()
+    {
+        DataContext = viewModel,
+        ShowSimulatedDataBanner = Vm?.IsSimulatedActive == true,
+    };
+
+    private void WireResearchChartRequest(
+        TradingTerminal.App.Authoring.StrategyAuthoringViewModel viewModel,
+        Settings.StrategyAuthoringWindow window)
+    {
+        EventHandler? requestHandler = null;
+        EventHandler? validationHandler = null;
+        EventHandler? paperHandler = null;
+        requestHandler = (_, _) => OpenResearchChart(viewModel, window);
+        validationHandler = (_, _) => OpenAuthoringHistoricalValidation(viewModel);
+        paperHandler = (_, _) => _ = OpenAuthoringPaperAsync(viewModel);
+        window.ResearchChartRequested += requestHandler;
+        window.HistoricalValidationRequested += validationHandler;
+        window.PaperHandoffRequested += paperHandler;
+        window.Closed += (_, _) =>
+        {
+            window.ResearchChartRequested -= requestHandler;
+            window.HistoricalValidationRequested -= validationHandler;
+            window.PaperHandoffRequested -= paperHandler;
+        };
+    }
+
+    private void OpenAuthoringHistoricalValidation(
+        TradingTerminal.App.Authoring.StrategyAuthoringViewModel authoring)
+    {
+        if ((Application.Current as App)?.Services is not { } services)
+            return;
+        if (!authoring.TryCreateHistoricalValidationContext(out var context, out var reason) || context is null)
+        {
+            if (!string.IsNullOrWhiteSpace(reason)) authoring.Status = reason;
+            return;
+        }
+
+        var registration = services
+            .GetRequiredService<TradingTerminal.UI.Strategies.IStrategyKernelRegistry>()
+            .Find(authoring.AuthoredUnitSpecification!.UnitId);
+        if (registration is null)
+        {
+            authoring.Status = "The exact compiled strategy is no longer registered.";
+            return;
+        }
+
+        var backtest = services.GetRequiredService<TradingTerminal.Backtest.QuickBacktestViewModel>();
+        var window = services.GetRequiredService<TradingTerminal.Backtest.AvaloniaUi.QuickBacktestAvaloniaWindow>();
+        window.DataContext = backtest;
+        window.Title = $"Historical validation — {registration.DisplayName}";
+
+        Action<TradingTerminal.Backtest.QuickBacktestPaperLaunchRequest>? completed = null;
+        Action<TradingTerminal.Backtest.QuickBacktestPaperLaunchRequest>? paper = null;
+        completed = request =>
+        {
+            if (request.ValidationEvidence is { } evidence &&
+                !authoring.AcceptHistoricalValidationEvidence(evidence, request.TestedParameters, out var rejection))
+                authoring.Status = rejection;
+        };
+        paper = request =>
+        {
+            if (request.ValidationEvidence is null)
+            {
+                authoring.Status = "This replay is not bound to the current Strategy Workspace.";
+                return;
+            }
+            _ = OpenAuthoringPaperAsync(authoring, request.Registration, request.TestedParameters);
+        };
+        backtest.HistoricalValidationCompleted += completed;
+        backtest.PaperLaunchRequested += paper;
+        window.Closed += (_, _) =>
+        {
+            backtest.HistoricalValidationCompleted -= completed;
+            backtest.PaperLaunchRequested -= paper;
+        };
+        if (!backtest.Initialize(registration, context))
+        {
+            authoring.Status = backtest.Status;
+            window.Close();
+            backtest.Dispose();
+            return;
+        }
+        ShowDisposing(window, backtest);
+    }
+
+    private async Task OpenAuthoringPaperAsync(
+        TradingTerminal.App.Authoring.StrategyAuthoringViewModel authoring,
+        TradingTerminal.UI.Strategies.StrategyKernelRegistration? registration = null,
+        IReadOnlyDictionary<string, object?>? testedParameters = null)
+    {
+        if ((Application.Current as App)?.Services is not { } services) return;
+        registration ??= authoring.AuthoredUnitSpecification is { } specification
+            ? services.GetRequiredService<TradingTerminal.UI.Strategies.IStrategyKernelRegistry>().Find(specification.UnitId)
+            : null;
+        testedParameters ??= authoring.ValidatedPaperParameters;
+        if (registration is null || testedParameters is null)
+        {
+            authoring.Status = "The exact validated strategy and tested parameters are unavailable. Run historical validation again.";
+            return;
+        }
+
+        try
+        {
+            var book = services
+                .GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperExecutionBookManager>()
+                .SelectedBook;
+            if (!authoring.BindValidatedPaperBook(book.Id, book.AccountId, out var reason))
+            {
+                authoring.Status = reason;
+                return;
+            }
+            await OpenPaperStrategyRunnerAsync(registration, testedParameters, book.Id);
+        }
+        catch (Exception exception)
+        {
+            authoring.Status = $"The selected Paper book could not be opened: {exception.Message}";
+        }
     }
 
     private void OnVolumeFootprint(object? sender, RoutedEventArgs e)
@@ -546,11 +705,8 @@ public partial class MainWindow : Window
     {
         if ((Application.Current as App)?.Services is not { } sp) return;
         var vm = sp.GetRequiredService<TradingTerminal.App.Authoring.StrategyAuthoringViewModel>();
-        var window = new Settings.StrategyAuthoringWindow
-        {
-            DataContext = vm,
-            ShowSimulatedDataBanner = Vm?.IsSimulatedActive == true,
-        };
+        var window = CreateAuthoringWindow(vm);
+        WireResearchChartRequest(vm, window);
         ShowDisposing(window, vm);
         Vm?.ActivityLog.Append("Tools", "INFO", "Opened Strategy authoring.");
     }

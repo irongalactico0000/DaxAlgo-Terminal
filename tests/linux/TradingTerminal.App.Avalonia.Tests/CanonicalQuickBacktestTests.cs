@@ -71,6 +71,40 @@ public sealed class CanonicalQuickBacktestTests
     }
 
     [Fact]
+    public async Task Builder_validation_emits_an_exact_context_bound_receipt()
+    {
+        var kernel = new ParameterCaptureBarKernel();
+        var registration = Registration(kernel);
+        var kernels = new StrategyKernelRegistry();
+        kernels.Register(registration);
+        var viewModel = new QuickBacktestViewModel(
+            new EmptyLegacyRegistry(),
+            new CapturingSession(),
+            new FixedBrokerSelector(new HistoricalBarClient()),
+            kernels,
+            new MemoryInstrumentRegistry(new Instrument(
+                InstrumentId, "SPY", AssetClass.Equity, "ARCA", "USD", 0.01d, 1d)),
+            NullLogger<QuickBacktestViewModel>.Instance);
+        var context = new HistoricalValidationContextV1(
+            "spy-workspace",
+            AuthoredUnitSpecificationCanonicalJsonV1.Hash(registration.AuthoredSpecification),
+            new string('b', 64),
+            new string('c', 64));
+        QuickBacktestPaperLaunchRequest? completed = null;
+        viewModel.HistoricalValidationCompleted += request => completed = request;
+
+        Assert.True(viewModel.Initialize(registration, context));
+        await viewModel.RunAsync();
+
+        Assert.NotNull(completed?.ValidationEvidence);
+        Assert.Equal(context, completed!.ValidationEvidence!.Context);
+        Assert.Equal(QuickBacktestDataMode.BarSynthetic.ToString(), completed.ValidationEvidence.DataMode);
+        Assert.Equal(DateTimeKind.Utc, completed.ValidationEvidence.FromUtc.Kind);
+        Assert.True(completed.ValidationEvidence.TradeCount >= 0);
+        HistoricalValidationEvidenceValidatorV1.RequireValid(completed.ValidationEvidence);
+    }
+
+    [Fact]
     public async Task Catalog_pair_strategy_fetches_every_reviewed_history_and_builds_one_multi_series_replay()
     {
         var registration = PairRegistration(new EmptyPairKernel());

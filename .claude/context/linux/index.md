@@ -3,7 +3,7 @@
 Primary source map for `src/linux/` and `tests/linux/`. This repository has no Windows tree.
 Paths are relative to the repository root.
 
-Generated from source fingerprint `e91d50e75733`: **66 projects / 1275 files / 235204 LOC**.
+Generated from source fingerprint `1ddf0170457d`: **66 projects / 1290 files / 239016 LOC**.
 Indexed extensions: `.cs`, `.xaml`, `.axaml`. Regenerate with `bash .claude/context/gen-context-linux.sh`.
 
 ## Groups
@@ -12,52 +12,52 @@ Indexed extensions: `.cs`, `.xaml`, `.axaml`. Regenerate with `bash .claude/cont
 |---|---:|---|
 | [AI](index/AI.md) | 88 | DaxAlgo.Daxq.Contracts, DaxAlgo.Daxq.Host, DaxAlgo.Daxq.Vm, DaxAlgo.FootprintTransformer, TradingTerminal.Ai, TradingTerminal.Ai.BacktestAnalysis, TradingTerminal.Ai.Coordinator, TradingTerminal.Ai.Coordinator.Client, TradingTerminal.Ai.Coordinator.Contracts, TradingTerminal.Ai.FactorResearch, TradingTerminal.Ai.MarketAnalyst, TradingTerminal.Ai.MlFeatures, TradingTerminal.Ai.PaperLab |
 | [Backtest](index/Backtest.md) | 57 | TradingTerminal.Backtest.Cli, TradingTerminal.Backtest.Client, TradingTerminal.Backtest.Engine, TradingTerminal.Backtest.Protocol, TradingTerminal.Backtest.Worker, TradingTerminal.TradeIr.Runtime |
-| [Charts](index/Charts.md) | 44 | TradingTerminal.BubbleChart, TradingTerminal.Charts, TradingTerminal.Heatmap, TradingTerminal.OrderBook, TradingTerminal.SurfaceLab, TradingTerminal.VolumeFootprint |
-| [Core](index/Core.md) | 306 | TradingTerminal.Core |
-| [Pipeline](index/Pipeline.md) | 183 | TradingTerminal.Infrastructure, TradingTerminal.MarketData, TradingTerminal.Sandbox |
+| [Charts](index/Charts.md) | 46 | TradingTerminal.BubbleChart, TradingTerminal.Charts, TradingTerminal.Heatmap, TradingTerminal.OrderBook, TradingTerminal.SurfaceLab, TradingTerminal.VolumeFootprint |
+| [Core](index/Core.md) | 310 | TradingTerminal.Core |
+| [Pipeline](index/Pipeline.md) | 184 | TradingTerminal.Infrastructure, TradingTerminal.MarketData, TradingTerminal.Sandbox |
 | [Sandbox](index/Sandbox.md) | 13 | TradingTerminal.Sandbox.Portfolio, TradingTerminal.Sandbox.Runtime |
 | [Sdk](index/Sdk.md) | 36 | DaxAlgo.Package, DaxAlgo.Sdk, DaxAlgo.Strategy.Bundle |
 | [Shell](index/Shell.md) | 142 | TradingTerminal.Accounts, TradingTerminal.App.Avalonia, TradingTerminal.Login |
-| [Tests](index/Tests.md) | 208 | DaxAlgo.Daxq.Compiler.Tests, DaxAlgo.Daxq.Contracts.Tests, DaxAlgo.Daxq.Host.Tests, DaxAlgo.Daxq.Vm.Tests, DaxAlgo.Package.Tests, DaxAlgo.SamplePlugin, DaxAlgo.Sdk.Drawing.Tests, TradingTerminal.App.Avalonia.Tests, TradingTerminal.Sandbox.Portfolio.Tests, TradingTerminal.Sandbox.Runtime.Tests, TradingTerminal.Sandbox.Tests, TradingTerminal.Tests.Headless, TradingTerminal.UI.Core.Tests |
+| [Tests](index/Tests.md) | 213 | DaxAlgo.Daxq.Compiler.Tests, DaxAlgo.Daxq.Contracts.Tests, DaxAlgo.Daxq.Host.Tests, DaxAlgo.Daxq.Vm.Tests, DaxAlgo.Package.Tests, DaxAlgo.SamplePlugin, DaxAlgo.Sdk.Drawing.Tests, TradingTerminal.App.Avalonia.Tests, TradingTerminal.Sandbox.Portfolio.Tests, TradingTerminal.Sandbox.Runtime.Tests, TradingTerminal.Sandbox.Tests, TradingTerminal.Tests.Headless, TradingTerminal.UI.Core.Tests |
 | [Tools](index/Tools.md) | 121 | DaxAlgo.Codegen, DaxAlgo.Coordinator.Cli, DaxAlgo.Daxq.Compiler, DaxAlgo.Strategy.BundleTool, DaxAlgo.StrategyTool, TradingTerminal.AdvancedMarketRegime, TradingTerminal.Backtest, TradingTerminal.BacktestStudio, TradingTerminal.Correlation, TradingTerminal.LseBacktest, TradingTerminal.QuantConnect, TradingTerminal.Recording |
-| [UI](index/UI.md) | 77 | TradingTerminal.Settings, TradingTerminal.StrategyComposer, TradingTerminal.UI.Avalonia, TradingTerminal.UI.Core |
+| [UI](index/UI.md) | 80 | TradingTerminal.Settings, TradingTerminal.StrategyComposer, TradingTerminal.UI.Avalonia, TradingTerminal.UI.Core |
 
 ## Project rollup
 
 | Project | Group | Role | LOC | Files |
 |---|---|---|---:|---:|
-| TradingTerminal.Core | Core | product | 35665 | 306 |
-| TradingTerminal.Tests.Headless | Tests | test | 29129 | 136 |
-| TradingTerminal.Infrastructure | Pipeline | product | 23921 | 135 |
-| TradingTerminal.App.Avalonia | Shell | product | 13259 | 83 |
-| TradingTerminal.Settings | UI | product | 10970 | 23 |
-| DaxAlgo.Codegen | Tools | product | 9655 | 29 |
-| TradingTerminal.App.Avalonia.Tests | Tests | test | 8052 | 22 |
+| TradingTerminal.Core | Core | product | 36499 | 310 |
+| TradingTerminal.Tests.Headless | Tests | test | 29635 | 139 |
+| TradingTerminal.Infrastructure | Pipeline | product | 24222 | 136 |
+| TradingTerminal.App.Avalonia | Shell | product | 13710 | 83 |
+| TradingTerminal.Settings | UI | product | 11814 | 26 |
+| DaxAlgo.Codegen | Tools | product | 9687 | 29 |
+| TradingTerminal.App.Avalonia.Tests | Tests | test | 8400 | 24 |
 | TradingTerminal.MarketData | Pipeline | product | 6306 | 39 |
 | TradingTerminal.Ai.Coordinator | AI | product | 6087 | 18 |
 | TradingTerminal.UI.Core | UI | product | 5465 | 37 |
 | DaxAlgo.Daxq.Host | AI | product | 5348 | 15 |
 | DaxAlgo.Daxq.Compiler | Tools | product | 4860 | 17 |
-| TradingTerminal.Backtest.Engine | Backtest | product | 4149 | 31 |
+| TradingTerminal.Backtest.Engine | Backtest | product | 4164 | 31 |
 | DaxAlgo.Strategy.Bundle | Sdk | product | 4055 | 15 |
 | TradingTerminal.Login | Shell | product | 3949 | 49 |
 | DaxAlgo.Daxq.Vm | AI | product | 3683 | 5 |
 | TradingTerminal.Sandbox | Pipeline | product | 3240 | 9 |
-| TradingTerminal.Sandbox.Runtime | Sandbox | product | 2738 | 8 |
-| TradingTerminal.Sandbox.Runtime.Tests | Tests | test | 2647 | 7 |
+| TradingTerminal.Sandbox.Runtime | Sandbox | product | 2735 | 8 |
+| TradingTerminal.Sandbox.Runtime.Tests | Tests | test | 2645 | 7 |
+| TradingTerminal.Charts | Charts | product | 2086 | 11 |
 | TradingTerminal.Accounts | Shell | product | 2071 | 10 |
 | TradingTerminal.SurfaceLab | Charts | product | 2044 | 8 |
 | DaxAlgo.Daxq.Vm.Tests | Tests | test | 2028 | 8 |
 | TradingTerminal.Sandbox.Tests | Tests | test | 1952 | 5 |
 | TradingTerminal.VolumeFootprint | Charts | product | 1947 | 7 |
 | DaxAlgo.Daxq.Host.Tests | Tests | test | 1772 | 6 |
-| TradingTerminal.Sandbox.Portfolio.Tests | Tests | test | 1722 | 4 |
+| TradingTerminal.Backtest | Tools | product | 1728 | 11 |
+| TradingTerminal.Sandbox.Portfolio.Tests | Tests | test | 1718 | 4 |
 | DaxAlgo.Sdk | Sdk | product | 1710 | 16 |
 | TradingTerminal.Correlation | Tools | product | 1705 | 11 |
-| TradingTerminal.Sandbox.Portfolio | Sandbox | product | 1693 | 5 |
-| TradingTerminal.Charts | Charts | product | 1678 | 9 |
+| TradingTerminal.Sandbox.Portfolio | Sandbox | product | 1688 | 5 |
 | TradingTerminal.Heatmap | Charts | product | 1647 | 8 |
-| TradingTerminal.Backtest | Tools | product | 1641 | 11 |
 | TradingTerminal.BacktestStudio | Tools | product | 1631 | 13 |
 | TradingTerminal.Backtest.Client | Backtest | product | 1592 | 6 |
 | TradingTerminal.Backtest.Worker | Backtest | product | 1404 | 7 |

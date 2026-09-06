@@ -1,6 +1,6 @@
 # TradingTerminal.Backtest — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `e91d50e75733`. Declaration lines only;
+Generated from source fingerprint `1ddf0170457d`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Tools/TradingTerminal.Backtest/AvaloniaUi/BacktestAvaloniaWindow.axaml.cs
@@ -50,30 +50,34 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 ## src/linux/Tools/TradingTerminal.Backtest/QuickBacktestViewModel.cs
 ```cs
    27: public enum QuickBacktestDataMode
-   50: public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
-   64: public QuickBacktestViewModel(
-  112: public ObservableCollection<SignalInstrument> Instruments { get; }
-  113: public ObservableCollection<BarSize> BarSizes { get; }
-  114: public ObservableCollection<LookbackOption> Lookbacks { get; }
-  115: public ObservableCollection<QuickBacktestDataMode> DataModes { get; }
-  116: public ObservableCollection<BrokerKind> Brokers { get; }
-  117: public ObservableCollection<Trade> Trades { get; }
-  118: public ObservableCollection<EquityPoint> EquityCurve { get; }
-  152: public bool IsFullTape => SelectedDataMode == QuickBacktestDataMode.FullTapeRealTrades;
-  153: public bool IsBarSynthetic => SelectedDataMode == QuickBacktestDataMode.BarSynthetic;
-  154: public bool IsAuthoredStrategy => _kernelOption is not null;
-  155: public bool CanSelectInstrument => !IsAuthoredStrategy && !IsRunning;
-  156: public bool CanSelectBarSize => !IsAuthoredStrategy && !IsRunning;
-  157: public IReadOnlyList<ParameterEditorItem> EditableParameters => Parameters?.Items
-  160: public bool HasStrategyParameters => EditableParameters.Count != 0;
-  161: public bool CanEditParameters => HasStrategyParameters && !IsRunning;
-  162: public string ReviewedInstrumentSummary => _canonicalSelections.Count == 0
-  191: public event EventHandler? EquityCurveUpdated;
-  199: public bool Initialize(string? backtestStrategyId, string displayName, bool preferFullTape)
-  238: public bool Initialize(StrategyKernelRegistration registration)
-  395: public async Task RunAsync()
-  605: public void Cancel() => _runCts?.Cancel();
-  608: public void Dispose()
-  677: public sealed record LookbackOption(string Label, TimeSpan Duration)
-  679: public override string ToString() => Label;
+   46: public sealed record QuickBacktestPaperLaunchRequest(
+   62: public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
+   78: public QuickBacktestViewModel(
+  126: public ObservableCollection<SignalInstrument> Instruments { get; }
+  127: public ObservableCollection<BarSize> BarSizes { get; }
+  128: public ObservableCollection<LookbackOption> Lookbacks { get; }
+  129: public ObservableCollection<QuickBacktestDataMode> DataModes { get; }
+  130: public ObservableCollection<BrokerKind> Brokers { get; }
+  131: public ObservableCollection<Trade> Trades { get; }
+  132: public ObservableCollection<EquityPoint> EquityCurve { get; }
+  166: public bool IsFullTape => SelectedDataMode == QuickBacktestDataMode.FullTapeRealTrades;
+  167: public bool IsBarSynthetic => SelectedDataMode == QuickBacktestDataMode.BarSynthetic;
+  168: public bool IsAuthoredStrategy => _kernelOption is not null;
+  169: public bool CanSelectInstrument => !IsAuthoredStrategy && !IsRunning;
+  170: public bool CanSelectBarSize => !IsAuthoredStrategy && !IsRunning;
+  171: public IReadOnlyList<ParameterEditorItem> EditableParameters => Parameters?.Items
+  174: public bool HasStrategyParameters => EditableParameters.Count != 0;
+  175: public bool CanEditParameters => HasStrategyParameters && !IsRunning;
+  176: public bool CanRunTestedStrategyInPaper => _paperLaunchRequest is not null && !IsRunning;
+  177: public string ReviewedInstrumentSummary => _canonicalSelections.Count == 0
+  206: public event EventHandler? EquityCurveUpdated;
+  207: public event Action<QuickBacktestPaperLaunchRequest>? PaperLaunchRequested;
+  208: public event Action<QuickBacktestPaperLaunchRequest>? HistoricalValidationCompleted;
+  216: public bool Initialize(string? backtestStrategyId, string displayName, bool preferFullTape)
+  257: public bool Initialize(
+  420: public async Task RunAsync()
+  669: public void Cancel() => _runCts?.Cancel();
+  686: public void Dispose()
+  759: public sealed record LookbackOption(string Label, TimeSpan Duration)
+  761: public override string ToString() => Label;
 ```

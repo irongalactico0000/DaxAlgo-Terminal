@@ -1,6 +1,6 @@
 # TradingTerminal.Core / Strategies — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `e91d50e75733`. Declaration lines only;
+Generated from source fingerprint `1ddf0170457d`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Core/TradingTerminal.Core/Strategies/Authoring/AiModelChoice.cs
@@ -407,40 +407,40 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
   187: public sealed record AuthoredUnitSpecificationIssueV1(string Code, string Path, string Message);
   193: public sealed record AuthoredUnitInstrumentCandidateV1(
   206: public sealed record AuthoredUnitSpecificationGenerationRequestV1(
-  215: public sealed record AuthoredUnitSpecificationGenerationIssueV1(
-  220: public sealed record AuthoredUnitSpecificationGenerationResultV1(
-  226: public bool Success => Specification is not null && Issues.Count == 0;
-  233: public interface IAuthoredUnitSpecificationGeneratorV1
-  235:     Task<AuthoredUnitSpecificationGenerationResultV1> GenerateAsync(
-  236:     IStrategyCodegenClient provider,
-  237:     AuthoredUnitSpecificationGenerationRequestV1 request,
-  238:     CancellationToken cancellationToken = default);
-  242: public sealed record AuthoredUnitIntentClassificationV1(
-  248: public sealed record AuthoredUnitIntentClassificationResultV1(
-  253: public bool Success => Classification is not null &&
-  258: public interface IAuthoredUnitIntentClassifierV1
-  260:     Task<AuthoredUnitIntentClassificationResultV1> ClassifyAsync(
-  261:     IStrategyCodegenClient provider,
-  262:     string rawRequest,
-  263:     IReadOnlyList<AuthoredChartReferenceV1>? chartReferences = null,
-  264:     CancellationToken cancellationToken = default);
-  271: public sealed record AuthoredUnitSourceGenerationRequestV1(
-  274: public sealed record AuthoredUnitSourceGenerationIssueV1(
-  284: public sealed record AuthoredUnitSourceGenerationResultV1(
-  291: public bool Success => Script is not null &&
-  300: public interface IAuthoredUnitSourceGeneratorV1
-  302:     Task<AuthoredUnitSourceGenerationResultV1> GenerateAsync(
-  303:     IStrategyCodegenClient provider,
-  304:     AuthoredUnitSourceGenerationRequestV1 request,
-  305:     CancellationToken cancellationToken = default);
-  309: public static class AuthoredUnitSpecificationValidatorV1
-  317: public static IReadOnlyList<AuthoredUnitSpecificationIssueV1> Validate(
-  321: public static IReadOnlyList<AuthoredUnitSpecificationIssueV1> ValidateForLaunch(
-  761: public static class AuthoredUnitSpecificationCanonicalJsonV1
-  763: public static string Serialize(AuthoredUnitSpecificationV1 specification) =>
-  766: public static AuthoredUnitSpecificationV1 Deserialize(string json) =>
-  769: public static string Hash(AuthoredUnitSpecificationV1 specification) =>
-  772: public static string Canonicalize(string json) =>
+  216: public sealed record AuthoredUnitSpecificationGenerationIssueV1(
+  221: public sealed record AuthoredUnitSpecificationGenerationResultV1(
+  227: public bool Success => Specification is not null && Issues.Count == 0;
+  234: public interface IAuthoredUnitSpecificationGeneratorV1
+  236:     Task<AuthoredUnitSpecificationGenerationResultV1> GenerateAsync(
+  237:     IStrategyCodegenClient provider,
+  238:     AuthoredUnitSpecificationGenerationRequestV1 request,
+  239:     CancellationToken cancellationToken = default);
+  243: public sealed record AuthoredUnitIntentClassificationV1(
+  249: public sealed record AuthoredUnitIntentClassificationResultV1(
+  254: public bool Success => Classification is not null &&
+  259: public interface IAuthoredUnitIntentClassifierV1
+  261:     Task<AuthoredUnitIntentClassificationResultV1> ClassifyAsync(
+  262:     IStrategyCodegenClient provider,
+  263:     string rawRequest,
+  264:     IReadOnlyList<AuthoredChartReferenceV1>? chartReferences = null,
+  265:     CancellationToken cancellationToken = default);
+  272: public sealed record AuthoredUnitSourceGenerationRequestV1(
+  275: public sealed record AuthoredUnitSourceGenerationIssueV1(
+  285: public sealed record AuthoredUnitSourceGenerationResultV1(
+  292: public bool Success => Script is not null &&
+  301: public interface IAuthoredUnitSourceGeneratorV1
+  303:     Task<AuthoredUnitSourceGenerationResultV1> GenerateAsync(
+  304:     IStrategyCodegenClient provider,
+  305:     AuthoredUnitSourceGenerationRequestV1 request,
+  306:     CancellationToken cancellationToken = default);
+  310: public static class AuthoredUnitSpecificationValidatorV1
+  318: public static IReadOnlyList<AuthoredUnitSpecificationIssueV1> Validate(
+  322: public static IReadOnlyList<AuthoredUnitSpecificationIssueV1> ValidateForLaunch(
+  762: public static class AuthoredUnitSpecificationCanonicalJsonV1
+  764: public static string Serialize(AuthoredUnitSpecificationV1 specification) =>
+  767: public static AuthoredUnitSpecificationV1 Deserialize(string json) =>
+  770: public static string Hash(AuthoredUnitSpecificationV1 specification) =>
+  773: public static string Canonicalize(string json) =>
 ```
 
 ## src/linux/Core/TradingTerminal.Core/Strategies/Generation/ChartPatternSimilarityV1.cs
@@ -525,6 +525,63 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
  1064: public static IReadOnlyList<StrategyIntentQuestionV1> Questions(
 ```
 
+## src/linux/Core/TradingTerminal.Core/Strategies/Generation/HistoricalValidationEvidenceV1.cs
+```cs
+    9: public sealed record HistoricalValidationContextV1(
+   19: public sealed record HistoricalValidationEvidenceV1(
+   33: public const string CurrentSchemaVersion = "historical-validation-evidence/v1";
+   36: public static class HistoricalValidationEvidenceCanonicalJsonV1
+   38: public static string Serialize(HistoricalValidationEvidenceV1 value) =>
+   41: public static HistoricalValidationEvidenceV1 Deserialize(string json)
+   48: public static string Hash(HistoricalValidationEvidenceV1 value) =>
+   52: public static class HistoricalValidationEvidenceValidatorV1
+   54: public static void RequireValid(HistoricalValidationEvidenceV1 value)
+```
+
+## src/linux/Core/TradingTerminal.Core/Strategies/Generation/ResearchDatasetV1.cs
+```cs
+    7: public enum ResearchEventLabelKindV1
+   15: public enum ResearchEventLabelSourceV1
+   26: public sealed record ResearchChartSelectionV1(
+   36: public sealed record ResearchEventSampleV1(
+   45: public const string CurrentSchemaVersion = "research-event-sample/v1";
+   49: public sealed record ResearchLeakagePolicyV1(
+   55: public static ResearchLeakagePolicyV1 SafeDefault { get; } = new(
+   62: public sealed record ResearchDatasetDefinitionV1(
+   70: public const string CurrentSchemaVersion = "research-dataset/v1";
+   73: public sealed record ResearchDatasetIssueV1(string Code, string Path, string Message);
+   75: public static class ResearchDatasetCanonicalJsonV1
+   77: public static string Serialize(ResearchDatasetDefinitionV1 value) =>
+   80: public static ResearchDatasetDefinitionV1 Deserialize(string json)
+   87: public static string Hash(ResearchDatasetDefinitionV1 value) =>
+   91: public static class ResearchDatasetValidatorV1
+   93: public static IReadOnlyList<ResearchDatasetIssueV1> Validate(
+  141: public static void RequireStructurallyValid(ResearchDatasetDefinitionV1 dataset)
+  148: public static void RequireValidSelection(ResearchChartSelectionV1 selection)
+```
+
+## src/linux/Core/TradingTerminal.Core/Strategies/Generation/ResearchExperimentV1.cs
+```cs
+    5: public sealed record ResearchFeatureDefinitionV1(
+   10: public sealed record ResearchFeatureTransformV1(
+   15: public sealed record ResearchFeatureWeightV1(
+   20: public sealed record ResearchFeatureVectorV1(
+   32: public sealed record ResearchChronologicalSplitV1(
+   44: public sealed record ResearchExperimentEvidenceV1(
+   58: public const string CurrentSchemaVersion = "research-experiment/v1";
+   59: public const string NonPromotionalStatement =
+   63: public interface IResearchExperimentRunnerV1
+   65:     Task<ResearchExperimentEvidenceV1> RunAsync(
+   66:     ResearchDatasetDefinitionV1 dataset,
+   67:     CancellationToken cancellationToken = default);
+   70: public static class ResearchExperimentCanonicalJsonV1
+   72: public static string Serialize(ResearchExperimentEvidenceV1 value) =>
+   75: public static ResearchExperimentEvidenceV1 Deserialize(string json)
+   82: public static string Hash(ResearchExperimentEvidenceV1 value) =>
+   86: public static class ResearchExperimentValidatorV1
+   88: public static void RequireValid(ResearchExperimentEvidenceV1 evidence)
+```
+
 ## src/linux/Core/TradingTerminal.Core/Strategies/Generation/StrategyCandidateCompositionV1.cs
 ```cs
     8: public sealed record StrategySpecialistRequestV1(
@@ -593,6 +650,31 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
    34: public static class StrategyCandidateValidatorV1
    36: public static StrategyCandidateAssessmentV1 Assess(StrategyCandidateV1? candidate)
    92: public static IReadOnlyList<StrategyCandidateIssueV1> ValidateWorkspace(StrategyGenerationWorkspaceV1? workspace)
+```
+
+## src/linux/Core/TradingTerminal.Core/Strategies/Generation/StrategyWorkspaceV1.cs
+```cs
+    6: public enum StrategyWorkspaceStageV1
+   16: public enum StrategyWorkspaceStageRequirementV1
+   23: public enum StrategyWorkspaceStageStateV1
+   36: public enum StrategyWorkspaceChangeKindV1
+   55: public sealed record StrategyWorkspaceBindingsV1(
+   68: public sealed record StrategyWorkspaceStageSnapshotV1(
+   79: public sealed record StrategyWorkspaceRevisionV1(
+   91: public const string CurrentSchemaVersion = "strategy-workspace/v1";
+   93: public StrategyWorkspaceStageSnapshotV1 Stage(StrategyWorkspaceStageV1 stage) =>
+   97: public sealed record StrategyWorkspaceIssueV1(string Code, string Path, string Message);
+   99: public static class StrategyWorkspaceCanonicalJsonV1
+  101: public static string Serialize(StrategyWorkspaceRevisionV1 value) =>
+  104: public static StrategyWorkspaceRevisionV1 Deserialize(string json)
+  111: public static string Hash(StrategyWorkspaceRevisionV1 value) =>
+  114: public static string HashArtifact(object value) =>
+  119: public static class StrategyWorkspaceRevisionPolicyV1
+  121: public static StrategyWorkspaceRevisionV1 Create(
+  147: public static StrategyWorkspaceRevisionV1 Revise(
+  185: public static StrategyWorkspaceBindingsV1 InvalidateDownstream(
+  255: public static IReadOnlyList<StrategyWorkspaceIssueV1> Validate(StrategyWorkspaceRevisionV1? value)
+  294: public static void RequireValid(StrategyWorkspaceRevisionV1 value)
 ```
 
 ## src/linux/Core/TradingTerminal.Core/Strategies/IPluginFaultAttribution.cs

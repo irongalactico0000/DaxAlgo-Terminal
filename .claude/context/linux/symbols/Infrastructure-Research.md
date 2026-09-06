@@ -1,6 +1,6 @@
 # TradingTerminal.Infrastructure / Research — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `e91d50e75733`. Declaration lines only;
+Generated from source fingerprint `1ddf0170457d`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Pipeline/TradingTerminal.Infrastructure/Research/Bridge/ReproSignalBridge.cs
@@ -97,4 +97,10 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
    13: public SandboxKind Kind => SandboxKind.Wsl2;
    15: public bool IsAvailable => false;
    17: public Task<ReproResult> RunAsync(
+```
+
+## src/linux/Pipeline/TradingTerminal.Infrastructure/Research/StrategyResearchExperimentRunnerV1.cs
+```cs
+   13: public sealed class StrategyResearchExperimentRunnerV1(IMarketDataStore store) : IResearchExperimentRunnerV1
+   30: public async Task<ResearchExperimentEvidenceV1> RunAsync(
 ```

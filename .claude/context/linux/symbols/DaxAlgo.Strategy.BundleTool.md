@@ -1,6 +1,6 @@
 # DaxAlgo.Strategy.BundleTool — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `e91d50e75733`. Declaration lines only;
+Generated from source fingerprint `1ddf0170457d`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Tools/DaxAlgo.Strategy.BundleTool/Program.cs

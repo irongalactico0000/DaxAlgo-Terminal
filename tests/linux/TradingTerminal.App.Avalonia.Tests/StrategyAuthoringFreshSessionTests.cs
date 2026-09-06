@@ -246,6 +246,12 @@ public sealed class StrategyAuthoringFreshSessionTests
         viewModel.CachedTokens.Should().Be(0);
         viewModel.WorkbenchTab.Should().Be(3, "a fresh Design screen must select the visible Request tab");
         viewModel.IsDesignScreen.Should().BeTrue();
+        viewModel.IsBriefStage.Should().BeTrue();
+        viewModel.ActiveScreenTitle.Should().Be("Brief");
+        viewModel.StrategyWorkspace.WorkspaceId.Should().Be("myStrategy");
+        viewModel.StrategyWorkspace.Stages.Should().HaveCount(6);
+        viewModel.ValidateStageState.Should().Be("LOCKED");
+        viewModel.PaperStageState.Should().Be("LOCKED");
         viewModel.Messages.Should().BeEmpty();
         viewModel.Activity.Should().BeEmpty();
         viewModel.Tasks.Should().BeEmpty();

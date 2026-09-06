@@ -101,6 +101,8 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
     private AuthoredUnitFeedLease? _feedLease;
     private int _disposed;
 
+    public string BookId => _bookId;
+
     public PaperStrategyRunnerViewModel(
         IBacktestStrategyRegistry strategyRegistry,
         IMarketDataHub hub,

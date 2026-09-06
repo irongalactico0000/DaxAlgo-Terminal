@@ -1,6 +1,6 @@
 # macOS index / Tests
 
-Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
+Generated from source fingerprint `1ddf0170457d`. macOS/Avalonia source only.
 
 | File | LOC | Tree | Project | Role | Public surface | Purpose |
 |---|---:|---|---|---|---|---|
@@ -35,34 +35,36 @@ Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/AuthoredStrategyIntentFixture.cs` | 32 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/AuthoredVisualizerFeedLeaseTests.cs` | 589 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/AuthoringChartReferenceTests.cs` | 111 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
-| `tests/linux/TradingTerminal.App.Avalonia.Tests/AuthoringSessionMigrationTests.cs` | 65 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
+| `tests/linux/TradingTerminal.App.Avalonia.Tests/AuthoringSessionMigrationTests.cs` | 66 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/AvaloniaTestApplication.cs` | 39 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
-| `tests/linux/TradingTerminal.App.Avalonia.Tests/CandidateAuthoringUxContractTests.cs` | 545 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
+| `tests/linux/TradingTerminal.App.Avalonia.Tests/CandidateAuthoringUxContractTests.cs` | 600 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/CandidateRestoreRecoveryTests.cs` | 1053 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/CanonicalAuthoredStrategyGenerationTests.cs` | 432 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
-| `tests/linux/TradingTerminal.App.Avalonia.Tests/CanonicalQuickBacktestTests.cs` | 331 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
+| `tests/linux/TradingTerminal.App.Avalonia.Tests/CanonicalQuickBacktestTests.cs` | 373 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
+| `tests/linux/TradingTerminal.App.Avalonia.Tests/ChartResearchSelectionTests.cs` | 37 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/MacPackagingConfigurationTests.cs` | 305 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/NativeStrategyRunAuthoringTests.cs` | 485 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/PaperExecutionBooksTests.cs` | 328 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
-| `tests/linux/TradingTerminal.App.Avalonia.Tests/PaperExecutionConsoleSurfaceTests.cs` | 185 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
+| `tests/linux/TradingTerminal.App.Avalonia.Tests/PaperExecutionConsoleSurfaceTests.cs` | 195 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/PaperExecutionDesktopSessionTests.cs` | 233 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
-| `tests/linux/TradingTerminal.App.Avalonia.Tests/PaperStrategyRunnerTests.cs` | 778 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
+| `tests/linux/TradingTerminal.App.Avalonia.Tests/PaperStrategyRunnerTests.cs` | 849 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/RecorderCapabilityBindingTests.cs` | 33 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/RenderSurfaceViewTests.cs` | 122 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
-| `tests/linux/TradingTerminal.App.Avalonia.Tests/StrategyAuthoringFreshSessionTests.cs` | 312 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
-| `tests/linux/TradingTerminal.App.Avalonia.Tests/StrategyIntentAuthoringTests.cs` | 1019 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
+| `tests/linux/TradingTerminal.App.Avalonia.Tests/StrategyAuthoringFreshSessionTests.cs` | 318 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
+| `tests/linux/TradingTerminal.App.Avalonia.Tests/StrategyIntentAuthoringTests.cs` | 1029 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
+| `tests/linux/TradingTerminal.App.Avalonia.Tests/StrategyResearchDatasetAuthoringTests.cs` | 116 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/StrategyStarterCatalogTests.cs` | 219 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/ThemeManagerTests.cs` | 18 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.App.Avalonia.Tests/TradeIrBacktestAuthoringTests.cs` | 818 | linux | TradingTerminal.App.Avalonia.Tests | test | Y |  |
-| `tests/linux/TradingTerminal.Sandbox.Portfolio.Tests/GlobalUsings.cs` | 3 | linux | TradingTerminal.Sandbox.Portfolio.Tests | test | N |  |
-| `tests/linux/TradingTerminal.Sandbox.Portfolio.Tests/ModelPortfolioExitTests.cs` | 752 | linux | TradingTerminal.Sandbox.Portfolio.Tests | test | Y |  |
-| `tests/linux/TradingTerminal.Sandbox.Portfolio.Tests/ModelPortfolioSimulatorTests.cs` | 776 | linux | TradingTerminal.Sandbox.Portfolio.Tests | test | Y |  |
-| `tests/linux/TradingTerminal.Sandbox.Portfolio.Tests/PendingEntryTests.cs` | 191 | linux | TradingTerminal.Sandbox.Portfolio.Tests | test | Y | Resting entries: the four pending orders a trader expects (buy limit, sell |
+| `tests/linux/TradingTerminal.Sandbox.Portfolio.Tests/GlobalUsings.cs` | 2 | linux | TradingTerminal.Sandbox.Portfolio.Tests | test | N |  |
+| `tests/linux/TradingTerminal.Sandbox.Portfolio.Tests/ModelPortfolioExitTests.cs` | 751 | linux | TradingTerminal.Sandbox.Portfolio.Tests | test | Y |  |
+| `tests/linux/TradingTerminal.Sandbox.Portfolio.Tests/ModelPortfolioSimulatorTests.cs` | 775 | linux | TradingTerminal.Sandbox.Portfolio.Tests | test | Y |  |
+| `tests/linux/TradingTerminal.Sandbox.Portfolio.Tests/PendingEntryTests.cs` | 190 | linux | TradingTerminal.Sandbox.Portfolio.Tests | test | Y | Resting entries: the four pending orders a trader expects (buy limit, sell |
 | `tests/linux/TradingTerminal.Sandbox.Runtime.Tests/DurablePaperExecutionBookTargetIntakeTests.cs` | 123 | linux | TradingTerminal.Sandbox.Runtime.Tests | test | Y |  |
-| `tests/linux/TradingTerminal.Sandbox.Runtime.Tests/GlobalUsings.cs` | 6 | linux | TradingTerminal.Sandbox.Runtime.Tests | test | N |  |
+| `tests/linux/TradingTerminal.Sandbox.Runtime.Tests/GlobalUsings.cs` | 5 | linux | TradingTerminal.Sandbox.Runtime.Tests | test | N |  |
 | `tests/linux/TradingTerminal.Sandbox.Runtime.Tests/ModelPortfolioAccountTests.cs` | 422 | linux | TradingTerminal.Sandbox.Runtime.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.Sandbox.Runtime.Tests/PaperExecutionBookTargetIntakeTests.cs` | 293 | linux | TradingTerminal.Sandbox.Runtime.Tests | test | Y |  |
-| `tests/linux/TradingTerminal.Sandbox.Runtime.Tests/RecordingVirtualBookTests.cs` | 27 | linux | TradingTerminal.Sandbox.Runtime.Tests | test | Y |  |
+| `tests/linux/TradingTerminal.Sandbox.Runtime.Tests/RecordingVirtualBookTests.cs` | 26 | linux | TradingTerminal.Sandbox.Runtime.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.Sandbox.Runtime.Tests/SandboxExecutionReplicatorTests.cs` | 240 | linux | TradingTerminal.Sandbox.Runtime.Tests | test | Y |  |
 | `tests/linux/TradingTerminal.Sandbox.Runtime.Tests/SandboxStrategyRuntimeTests.cs` | 1536 | linux | TradingTerminal.Sandbox.Runtime.Tests | test | Y | Deadlock detector, NOT a performance assertion. Nothing here is asserting that the |
 | `tests/linux/TradingTerminal.Sandbox.Tests/PaperMarketDataExecutionBridgeTests.cs` | 325 | linux | TradingTerminal.Sandbox.Tests | test | Y |  |
@@ -97,7 +99,7 @@ Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 | `tests/linux/TradingTerminal.Tests.Headless/Backtesting/OptimizerTests.cs` | 74 | linux | TradingTerminal.Tests.Headless | test | Y | Covers the grid optimizer: Cartesian expansion, that it evaluates every combination, |
 | `tests/linux/TradingTerminal.Tests.Headless/Backtesting/PlatformFactAttributes.cs` | 11 | linux | TradingTerminal.Tests.Headless | test | Y |  |
 | `tests/linux/TradingTerminal.Tests.Headless/Backtesting/PythonStrategyTests.cs` | 72 | linux | TradingTerminal.Tests.Headless | test | Y | End-to-end check that a Python-authored strategy (daxalgo_bt example) runs on the new |
-| `tests/linux/TradingTerminal.Tests.Headless/Backtesting/StoreFeedAndPortfolioTests.cs` | 95 | linux | TradingTerminal.Tests.Headless | test | Y | Exercises the store-backed feed's k-way merge and the engine's multi-instrument (portfolio) |
+| `tests/linux/TradingTerminal.Tests.Headless/Backtesting/StoreFeedAndPortfolioTests.cs` | 153 | linux | TradingTerminal.Tests.Headless | test | Y | Exercises the store-backed feed's k-way merge and the engine's multi-instrument (portfolio) |
 | `tests/linux/TradingTerminal.Tests.Headless/Backtesting/TradeIrClosedLaneIntegrationTests.cs` | 202 | linux | TradingTerminal.Tests.Headless | test | Y |  |
 | `tests/linux/TradingTerminal.Tests.Headless/Backtesting/TradeIrExecutionPlanCompilerV1Tests.cs` | 368 | linux | TradingTerminal.Tests.Headless | test | Y |  |
 | `tests/linux/TradingTerminal.Tests.Headless/Backtesting/TradeIrRiskGatewayV1Tests.cs` | 671 | linux | TradingTerminal.Tests.Headless | test | Y |  |
@@ -191,6 +193,7 @@ Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 | `tests/linux/TradingTerminal.Tests.Headless/Strategies/ConfirmedStrategyIntentV1Tests.cs` | 1219 | linux | TradingTerminal.Tests.Headless | test | Y |  |
 | `tests/linux/TradingTerminal.Tests.Headless/Strategies/IndexRegimeAggregatorTests.cs` | 103 | linux | TradingTerminal.Tests.Headless | test | Y | Snapshot whose every timeframe column carries the trend score returned by |
 | `tests/linux/TradingTerminal.Tests.Headless/Strategies/ParallelStrategyCandidateGeneratorV1Tests.cs` | 2570 | linux | TradingTerminal.Tests.Headless | test | Y |  |
+| `tests/linux/TradingTerminal.Tests.Headless/Strategies/ResearchDatasetV1Tests.cs` | 83 | linux | TradingTerminal.Tests.Headless | test | Y |  |
 | `tests/linux/TradingTerminal.Tests.Headless/Strategies/RoslynAuthoredUnitCompilerV1Tests.cs` | 290 | linux | TradingTerminal.Tests.Headless | test | Y |  |
 | `tests/linux/TradingTerminal.Tests.Headless/Strategies/RoslynStrategyCompilerTests.cs` | 100 | linux | TradingTerminal.Tests.Headless | test | Y |  |
 | `tests/linux/TradingTerminal.Tests.Headless/Strategies/StrategyCandidateGenerationOrchestratorV1Tests.cs` | 464 | linux | TradingTerminal.Tests.Headless | test | Y |  |
@@ -199,7 +202,9 @@ Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 | `tests/linux/TradingTerminal.Tests.Headless/Strategies/StrategyCompilationAdmissionV1Tests.cs` | 373 | linux | TradingTerminal.Tests.Headless | test | Y |  |
 | `tests/linux/TradingTerminal.Tests.Headless/Strategies/StrategyOperatorRegistryIntegrityV1Tests.cs` | 188 | linux | TradingTerminal.Tests.Headless | test | Y |  |
 | `tests/linux/TradingTerminal.Tests.Headless/Strategies/StrategyParametersTests.cs` | 128 | linux | TradingTerminal.Tests.Headless | test | Y |  |
+| `tests/linux/TradingTerminal.Tests.Headless/Strategies/StrategyResearchExperimentRunnerV1Tests.cs` | 214 | linux | TradingTerminal.Tests.Headless | test | Y |  |
 | `tests/linux/TradingTerminal.Tests.Headless/Strategies/StrategySpecTests.cs` | 234 | linux | TradingTerminal.Tests.Headless | test | Y |  |
+| `tests/linux/TradingTerminal.Tests.Headless/Strategies/StrategyWorkspaceV1Tests.cs` | 151 | linux | TradingTerminal.Tests.Headless | test | Y |  |
 | `tests/linux/TradingTerminal.Tests.Headless/Strategies/TradeIrCoreContractsTests.cs` | 272 | linux | TradingTerminal.Tests.Headless | test | Y |  |
 | `tests/linux/TradingTerminal.Tests.Headless/Strategies/TradeIrDataBindingTests.cs` | 355 | linux | TradingTerminal.Tests.Headless | test | Y |  |
 | `tests/linux/TradingTerminal.Tests.Headless/TestSupport/ImmediateDispatcher.cs` | 11 | linux | TradingTerminal.Tests.Headless | test | Y | UI dispatcher stand-in for tests; runs everything inline on the calling thread. |

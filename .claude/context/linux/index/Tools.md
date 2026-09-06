@@ -1,6 +1,6 @@
 # macOS index / Tools
 
-Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
+Generated from source fingerprint `1ddf0170457d`. macOS/Avalonia source only.
 
 | File | LOC | Tree | Project | Role | Public surface | Purpose |
 |---|---:|---|---|---|---|---|
@@ -11,14 +11,14 @@ Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 | `src/linux/Tools/DaxAlgo.Codegen/AnthropicStreamParser.cs` | 111 | linux | DaxAlgo.Codegen | product | Y | Everything the model has written so far. |
 | `src/linux/Tools/DaxAlgo.Codegen/AuthoredUnitIntentClassifierV1.cs` | 119 | linux | DaxAlgo.Codegen | product | Y | Chooses the product lane before semantic strategy research begins. It cannot create |
 | `src/linux/Tools/DaxAlgo.Codegen/AuthoredUnitSourceGeneratorV1.cs` | 221 | linux | DaxAlgo.Codegen | product | Y | Converts one reviewed authored-unit specification into SDK source. The model may choose |
-| `src/linux/Tools/DaxAlgo.Codegen/AuthoredUnitSpecificationGeneratorV1.cs` | 419 | linux | DaxAlgo.Codegen | product | Y | AI-assisted lowering from reviewed language/reference evidence into a launchable authored-unit |
+| `src/linux/Tools/DaxAlgo.Codegen/AuthoredUnitSpecificationGeneratorV1.cs` | 441 | linux | DaxAlgo.Codegen | product | Y | AI-assisted lowering from reviewed language/reference evidence into a launchable authored-unit |
 | `src/linux/Tools/DaxAlgo.Codegen/ChartReferenceInspectorV1.cs` | 169 | linux | DaxAlgo.Codegen | product | Y | Sends the exact hash-verified image to a multimodal provider and accepts only |
 | `src/linux/Tools/DaxAlgo.Codegen/CliWorkspaceLauncher.cs` | 371 | linux | DaxAlgo.Codegen | product | Y | What |
 | `src/linux/Tools/DaxAlgo.Codegen/CodegenCodeExtractor.cs` | 148 | linux | DaxAlgo.Codegen | product | Y | A bare file name mentioned in prose/info strings — |
 | `src/linux/Tools/DaxAlgo.Codegen/FakeCodegenClient.cs` | 82 | linux | DaxAlgo.Codegen | product | Y | How many times the loop asked this client to generate — the |
 | `src/linux/Tools/DaxAlgo.Codegen/OpenAiCompatibleCodegenClient.cs` | 298 | linux | DaxAlgo.Codegen | product | Y | Every OpenAI-compatible endpoint (including Ollama) exposes |
 | `src/linux/Tools/DaxAlgo.Codegen/ParallelStrategyCandidateGeneratorV1.cs` | 1026 | linux | DaxAlgo.Codegen | product | Y | Conservative host-owned gate for the single optional repair call. It prefers stopping |
-| `src/linux/Tools/DaxAlgo.Codegen/ParallelStrategyGenerationContractsV1.cs` | 1063 | linux | DaxAlgo.Codegen | product | Y | The four authoring representations offered for every strategy brief. |
+| `src/linux/Tools/DaxAlgo.Codegen/ParallelStrategyGenerationContractsV1.cs` | 1073 | linux | DaxAlgo.Codegen | product | Y | The four authoring representations offered for every strategy brief. |
 | `src/linux/Tools/DaxAlgo.Codegen/ParallelStrategyGenerationPromptV1.cs` | 615 | linux | DaxAlgo.Codegen | product | Y |  |
 | `src/linux/Tools/DaxAlgo.Codegen/StrategyBacktestSmoke.cs` | 112 | linux | DaxAlgo.Codegen | product | Y | Ticks fed through |
 | `src/linux/Tools/DaxAlgo.Codegen/StrategyBuildSession.cs` | 469 | linux | DaxAlgo.Codegen | product | Y | What one turn of the conversation produced. |
@@ -67,14 +67,14 @@ Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 | `src/linux/Tools/TradingTerminal.Backtest/AvaloniaUi/BacktestAvaloniaWindow.axaml.cs` | 58 | linux | TradingTerminal.Backtest | product | Y | Avalonia (cross-platform) view for the Backtest tool — net9.0-leg counterpart to the |
 | `src/linux/Tools/TradingTerminal.Backtest/AvaloniaUi/BacktestAvaloniaWindow.axaml` | 40 | linux | TradingTerminal.Backtest | product | N | UI |
 | `src/linux/Tools/TradingTerminal.Backtest/AvaloniaUi/QuickBacktestAvaloniaWindow.axaml.cs` | 50 | linux | TradingTerminal.Backtest | product | Y |  |
-| `src/linux/Tools/TradingTerminal.Backtest/AvaloniaUi/QuickBacktestAvaloniaWindow.axaml` | 126 | linux | TradingTerminal.Backtest | product | N | UI |
+| `src/linux/Tools/TradingTerminal.Backtest/AvaloniaUi/QuickBacktestAvaloniaWindow.axaml` | 131 | linux | TradingTerminal.Backtest | product | N | UI |
 | `src/linux/Tools/TradingTerminal.Backtest/BacktestServiceCollectionExtensions.cs` | 27 | linux | TradingTerminal.Backtest | product | Y | DI registration for the Backtest tab. |
 | `src/linux/Tools/TradingTerminal.Backtest/BacktestView.xaml.cs` | 41 | linux | TradingTerminal.Backtest | product | Y |  |
 | `src/linux/Tools/TradingTerminal.Backtest/BacktestView.xaml` | 188 | linux | TradingTerminal.Backtest | product | N | UI |
 | `src/linux/Tools/TradingTerminal.Backtest/BacktestViewModel.cs` | 181 | linux | TradingTerminal.Backtest | product | Y | Raised after a run completes so the view can redraw the ScottPlot |
 | `src/linux/Tools/TradingTerminal.Backtest/QuickBacktestView.xaml.cs` | 37 | linux | TradingTerminal.Backtest | product | Y |  |
 | `src/linux/Tools/TradingTerminal.Backtest/QuickBacktestView.xaml` | 213 | linux | TradingTerminal.Backtest | product | N | UI |
-| `src/linux/Tools/TradingTerminal.Backtest/QuickBacktestViewModel.cs` | 680 | linux | TradingTerminal.Backtest | product | Y | How the Quick-backtest sources its replay data. |
+| `src/linux/Tools/TradingTerminal.Backtest/QuickBacktestViewModel.cs` | 762 | linux | TradingTerminal.Backtest | product | Y | How the Quick-backtest sources its replay data. |
 | `src/linux/Tools/TradingTerminal.BacktestStudio/AvaloniaUi/BacktestStudioAvaloniaWindow.axaml.cs` | 11 | linux | TradingTerminal.BacktestStudio | product | Y | Avalonia (cross-platform) view for Backtest Studio — net9.0-leg counterpart to the WPF |
 | `src/linux/Tools/TradingTerminal.BacktestStudio/AvaloniaUi/BacktestStudioAvaloniaWindow.axaml` | 83 | linux | TradingTerminal.BacktestStudio | product | N | UI |
 | `src/linux/Tools/TradingTerminal.BacktestStudio/AxisRowViewModel.cs` | 28 | linux | TradingTerminal.BacktestStudio | product | Y | One row in the optimization axis editor: a parameter the user can |

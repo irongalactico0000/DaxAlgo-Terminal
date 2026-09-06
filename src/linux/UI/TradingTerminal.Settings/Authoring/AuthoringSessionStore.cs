@@ -68,9 +68,12 @@ public sealed record AuthoringSessionSnapshot(
     string? AuthoredUnitSpecificationJson = null,
     IReadOnlyList<AuthoredChartReferenceInspectionV1>? ChartReferenceInspections = null,
     ChartPatternSearchResultV1? ChartPatternSearchResult = null,
-    IReadOnlyList<ChartPatternSelectionV1>? ChartPatternSelections = null)
+    IReadOnlyList<ChartPatternSelectionV1>? ChartPatternSelections = null,
+    string? StrategyWorkspaceJson = null,
+    string? ResearchDatasetJson = null,
+    string? ResearchExperimentJson = null)
 {
-    public const int CurrentAuthoringUxVersion = 2;
+    public const int CurrentAuthoringUxVersion = 3;
 
     [JsonIgnore]
     public bool FourLaneGenerationEnabled =>

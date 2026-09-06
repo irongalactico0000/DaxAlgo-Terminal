@@ -1,6 +1,6 @@
 # macOS index / Charts
 
-Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
+Generated from source fingerprint `1ddf0170457d`. macOS/Avalonia source only.
 
 | File | LOC | Tree | Project | Role | Public surface | Purpose |
 |---|---:|---|---|---|---|---|
@@ -10,14 +10,16 @@ Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 | `src/linux/Charts/TradingTerminal.BubbleChart/BubbleChartWindow.axaml` | 232 | linux | TradingTerminal.BubbleChart | product | N | UI |
 | `src/linux/Charts/TradingTerminal.BubbleChart/HeatmapBubbleSurface.cs` | 400 | linux | TradingTerminal.BubbleChart | product | Y | Native Avalonia renderer for the Professional bubble heatmap. It preserves the Windows |
 | `src/linux/Charts/TradingTerminal.Charts/AvaloniaInstrumentTagsConverter.cs` | 75 | linux | TradingTerminal.Charts | product | Y | Native-Avalonia projection of the Windows instrument picker's broker, asset and data pills. |
-| `src/linux/Charts/TradingTerminal.Charts/ChartsPanel.axaml.cs` | 189 | linux | TradingTerminal.Charts | product | Y | Avalonia host for the reusable chart VM and native renderer. It preserves |
-| `src/linux/Charts/TradingTerminal.Charts/ChartsPanel.axaml` | 157 | linux | TradingTerminal.Charts | product | N | UI |
+| `src/linux/Charts/TradingTerminal.Charts/ChartResearchSelection.cs` | 80 | linux | TradingTerminal.Charts | product | Y | The two mutually exclusive left-drag behaviors supported by the native chart. |
+| `src/linux/Charts/TradingTerminal.Charts/ChartsPanel.axaml.cs` | 219 | linux | TradingTerminal.Charts | product | Y | Avalonia host for the reusable chart VM and native renderer. It preserves |
+| `src/linux/Charts/TradingTerminal.Charts/ChartsPanel.axaml` | 171 | linux | TradingTerminal.Charts | product | N | UI |
 | `src/linux/Charts/TradingTerminal.Charts/ChartsPanelFeatures.cs` | 53 | linux | TradingTerminal.Charts | product | Y | Symbol/timeframe selectors, presets, pause/export, the ? help and the ⚙ rail toggle. |
 | `src/linux/Charts/TradingTerminal.Charts/ChartsServiceCollectionExtensions.cs` | 15 | linux | TradingTerminal.Charts | product | Y | DI registration for the TradingView-style Charts tool. Transient so each open gets |
-| `src/linux/Charts/TradingTerminal.Charts/ChartsViewModel.cs` | 560 | linux | TradingTerminal.Charts | product | Y | Non-null when this view-model lives inside a strategy window rather than the |
+| `src/linux/Charts/TradingTerminal.Charts/ChartsViewModel.Research.cs` | 138 | linux | TradingTerminal.Charts | product | Y |  |
+| `src/linux/Charts/TradingTerminal.Charts/ChartsViewModel.cs` | 569 | linux | TradingTerminal.Charts | product | Y | Non-null when this view-model lives inside a strategy window rather than the |
 | `src/linux/Charts/TradingTerminal.Charts/ChartsWindow.axaml.cs` | 12 | linux | TradingTerminal.Charts | product | Y | Standalone native-Avalonia host around . The shell owns and disposes the |
 | `src/linux/Charts/TradingTerminal.Charts/ChartsWindow.axaml` | 12 | linux | TradingTerminal.Charts | product | N | UI |
-| `src/linux/Charts/TradingTerminal.Charts/NativeChartSurface.cs` | 605 | linux | TradingTerminal.Charts | product | Y | Splices a forming candle exactly as Lightweight Charts' |
+| `src/linux/Charts/TradingTerminal.Charts/NativeChartSurface.cs` | 742 | linux | TradingTerminal.Charts | product | Y | Controls only left-drag. Pan remains the default chart interaction. |
 | `src/linux/Charts/TradingTerminal.Heatmap/AvaloniaUi/BookmapHeatmapAvaloniaWindow.axaml.cs` | 13 | linux | TradingTerminal.Heatmap | product | Y | Avalonia (cross-platform) view for the Bookmap + VolBook tool — net9.0-leg counterpart |
 | `src/linux/Charts/TradingTerminal.Heatmap/AvaloniaUi/BookmapHeatmapAvaloniaWindow.axaml` | 46 | linux | TradingTerminal.Heatmap | product | N | UI |
 | `src/linux/Charts/TradingTerminal.Heatmap/BookmapHeatmapViewModel.cs` | 395 | linux | TradingTerminal.Heatmap | product | Y | How many time columns are visible at once (the scrolling window width). |

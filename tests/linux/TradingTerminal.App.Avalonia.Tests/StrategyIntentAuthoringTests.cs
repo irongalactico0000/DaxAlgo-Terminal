@@ -344,6 +344,13 @@ public sealed class StrategyIntentAuthoringTests
 
             repository.Saved.Should().NotBeNull();
             repository.Saved!.ActiveScreen.Should().Be(StrategyAuthoringScreen.Build);
+            repository.Saved.StrategyWorkspaceJson.Should().NotBeNullOrWhiteSpace();
+            var workspace = StrategyWorkspaceCanonicalJsonV1.Deserialize(repository.Saved.StrategyWorkspaceJson!);
+            workspace.ActiveStage.Should().Be(StrategyWorkspaceStageV1.Build);
+            workspace.Bindings.ResearchCaseHashSha256.Should().Be(ResearchCaseCanonicalJsonV1.Hash(research));
+            workspace.Bindings.ConfirmedIntentHashSha256.Should().Be(viewModel.ConfirmedStrategyIntentHash);
+            workspace.Stage(StrategyWorkspaceStageV1.Validate).State
+                .Should().Be(StrategyWorkspaceStageStateV1.Unavailable);
         }
 
         using var restored = new StrategyAuthoringViewModel(
@@ -355,6 +362,9 @@ public sealed class StrategyIntentAuthoringTests
         restored.HasConfirmedStrategyIntent.Should().BeTrue();
         restored.CanEnterFourLaneConformance.Should().BeTrue();
         restored.IsBuildScreen.Should().BeTrue();
+        restored.IsBuildStage.Should().BeTrue();
+        restored.StrategyWorkspace.ActiveStage.Should().Be(StrategyWorkspaceStageV1.Build);
+        restored.StrategyWorkspace.PreviousRevisionHashSha256.Should().MatchRegex("^[0-9a-f]{64}$");
         restored.WorkbenchGridColumn.Should().Be(1);
         restored.WorkbenchGridColumnSpan.Should().Be(3);
     }

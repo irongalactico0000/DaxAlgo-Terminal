@@ -1,6 +1,6 @@
 # TradingTerminal.Core / MarketData — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `e91d50e75733`. Declaration lines only;
+Generated from source fingerprint `1ddf0170457d`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Core/TradingTerminal.Core/MarketData/AdvancedRegime/AdvancedRegimeBarIndicators.cs
@@ -315,28 +315,28 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
    15:     void EnqueueQuote(Quote quote);
    18:     void EnqueueTrade(TradePrint trade);
    22:     void EnqueueBar(OhlcvBar bar);
-   27:     void EnqueueDepth(InstrumentId instrumentId, DepthSnapshot snapshot, BrokerKind source);
-   30:     Task FlushAsync(CancellationToken ct = default);
-   36:     Task<StoredDataExtent> GetDataExtentAsync(CancellationToken ct = default) =>
-   37:     Task.FromResult(StoredDataExtent.Empty);
-   43:     Task<IReadOnlyList<OhlcvBar>> GetRecentBarsAsync(
-   44:     InstrumentId instrumentId, BarSize size, int count, BrokerKind? source = null,
-   45:     CancellationToken ct = default);
-   49:     IAsyncEnumerable<Quote> ReadQuotesAsync(
-   50:     InstrumentId instrumentId, DateTime fromUtc, DateTime toUtc, BrokerKind? source = null,
-   51:     CancellationToken ct = default);
-   55:     IAsyncEnumerable<TradePrint> ReadTradesAsync(
-   56:     InstrumentId instrumentId, DateTime fromUtc, DateTime toUtc, BrokerKind? source = null,
-   57:     CancellationToken ct = default);
-   61:     IAsyncEnumerable<DepthSnapshot> ReadDepthAsync(
-   62:     InstrumentId instrumentId, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
-   67:     IAsyncEnumerable<OhlcvBar> ReadBarsAsync(
-   68:     InstrumentId instrumentId, BarSize size, DateTime fromUtc, DateTime toUtc,
-   69:     BrokerKind? source = null, CancellationToken ct = default);
-   73:     Task<long> DeleteQuotesInRangeAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
-   76:     Task<long> DeleteTradesInRangeAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
-   79:     Task<long> DeleteBarsInRangeAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
-   84:     Task<long> DeleteDepthInRangeAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
+   26:     void EnqueueDepth(InstrumentId instrumentId, DepthSnapshot snapshot, BrokerKind source);
+   29:     Task FlushAsync(CancellationToken ct = default);
+   35:     Task<StoredDataExtent> GetDataExtentAsync(CancellationToken ct = default) =>
+   36:     Task.FromResult(StoredDataExtent.Empty);
+   42:     Task<IReadOnlyList<OhlcvBar>> GetRecentBarsAsync(
+   43:     InstrumentId instrumentId, BarSize size, int count, BrokerKind? source = null,
+   44:     CancellationToken ct = default);
+   48:     IAsyncEnumerable<Quote> ReadQuotesAsync(
+   49:     InstrumentId instrumentId, DateTime fromUtc, DateTime toUtc, BrokerKind? source = null,
+   50:     CancellationToken ct = default);
+   54:     IAsyncEnumerable<TradePrint> ReadTradesAsync(
+   55:     InstrumentId instrumentId, DateTime fromUtc, DateTime toUtc, BrokerKind? source = null,
+   56:     CancellationToken ct = default);
+   60:     IAsyncEnumerable<DepthSnapshot> ReadDepthAsync(
+   61:     InstrumentId instrumentId, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
+   66:     IAsyncEnumerable<OhlcvBar> ReadBarsAsync(
+   67:     InstrumentId instrumentId, BarSize size, DateTime fromUtc, DateTime toUtc,
+   68:     BrokerKind? source = null, CancellationToken ct = default);
+   72:     Task<long> DeleteQuotesInRangeAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
+   75:     Task<long> DeleteTradesInRangeAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
+   78:     Task<long> DeleteBarsInRangeAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
+   83:     Task<long> DeleteDepthInRangeAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
 ```
 
 ## src/linux/Core/TradingTerminal.Core/MarketData/IQuestDbLauncher.cs

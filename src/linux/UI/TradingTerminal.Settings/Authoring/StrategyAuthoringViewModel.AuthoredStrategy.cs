@@ -16,7 +16,9 @@ public sealed partial class StrategyAuthoringViewModel
         StrategyIntentKindV1.MultiLegTarget or
         StrategyIntentKindV1.PortfolioTarget;
 
-    public string CanonicalPaperStrategyAvailabilityText => ConfirmedStrategyIntent?.IntentModel.Kind switch
+    public string CanonicalPaperStrategyAvailabilityText => !ResearchEvidenceReadyForGeneration
+        ? "Run the observation-only chronological research experiment before building from the labeled dataset."
+        : ConfirmedStrategyIntent?.IntentModel.Kind switch
     {
         null => "Confirm the complete strategy request first.",
         StrategyIntentKindV1.PositionTarget => "Build one runnable SDK strategy whose targets can be backtested and sent to a Paper book.",
@@ -31,6 +33,7 @@ public sealed partial class StrategyAuthoringViewModel
 
     public bool CanGenerateCanonicalPaperStrategy =>
         CanEnterFourLaneConformance &&
+        ResearchEvidenceReadyForGeneration &&
         CanonicalPaperStrategyIntentSupported &&
         ChartEvidenceReadyForSpecification &&
         !IsGenerating &&
@@ -95,7 +98,8 @@ public sealed partial class StrategyAuthoringViewModel
                     confirmedIntent,
                     ChartReferences.Select(static item => item.Reference).ToArray(),
                     ChartReferenceInspections.ToArray(),
-                    ChartPatternSelections.ToArray()),
+                    ChartPatternSelections.ToArray(),
+                    ResearchExperimentEvidence),
                 turnCts.Token);
             InputTokens += result.Usage.InputTokens;
             OutputTokens += result.Usage.OutputTokens;

@@ -133,8 +133,17 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
     private const string InstrumentPersistKey = "tool.charts";
 
     partial void OnInstrumentSearchTextChanged(string value) => ApplyFilter();
-    partial void OnSelectedInstrumentChanged(TradableInstrument? value) => QueueReload();
-    partial void OnSelectedTimeframeChanged(ChartTimeframe? value) => QueueReload();
+    partial void OnSelectedInstrumentChanged(TradableInstrument? value)
+    {
+        ResetResearchSelection();
+        QueueReload();
+    }
+
+    partial void OnSelectedTimeframeChanged(ChartTimeframe? value)
+    {
+        ResetResearchSelection();
+        QueueReload();
+    }
     partial void OnSelectedChartTypeChanged(string value) => QueueReload();
     partial void OnShowSmaChanged(bool value) => QueueReload();
     partial void OnShowEmaChanged(bool value) => QueueReload();

@@ -82,6 +82,20 @@
           <ToggleButton Content="⏸"
                         IsChecked="{Binding IsPaused}"
                         ToolTip.Tip="Pause display updates; the live stream continues underneath" />
+          <Button Content="Capture event"
+                  Command="{Binding StartResearchSelectionCommand}"
+                  IsEnabled="{Binding HasData}"
+                  ToolTip.Tip="Select an observation window, then a separate future outcome window" />
+          <Button Content="Cancel capture"
+                  Command="{Binding CancelResearchSelectionCommand}"
+                  IsVisible="{Binding IsResearchRangeSelectionEnabled}" />
+          <Button Content="Send to Builder"
+                  Command="{Binding SendResearchSelectionCommand}"
+                  IsEnabled="{Binding CanSendResearchSelection}"
+                  ToolTip.Tip="Send only the typed time ranges and data requirements to Strategy Builder" />
+          <TextBlock Text="{Binding ResearchSelectionSummary}"
+                     Width="260" TextWrapping="Wrap" FontSize="10"
+                     Foreground="#9AA0AC" VerticalAlignment="Center" />
           <Button Content="↧"
                   Command="{Binding ExportCsvCommand}"
                   IsEnabled="{Binding HasData}"
@@ -95,7 +109,7 @@
                   <StackPanel Spacing="8">
                     <TextBlock Text="READING THE CHART" FontSize="12" FontWeight="SemiBold" Foreground="#D1D4DC" />
                     <TextBlock TextWrapping="Wrap" FontSize="11.5" Foreground="#B2B5BE" LineHeight="17"
-                               Text="Price — candles, bars, line or area. Scroll to zoom, drag to pan, and hover for OHLC.&#10;&#10;Volume — bottom histogram on the price pane.&#10;&#10;SMA 20 / EMA 50 — C# overlays shared with backtesting.&#10;&#10;RSI 14 — separate pane with 30 / 70 bands.&#10;&#10;MACD 12·26·9 — histogram, MACD and signal in a separate pane." />
+                               Text="Price — candles, bars, line or area. Scroll to zoom, drag to pan, and hover for OHLC.&#10;&#10;Research capture — choose Capture event, drag the blue observation window, then drag a later amber outcome window. The future window is label-only; pan is restored after selection.&#10;&#10;Volume — bottom histogram on the price pane.&#10;&#10;SMA 20 / EMA 50 — C# overlays shared with backtesting.&#10;&#10;RSI 14 — separate pane with 30 / 70 bands.&#10;&#10;MACD 12·26·9 — histogram, MACD and signal in a separate pane." />
                   </StackPanel>
                 </Border>
               </Flyout>

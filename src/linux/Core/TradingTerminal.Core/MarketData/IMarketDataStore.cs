@@ -21,9 +21,8 @@ public interface IMarketDataStore
     /// exists). Returns immediately.</summary>
     void EnqueueBar(OhlcvBar bar);
 
-    /// <summary>Queue an L2 depth snapshot for batched persistence. Returns immediately. Unlike the
-    /// other streams, depth is only persisted by backends purpose-built for its volume (QuestDB);
-    /// the SQLite and Postgres stores ignore depth, so this is a no-op there by design.</summary>
+    /// <summary>Queue an L2 depth snapshot for batched persistence. Returns immediately.
+    /// Implementations without depth support may expose an empty read/no-op write explicitly.</summary>
     void EnqueueDepth(InstrumentId instrumentId, DepthSnapshot snapshot, BrokerKind source);
 
     /// <summary>Flush any queued records to disk now. Mainly for tests and graceful shutdown.</summary>

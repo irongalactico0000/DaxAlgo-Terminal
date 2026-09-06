@@ -1,6 +1,6 @@
 # macOS index / Backtest
 
-Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
+Generated from source fingerprint `1ddf0170457d`. macOS/Avalonia source only.
 
 | File | LOC | Tree | Project | Role | Public surface | Purpose |
 |---|---:|---|---|---|---|---|
@@ -22,10 +22,10 @@ Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 | `src/linux/Backtest/TradingTerminal.Backtest.Engine/Execution/IFillModel.cs` | 73 | linux | TradingTerminal.Backtest.Engine | product | Y | Decides whether a working order fills against the current quote and at |
 | `src/linux/Backtest/TradingTerminal.Backtest.Engine/Execution/SimulatedOrderBook.cs` | 189 | linux | TradingTerminal.Backtest.Engine | product | Y | Evaluate fills for the orders resting on one instrument against its latest |
 | `src/linux/Backtest/TradingTerminal.Backtest.Engine/Execution/WorkingOrder.cs` | 19 | linux | TradingTerminal.Backtest.Engine | product | Y | A live order resting in the simulated book, tagged with the instrument |
-| `src/linux/Backtest/TradingTerminal.Backtest.Engine/Feeds/AsyncMerge.cs` | 49 | linux | TradingTerminal.Backtest.Engine | product | Y | K-way merge of already-ascending streams into one globally |
+| `src/linux/Backtest/TradingTerminal.Backtest.Engine/Feeds/AsyncMerge.cs` | 56 | linux | TradingTerminal.Backtest.Engine | product | Y | K-way merge of already-ascending streams into one globally |
 | `src/linux/Backtest/TradingTerminal.Backtest.Engine/Feeds/IMarketDataFeed.cs` | 14 | linux | TradingTerminal.Backtest.Engine | product | Y | Produces the time-ordered event stream the engine replays for a run. Implementations |
 | `src/linux/Backtest/TradingTerminal.Backtest.Engine/Feeds/InMemoryMarketDataFeed.cs` | 28 | linux | TradingTerminal.Backtest.Engine | product | Y | A feed backed by an in-memory event list — the workhorse for |
-| `src/linux/Backtest/TradingTerminal.Backtest.Engine/Feeds/StoreMarketDataFeed.cs` | 50 | linux | TradingTerminal.Backtest.Engine | product | Y | Replays a run from the canonical market-data store — the primary data |
+| `src/linux/Backtest/TradingTerminal.Backtest.Engine/Feeds/StoreMarketDataFeed.cs` | 58 | linux | TradingTerminal.Backtest.Engine | product | Y | Replays a run from the canonical market-data store — the primary data |
 | `src/linux/Backtest/TradingTerminal.Backtest.Engine/Feeds/SyntheticMarketDataFeed.cs` | 48 | linux | TradingTerminal.Backtest.Engine | product | Y | A deterministic synthetic feed: a mean-reverting (Ornstein-Uhlenbeck-ish) random walk of the mid |
 | `src/linux/Backtest/TradingTerminal.Backtest.Engine/Feeds/SyntheticTapeFeed.cs` | 95 | linux | TradingTerminal.Backtest.Engine | product | Y | Default anchor: a weekday in the London/NY overlap so session gates pass. |
 | `src/linux/Backtest/TradingTerminal.Backtest.Engine/Kernels/BacktestStrategyKernelAdapter.cs` | 73 | linux | TradingTerminal.Backtest.Engine | product | Y | Wrap an already-built legacy strategy (used by the parity test). |

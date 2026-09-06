@@ -199,22 +199,77 @@ public sealed class CandidateAuthoringUxContractTests
     }
 
     [Fact]
-    public void Design_and_build_are_separate_navigable_screens_with_one_confirmed_handoff()
+    public void Builder_exposes_six_workspace_stages_with_truthful_gates()
     {
         var root = LoadAuthoringWindow();
         var navigation = root.Descendants(Avalonia + "Border").Single(element =>
             (string?)element.Attribute("AutomationProperties.Name") == "Authoring screen navigation");
         navigation.Descendants(Avalonia + "StackPanel").Should().Contain(element =>
             (string?)element.Attribute("IsVisible") == "{Binding ShowScreenNavigation}");
-        var design = navigation.Descendants(Avalonia + "Button").Single(element =>
+        var buttons = navigation.Descendants(Avalonia + "Button").ToArray();
+        var brief = buttons.Single(element =>
+            (string?)element.Attribute("AutomationProperties.Name") == "Open Brief screen");
+        var research = buttons.Single(element =>
+            (string?)element.Attribute("AutomationProperties.Name") == "Open Research screen");
+        var design = buttons.Single(element =>
             (string?)element.Attribute("AutomationProperties.Name") == "Open Design and Confirm screen");
-        var build = navigation.Descendants(Avalonia + "Button").Single(element =>
+        var build = buttons.Single(element =>
             (string?)element.Attribute("AutomationProperties.Name") == "Open Build Test and Compare screen");
+        var validate = buttons.Single(element =>
+            (string?)element.Attribute("AutomationProperties.Name") == "Open Validate screen");
+        var paper = buttons.Single(element =>
+            (string?)element.Attribute("AutomationProperties.Name") == "Open Paper screen");
 
+        brief.Attribute("Command")!.Value.Should().Be("{Binding OpenBriefScreenCommand}");
+        brief.Attribute("IsEnabled")!.Value.Should().Be("{Binding CanOpenBriefScreen}");
+        research.Attribute("Command")!.Value.Should().Be("{Binding OpenResearchScreenCommand}");
+        research.Attribute("IsEnabled")!.Value.Should().Be("{Binding CanOpenResearchScreen}");
         design.Attribute("Command")!.Value.Should().Be("{Binding OpenDesignScreenCommand}");
         design.Attribute("IsEnabled")!.Value.Should().Be("{Binding CanOpenDesignScreen}");
         build.Attribute("Command")!.Value.Should().Be("{Binding OpenBuildScreenCommand}");
         build.Attribute("IsEnabled")!.Value.Should().Be("{Binding CanOpenBuildScreen}");
+        validate.Attribute("Command")!.Value.Should().Be("{Binding OpenValidateScreenCommand}");
+        validate.Attribute("IsEnabled")!.Value.Should().Be("{Binding CanOpenValidateScreen}");
+        paper.Attribute("Command")!.Value.Should().Be("{Binding OpenPaperScreenCommand}");
+        paper.Attribute("IsEnabled")!.Value.Should().Be("{Binding CanOpenPaperScreen}");
+
+        var historicalValidation = root.Descendants(Avalonia + "Button").Single(element =>
+            (string?)element.Attribute("AutomationProperties.Name") == "Run exact historical validation");
+        historicalValidation.Attribute("Click")!.Value.Should().Be("OnHistoricalValidationRequested");
+        historicalValidation.Attribute("IsEnabled")!.Value.Should().Be("{Binding CanRunHistoricalValidation}");
+        root.Descendants(Avalonia + "Button").Should().ContainSingle(element =>
+            (string?)element.Attribute("AutomationProperties.Name") ==
+                "Bind validated strategy to selected Paper book" &&
+            (string?)element.Attribute("Click") == "OnPaperHandoffRequested");
+
+        navigation.Descendants(Avalonia + "TextBlock").Should().Contain(element =>
+            (string?)element.Attribute("Text") == "{Binding WorkspaceRevisionText}");
+        foreach (var state in new[]
+                 {
+                     "BriefStageState", "ResearchStageState", "DesignStageState",
+                     "BuildStageState", "ValidateStageState", "PaperStageState",
+                 })
+        {
+            navigation.Descendants(Avalonia + "TextBlock").Should().Contain(element =>
+                (string?)element.Attribute("Text") == $"{{Binding {state}}}");
+        }
+
+        var researchWorkspace = root.Descendants(Avalonia + "Border").Single(element =>
+            (string?)element.Attribute("AutomationProperties.Name") == "Research event discovery workspace");
+        researchWorkspace.Attribute("IsVisible")!.Value.Should().Be("{Binding ShowResearchWorkspace}");
+        researchWorkspace.Descendants(Avalonia + "Button").Should().Contain(element =>
+            (string?)element.Attribute("AutomationProperties.Name") ==
+                "Open host chart for research selection" &&
+            (string?)element.Attribute("Click") == "OnResearchChartRequested");
+        researchWorkspace.Descendants(Avalonia + "Button").Should().Contain(element =>
+            (string?)element.Attribute("Command") == "{Binding MarkPreBreakoutCommand}" &&
+            (string?)element.Attribute("IsEnabled") == "{Binding HasResearchChartSelection}");
+        researchWorkspace.Descendants(Avalonia + "Button").Should().Contain(element =>
+            (string?)element.Attribute("Command") == "{Binding MarkPreCrashCommand}");
+        researchWorkspace.Descendants(Avalonia + "Button").Should().Contain(element =>
+            (string?)element.Attribute("Command") == "{Binding MarkNeutralCommand}");
+        researchWorkspace.Descendants(Avalonia + "ItemsControl").Should().Contain(element =>
+            (string?)element.Attribute("ItemsSource") == "{Binding ResearchEventSamples}");
 
         root.Descendants(Avalonia + "Grid").Should().ContainSingle(element =>
             (string?)element.Attribute("AutomationProperties.Name") == "Design and Confirm screen" &&

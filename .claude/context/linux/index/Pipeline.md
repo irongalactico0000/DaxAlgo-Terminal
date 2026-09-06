@@ -1,6 +1,6 @@
 # macOS index / Pipeline
 
-Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
+Generated from source fingerprint `1ddf0170457d`. macOS/Avalonia source only.
 
 | File | LOC | Tree | Project | Role | Public surface | Purpose |
 |---|---:|---|---|---|---|---|
@@ -120,6 +120,7 @@ Generated from source fingerprint `e91d50e75733`. macOS/Avalonia source only.
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Research/Sandbox/RepoFetcher.cs` | 84 | linux | TradingTerminal.Infrastructure | product | Y | Result of a clone attempt: the scratch directory the repo was checked |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Research/Sandbox/SandboxProcess.cs` | 104 | linux | TradingTerminal.Infrastructure | product | Y | Outcome of a sandbox subprocess run: exit code (null = could not |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Research/Sandbox/Wsl2SandboxRunner.cs` | 28 | linux | TradingTerminal.Infrastructure | product | Y | Placeholder WSL2 sandbox backend. Not yet implemented — reports = false so |
+| `src/linux/Pipeline/TradingTerminal.Infrastructure/Research/StrategyResearchExperimentRunnerV1.cs` | 301 | linux | TradingTerminal.Infrastructure | product | Y | Reads only each sample's observation interval from the local store, fits normalization |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Sidecar/JobObjectProcessGuard.cs` | 134 | linux | TradingTerminal.Infrastructure | product | Y | True off Windows (where process-tree kill is used), or when KILL_ON_JOB_CLOSE is |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Sidecar/SidecarHostService.cs` | 422 | linux | TradingTerminal.Infrastructure | product | Y | Walks up from |
 | `src/linux/Pipeline/TradingTerminal.Infrastructure/Sidecar/SidecarServiceCollectionExtensions.cs` | 26 | linux | TradingTerminal.Infrastructure | product | Y | Registers the managed Python sidecar launcher: binds , registers the |

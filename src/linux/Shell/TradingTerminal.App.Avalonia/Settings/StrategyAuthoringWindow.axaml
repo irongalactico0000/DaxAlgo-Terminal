@@ -126,24 +126,100 @@
               Background="{StaticResource Background.Surface}"
               BorderBrush="{StaticResource Border.Brush}" BorderThickness="0,0,0,1"
               AutomationProperties.Name="Authoring screen navigation">
-        <Grid ColumnDefinitions="*,Auto">
+        <Grid ColumnDefinitions="260,*">
           <StackPanel Grid.Column="0" Spacing="2">
             <TextBlock Text="{Binding ActiveScreenTitle}" FontWeight="SemiBold" FontSize="13" />
             <TextBlock Text="{Binding ActiveScreenDescription}" Classes="caption" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding WorkspaceRevisionText}" Classes="eyebrow" Margin="0,3,0,0" />
           </StackPanel>
-          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center"
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
+                      HorizontalAlignment="Right"
                       IsVisible="{Binding ShowScreenNavigation}">
-            <Button Classes="pill" Content="1  Design &amp; Confirm"
-                    Command="{Binding OpenDesignScreenCommand}"
-                    IsEnabled="{Binding CanOpenDesignScreen}"
-                    AutomationProperties.Name="Open Design and Confirm screen" />
+            <StackPanel Spacing="2">
+              <Button Classes="pill" Content="1  Brief"
+                      Command="{Binding OpenBriefScreenCommand}"
+                      IsEnabled="{Binding CanOpenBriefScreen}"
+                      AutomationProperties.Name="Open Brief screen" />
+              <TextBlock Text="{Binding BriefStageState}" Classes="eyebrow" HorizontalAlignment="Center" />
+            </StackPanel>
             <TextBlock Text="→" Classes="caption" VerticalAlignment="Center" />
-            <Button Classes="aiAction" Content="2  Build, Test &amp; Compare"
-                    Command="{Binding OpenBuildScreenCommand}"
-                    IsEnabled="{Binding CanOpenBuildScreen}"
-                    AutomationProperties.Name="Open Build Test and Compare screen"
-                    ToolTip.Tip="Loads retained native evidence when configured; legacy draft generation still requires a confirmed request." />
+            <StackPanel Spacing="2">
+              <Button Classes="pill" Content="2  Research"
+                      Command="{Binding OpenResearchScreenCommand}"
+                      IsEnabled="{Binding CanOpenResearchScreen}"
+                      AutomationProperties.Name="Open Research screen"
+                      ToolTip.Tip="Optional for explicit indicator rules; required for discovery claims and event studies." />
+              <TextBlock Text="{Binding ResearchStageState}" Classes="eyebrow" HorizontalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="→" Classes="caption" VerticalAlignment="Center" />
+            <StackPanel Spacing="2">
+              <Button Classes="pill" Content="3  Design"
+                      Command="{Binding OpenDesignScreenCommand}"
+                      IsEnabled="{Binding CanOpenDesignScreen}"
+                      AutomationProperties.Name="Open Design and Confirm screen"
+                      ToolTip.Tip="Optional chart customization. Visibility never changes computational strategy rules." />
+              <TextBlock Text="{Binding DesignStageState}" Classes="eyebrow" HorizontalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="→" Classes="caption" VerticalAlignment="Center" />
+            <StackPanel Spacing="2">
+              <Button Classes="aiAction" Content="4  Build"
+                      Command="{Binding OpenBuildScreenCommand}"
+                      IsEnabled="{Binding CanOpenBuildScreen}"
+                      AutomationProperties.Name="Open Build Test and Compare screen"
+                      ToolTip.Tip="Generate, verify, compile, review, and install the exact confirmed specification." />
+              <TextBlock Text="{Binding BuildStageState}" Classes="eyebrow" HorizontalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="→" Classes="caption" VerticalAlignment="Center" />
+            <StackPanel Spacing="2">
+              <Button Classes="pill" Content="5  Validate"
+                      Command="{Binding OpenValidateScreenCommand}"
+                      IsEnabled="{Binding CanOpenValidateScreen}"
+                      AutomationProperties.Name="Open Validate screen"
+                      ToolTip.Tip="Requires an exact compiled artifact; synthetic smoke is not historical evidence." />
+              <TextBlock Text="{Binding ValidateStageState}" Classes="eyebrow" HorizontalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="→" Classes="caption" VerticalAlignment="Center" />
+            <StackPanel Spacing="2">
+              <Button Classes="pill" Content="6  Paper"
+                      Command="{Binding OpenPaperScreenCommand}"
+                      IsEnabled="{Binding CanOpenPaperScreen}"
+                      AutomationProperties.Name="Open Paper screen"
+                      ToolTip.Tip="Requires exact-revision validation and a selected Paper book. Real-money routing is unavailable." />
+              <TextBlock Text="{Binding PaperStageState}" Classes="eyebrow" HorizontalAlignment="Center" />
+            </StackPanel>
           </StackPanel>
+        </Grid>
+      </Border>
+      <Border IsVisible="{Binding IsValidateStage}"
+              Background="{StaticResource Background.Elevated}"
+              BorderBrush="{StaticResource Border.Brush}" BorderThickness="0,1,0,0"
+              Padding="14,9">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Grid.Column="0" Spacing="2">
+            <TextBlock Text="EXACT HISTORICAL VALIDATION" Classes="eyebrow" />
+            <TextBlock Text="{Binding HistoricalValidationStatusText}" Classes="caption" TextWrapping="Wrap" />
+          </StackPanel>
+          <Button Grid.Column="1" Classes="aiAction" Content="Run historical validation"
+                  Margin="12,0,0,0"
+                  IsEnabled="{Binding CanRunHistoricalValidation}"
+                  Click="OnHistoricalValidationRequested"
+                  AutomationProperties.Name="Run exact historical validation" />
+        </Grid>
+      </Border>
+      <Border IsVisible="{Binding IsPaperStage}"
+              Background="{StaticResource Warning.Soft}"
+              BorderBrush="{StaticResource Warning.Brush}" BorderThickness="0,1,0,0"
+              Padding="14,9">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Grid.Column="0" Spacing="2">
+            <TextBlock Text="PAPER-ONLY HANDOFF" Classes="eyebrow" />
+            <TextBlock Text="Select the current Paper book, bind this validated revision, and review it in the runner. No real-money route is available."
+                       Classes="caption" TextWrapping="Wrap" />
+          </StackPanel>
+          <Button Grid.Column="1" Classes="aiAction" Content="Bind selected Paper book"
+                  Margin="12,0,0,0"
+                  Click="OnPaperHandoffRequested"
+                  AutomationProperties.Name="Bind validated strategy to selected Paper book" />
         </Grid>
       </Border>
     </StackPanel>
@@ -981,6 +1057,136 @@
 
             <TabItem Header="{Binding CandidateTabHeader}">
               <Grid Margin="0,8,0,0" RowDefinitions="Auto,*">
+                <Border Grid.Row="0" Grid.RowSpan="2" ZIndex="20"
+                        IsVisible="{Binding ShowResearchWorkspace}"
+                        Background="{StaticResource Background.Base}"
+                        BorderBrush="{StaticResource Ai.Glow.Brush}" BorderThickness="1"
+                        CornerRadius="6" Padding="10"
+                        AutomationProperties.Name="Research event discovery workspace">
+                  <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="10" Margin="0,0,4,0">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                          <TextBlock Text="EVENT DISCOVERY" Classes="eyebrow" />
+                          <TextBlock Text="Mark what was observable before an event; keep the future outcome in a separate shaded window used only for labeling."
+                                     Classes="caption" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="chip">
+                          <TextBlock FontFamily="{StaticResource Font.Data}">
+                            <Run Text="SAMPLES  " /><Run Text="{Binding ResearchEventSampleCount}" />
+                          </TextBlock>
+                        </Border>
+                      </Grid>
+
+                      <Border Background="{StaticResource Background.Elevated}"
+                              BorderBrush="{StaticResource Border.Brush}" BorderThickness="1"
+                              CornerRadius="5" Padding="9,8">
+                        <StackPanel Spacing="6">
+                          <TextBlock Text="HOST CHART SELECTION" Classes="eyebrow" />
+                          <Button Classes="aiAction" Content="Open host chart"
+                                  HorizontalAlignment="Left"
+                                  Click="OnResearchChartRequested"
+                                  AutomationProperties.Name="Open host chart for research selection" />
+                          <TextBlock Text="{Binding ResearchChartSelectionText}"
+                                     Classes="caption" TextWrapping="Wrap"
+                                     AutomationProperties.Name="Research chart selection summary" />
+                          <TextBlock Text="Brush observation → extend future outcome → label. The authored strategy never receives pointer events or UI controls."
+                                     Classes="caption" TextWrapping="Wrap" />
+                          <WrapPanel Orientation="Horizontal">
+                            <Button Classes="aiAction" Content="B  Pre-breakout"
+                                    Command="{Binding MarkPreBreakoutCommand}"
+                                    IsEnabled="{Binding HasResearchChartSelection}"
+                                    Margin="0,0,6,4"
+                                    AutomationProperties.Name="Label selection pre-breakout" />
+                            <Button Classes="ghost" Content="C  Pre-crash"
+                                    Command="{Binding MarkPreCrashCommand}"
+                                    IsEnabled="{Binding HasResearchChartSelection}"
+                                    Margin="0,0,6,4"
+                                    AutomationProperties.Name="Label selection pre-crash" />
+                            <Button Classes="ghost" Content="N  Neutral"
+                                    Command="{Binding MarkNeutralCommand}"
+                                    IsEnabled="{Binding HasResearchChartSelection}"
+                                    Margin="0,0,6,4"
+                                    AutomationProperties.Name="Label selection neutral" />
+                            <Button Classes="ghost" Content="Clear selection"
+                                    Command="{Binding ClearResearchChartSelectionCommand}"
+                                    IsEnabled="{Binding HasResearchChartSelection}"
+                                    Margin="0,0,0,4" />
+                          </WrapPanel>
+                        </StackPanel>
+                      </Border>
+
+                      <Border Background="{StaticResource Warning.Soft}"
+                              BorderBrush="{StaticResource Warning.Brush}" BorderThickness="1"
+                              CornerRadius="5" Padding="8,7">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="LEAKAGE BOUNDARY" Classes="eyebrow"
+                                     Foreground="{StaticResource Warning.Brush}" />
+                          <TextBlock Text="Observation data may become features. Future outcome data may assign a label only. Normalization is fitted on chronological training data and then frozen for validation/test."
+                                     Classes="caption" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </Border>
+
+                      <TextBlock Text="{Binding ResearchDatasetStatusText}"
+                                 Classes="caption" TextWrapping="Wrap" />
+                      <Border Background="{StaticResource Background.Elevated}"
+                              BorderBrush="{StaticResource Border.Brush}" BorderThickness="1"
+                              CornerRadius="5" Padding="9,8"
+                              AutomationProperties.Name="Research feature experiment">
+                        <StackPanel Spacing="6">
+                          <TextBlock Text="OBSERVATION-ONLY FEATURE EXPERIMENT" Classes="eyebrow" />
+                          <TextBlock Text="{Binding ResearchExperimentStatusText}"
+                                     Classes="caption" TextWrapping="Wrap" />
+                          <TextBlock Text="{Binding ResearchFormulaText}"
+                                     Classes="caption" TextWrapping="Wrap"
+                                     FontFamily="{StaticResource Font.Data}" />
+                          <Button Classes="aiAction" Content="Run chronological experiment"
+                                  HorizontalAlignment="Left"
+                                  Command="{Binding RunResearchExperimentCommand}"
+                                  IsEnabled="{Binding CanRunResearchExperiment}"
+                                  AutomationProperties.Name="Run observation-only research experiment" />
+                          <TextBlock Text="This ranks an exploratory formula only. It cannot unlock Validate or Paper without separate exact historical evidence."
+                                     Classes="caption" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </Border>
+                      <ItemsControl ItemsSource="{Binding ResearchEventSamples}"
+                                    AutomationProperties.Name="Research event samples">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Border Background="{StaticResource Background.Elevated}"
+                                    BorderBrush="{StaticResource Border.Brush}" BorderThickness="1"
+                                    CornerRadius="5" Padding="8,7" Margin="0,2">
+                              <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                  <TextBlock FontWeight="SemiBold">
+                                    <Run Text="{Binding Label}" /><Run Text="  ·  " />
+                                    <Run Text="{Binding Selection.CanonicalSymbol}" />
+                                  </TextBlock>
+                                  <TextBlock Classes="caption" FontFamily="{StaticResource Font.Data}"
+                                             TextWrapping="Wrap">
+                                    <Run Text="observe " /><Run Text="{Binding Selection.ObservationFromUtc}" />
+                                    <Run Text=" → " /><Run Text="{Binding Selection.ObservationToUtc}" />
+                                  </TextBlock>
+                                  <TextBlock Classes="caption" FontFamily="{StaticResource Font.Data}"
+                                             TextWrapping="Wrap">
+                                    <Run Text="outcome " /><Run Text="{Binding Selection.OutcomeFromUtc}" />
+                                    <Run Text=" → " /><Run Text="{Binding Selection.OutcomeToUtc}" />
+                                    <Run Text="  ·  " /><Run Text="{Binding Selection.RequiredData}" />
+                                  </TextBlock>
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="ghost" Content="Remove"
+                                        Command="{Binding DataContext.RemoveResearchEventSampleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding}"
+                                        AutomationProperties.Name="Remove research event sample" />
+                              </Grid>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </ScrollViewer>
+                </Border>
+
                 <Border Grid.Row="0" Grid.RowSpan="2"
                         IsVisible="{Binding ShowNativeStrategyRunPanel}"
                         Background="{StaticResource Background.Base}"

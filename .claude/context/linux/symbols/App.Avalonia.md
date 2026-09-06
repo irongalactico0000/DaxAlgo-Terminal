@@ -1,6 +1,6 @@
 # TradingTerminal.App.Avalonia — public API surface (macOS/Avalonia)
 
-Generated from source fingerprint `e91d50e75733`. Declaration lines only;
+Generated from source fingerprint `1ddf0170457d`. Declaration lines only;
 multi-line signatures show their first line. `[ObservableProperty]` generated properties are not listed.
 
 ## src/linux/Shell/TradingTerminal.App.Avalonia/App.axaml.cs
@@ -223,23 +223,25 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
    67: public InstrumentId Instrument { get; }
    68: public string Symbol { get; }
    84: public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDisposable
-  104: public PaperStrategyRunnerViewModel(
-  187: public IReadOnlyList<PaperStrategyChoice> Strategies { get; }
-  188: public IReadOnlyList<PaperExecutionInstrumentChoice> Instruments { get; }
-  189: public int UnsupportedMultiAssetStrategyCount { get; }
-  190: public string StrategyEligibilitySummary => UnsupportedMultiAssetStrategyCount == 0
-  193: public ObservableCollection<PaperStrategyParameterRow> Parameters { get; } = [];
-  194: public ObservableCollection<PaperStrategyLegRow> StrategyLegs { get; } = [];
-  195: public Action<IRenderSurface> Draw => DrawFrame;
-  197: public bool HasEligibleStrategies => Strategies.Count != 0;
-  198: public bool SelectionLocked => _runtime is not null;
-  199: public bool IsRunning => _runtime?.State == SandboxStrategyRuntimeState.Running;
-  200: public bool IsPaused => _runtime?.State == SandboxStrategyRuntimeState.Paused;
-  201: public bool IsStopped => _runtime is null;
-  202: public bool CanSelectInstrument => IsStopped && SelectedStrategy?.CanonicalRegistration is null;
-  203: public bool IsMultiAssetStrategy => StrategyLegs.Count > 1;
-  205: public event EventHandler? FrameRequested;
-  692: public void Dispose()
+  104: public string BookId => _bookId;
+  106: public PaperStrategyRunnerViewModel(
+  196: public IReadOnlyList<PaperStrategyChoice> Strategies { get; }
+  197: public IReadOnlyList<PaperExecutionInstrumentChoice> Instruments { get; }
+  198: public int UnsupportedMultiAssetStrategyCount { get; }
+  199: public string StrategyEligibilitySummary => UnsupportedMultiAssetStrategyCount == 0
+  202: public ObservableCollection<PaperStrategyParameterRow> Parameters { get; } = [];
+  203: public ObservableCollection<PaperStrategyLegRow> StrategyLegs { get; } = [];
+  204: public Action<IRenderSurface> Draw => DrawFrame;
+  206: public bool HasEligibleStrategies => Strategies.Count != 0;
+  207: public bool SelectionLocked => _runtime is not null;
+  208: public bool IsRunning => _runtime?.State == SandboxStrategyRuntimeState.Running;
+  209: public bool IsPaused => _runtime?.State == SandboxStrategyRuntimeState.Paused;
+  210: public bool IsStopped => _runtime is null;
+  211: public bool CanSelectInstrument => IsStopped && SelectedStrategy?.CanonicalRegistration is null;
+  212: public bool IsMultiAssetStrategy => StrategyLegs.Count > 1;
+  214: public event EventHandler? FrameRequested;
+  220: public bool TryPrepareTestedStrategy(
+  752: public void Dispose()
 ```
 
 ## src/linux/Shell/TradingTerminal.App.Avalonia/Execution/PaperStrategyRunnerWindow.axaml.cs
@@ -357,14 +359,17 @@ multi-line signatures show their first line. `[ObservableProperty]` generated pr
 ## src/linux/Shell/TradingTerminal.App.Avalonia/Settings/StrategyAuthoringWindow.axaml.cs
 ```cs
    13: public partial class StrategyAuthoringWindow : Window
-   17: public StrategyAuthoringWindow()
-   24: public bool ShowSimulatedDataBanner
-   94: public sealed class ParameterKindMatchConverter : IValueConverter
-   96: public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-  105: public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-  110: public sealed class PositiveCountConverter : IValueConverter
-  112: public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-  115: public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+   17: public event EventHandler? ResearchChartRequested;
+   18: public event EventHandler? HistoricalValidationRequested;
+   19: public event EventHandler? PaperHandoffRequested;
+   21: public StrategyAuthoringWindow()
+   28: public bool ShowSimulatedDataBanner
+  107: public sealed class ParameterKindMatchConverter : IValueConverter
+  109: public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+  118: public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+  123: public sealed class PositiveCountConverter : IValueConverter
+  125: public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+  128: public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
 ```
 
 ## src/linux/Shell/TradingTerminal.App.Avalonia/Settings/SupportWindow.axaml.cs

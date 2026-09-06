@@ -5,7 +5,7 @@ namespace TradingTerminal.Backtest.Engine.Feeds;
 /// <summary>
 /// K-way merge of already-ascending <see cref="MarketEvent"/> streams into one globally
 /// time-ordered stream, using a min-heap over each source's head. This is how a portfolio run
-/// interleaves many instruments (and each instrument's quote/trade streams) into the single timeline
+/// interleaves many instruments (and each instrument's quote/trade/depth streams) into the single timeline
 /// the engine replays. On equal timestamps a quote sorts before a trade so the strategy's view of the
 /// spread is current when it sees the print — matching the legacy engine's tie-break.
 /// </summary>
@@ -45,5 +45,12 @@ internal static class AsyncMerge
     }
 
     private static (DateTime, int, int) KeyOf(MarketEvent ev, int idx) =>
-        (ev.TimestampUtc, ev.Kind == MarketEventKind.Quote ? 0 : 1, idx);
+        (ev.TimestampUtc, ev.Kind switch
+        {
+            MarketEventKind.Quote => 0,
+            MarketEventKind.Trade => 1,
+            MarketEventKind.Depth => 2,
+            MarketEventKind.Bar => 3,
+            _ => 4,
+        }, idx);
 }

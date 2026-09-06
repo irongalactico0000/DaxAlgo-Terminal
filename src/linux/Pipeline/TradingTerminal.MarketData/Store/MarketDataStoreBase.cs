@@ -136,7 +136,7 @@ internal abstract class MarketDataStoreBase : IMarketDataStore, IDisposable
         InstrumentId instrumentId, DateTime fromUtc, DateTime toUtc, BrokerKind? source = null,
         CancellationToken ct = default);
 
-    /// <summary>Default: no depth persistence (SQLite/Postgres). QuestDB overrides this.</summary>
+    /// <summary>Default: no depth persistence. Depth-capable stores override this.</summary>
     public virtual async IAsyncEnumerable<DepthSnapshot> ReadDepthAsync(
         InstrumentId instrumentId, DateTime fromUtc, DateTime toUtc,
         [EnumeratorCancellation] CancellationToken ct = default)
