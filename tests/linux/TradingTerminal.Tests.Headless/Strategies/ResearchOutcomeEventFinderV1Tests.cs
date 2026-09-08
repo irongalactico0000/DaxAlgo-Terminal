@@ -99,6 +99,43 @@ public sealed class ResearchOutcomeEventFinderV1Tests
         Assert.Contains(matches, static match => match.OutcomeReturn >= 0.05 && match.Timeframe == BarSize.OneHour);
     }
 
+    [Fact]
+    public void Next_bar_plus_five_includes_indicator_scores()
+    {
+        var start = new DateTime(2024, 6, 3, 14, 0, 0, DateTimeKind.Utc);
+        var closes = Enumerable.Range(0, 40).Select(i => 100.0 + (i % 7) * 0.15).ToList();
+        closes[^1] = closes[^2] * 1.08;
+        var bars = new List<OhlcvBar>(closes.Count);
+        for (var i = 0; i < closes.Count; i++)
+        {
+            var close = closes[i];
+            bars.Add(new OhlcvBar(
+                new InstrumentId(1),
+                BarSize.OneHour,
+                start.AddHours(i),
+                close,
+                close * 1.001,
+                close * 0.999,
+                close,
+                10_000,
+                BrokerKind.Simulated,
+                IsFinal: true));
+        }
+
+        var matches = ResearchOutcomeEventFinderV1.FindEvents(
+            "next-day-plus-5",
+            new InstrumentId(1),
+            "AAPL",
+            "Apple Inc.",
+            bars);
+
+        Assert.NotEmpty(matches);
+        Assert.Contains(matches, static match =>
+            match.OutcomeReturn >= 0.05 &&
+            match.IndicatorScoreSummary is { Length: > 0 } &&
+            match.Rsi14 is not null);
+    }
+
     private static IReadOnlyList<OhlcvBar> BuildDailyCloses(params double[] closes)
     {
         var start = new DateTime(2024, 1, 2, 14, 30, 0, DateTimeKind.Utc);

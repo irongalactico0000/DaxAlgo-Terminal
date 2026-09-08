@@ -17,6 +17,8 @@ public partial class MainWindow : Window
     private Window? _executionBooksWindow;
     private Window? _executionConsoleWindow;
     private Window? _paperStrategyRunnerWindow;
+    private TradingTerminal.Charts.ChartsWindow? _researchChartWindow;
+    private TradingTerminal.Charts.ChartsViewModel? _researchChartViewModel;
 
     public MainWindow()
     {
@@ -400,8 +402,12 @@ public partial class MainWindow : Window
                 ? $"resolving Charts services for overlays [{string.Join(',', hostOverlayIds)}]"
                 : "resolving Charts services");
 
-        var chartViewModel = services.GetRequiredService<TradingTerminal.Charts.ChartsViewModel>();
-        PreviewLog("ChartsViewModel resolved");
+        // Reuse one Charts window for gallery focus so Research boxes do not spawn a stack of windows.
+        var reuseExisting = _researchChartWindow is { IsVisible: true } && _researchChartViewModel is not null;
+        var chartViewModel = reuseExisting
+            ? _researchChartViewModel!
+            : services.GetRequiredService<TradingTerminal.Charts.ChartsViewModel>();
+        PreviewLog(reuseExisting ? "ChartsViewModel reused" : "ChartsViewModel resolved");
         if (hostOverlayIds is { Count: > 0 })
         {
             chartViewModel.ApplyHostOverlayIds(hostOverlayIds);
@@ -426,12 +432,23 @@ public partial class MainWindow : Window
             PreviewLog($"preferred symbol applied: {preferredSymbol}");
         }
 
+        if (reuseExisting)
+        {
+            if (startResearchCapture)
+                ArmHostResearchCapture(chartViewModel, PreviewLog);
+            _researchChartWindow!.Activate();
+            PreviewLog("Activated existing Charts window for gallery focus");
+            return;
+        }
+
         var chartWindow = services.GetRequiredService<TradingTerminal.Charts.ChartsWindow>();
         PreviewLog("ChartsWindow resolved");
         chartWindow.DataContext = chartViewModel;
         // ChartsWindow.axaml used CenterOwner; without an owner Avalonia can leave the window
         // off-screen / non-visible on macOS. Force CenterScreen and Show(owner).
         chartWindow.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        _researchChartWindow = chartWindow;
+        _researchChartViewModel = chartViewModel;
 
         EventHandler<TradingTerminal.Charts.ResearchChartSelectionRequestedEventArgs>? selectionHandler = null;
         selectionHandler = (_, args) =>
@@ -448,13 +465,18 @@ public partial class MainWindow : Window
 
             authoringViewModel.SetResearchChartSelection(args.Selection);
             authoringWindow.Activate();
-            chartWindow.Close();
+            // Keep the single Charts window open for further gallery box focus.
         };
         chartViewModel.ResearchSelectionRequested += selectionHandler;
         chartWindow.Closed += (_, _) =>
         {
             PreviewLog("Charts window closed");
             chartViewModel.ResearchSelectionRequested -= selectionHandler;
+            if (ReferenceEquals(_researchChartWindow, chartWindow))
+            {
+                _researchChartWindow = null;
+                _researchChartViewModel = null;
+            }
         };
         if (chartViewModel is IDisposable disposable)
             chartWindow.Closed += (_, _) => disposable.Dispose();

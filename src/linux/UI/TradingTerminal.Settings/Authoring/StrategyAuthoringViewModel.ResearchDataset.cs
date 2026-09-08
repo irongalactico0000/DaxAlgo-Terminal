@@ -237,7 +237,7 @@ public sealed partial class StrategyAuthoringViewModel
 
         UseResearchOutcomeGalleryMatch(next);
         Status =
-            $"{Status} Opened next gallery event {next.CanonicalSymbol} · {next.OutcomeReturn:P1} for labeling.";
+            $"{Status} Selected next gallery box {next.CanonicalSymbol} · {next.OutcomeReturn:P1} for labeling.";
     }
 
     private static string GalleryMatchKey(string symbol, DateTime observationFromUtc, DateTime outcomeFromUtc) =>
@@ -308,7 +308,7 @@ public sealed partial class StrategyAuthoringViewModel
             {
                 foreach (var match in matches.Take(4))
                 {
-                    UseResearchOutcomeGalleryMatch(match);
+                    FocusResearchGalleryMatch(match, openChart: false, announce: false);
                     if (PendingResearchChartSelection is null)
                         continue;
                     CommitResearchSelection(label, ResearchEventLabelSourceV1.RuleSuggestedHumanReviewed);
@@ -328,10 +328,10 @@ public sealed partial class StrategyAuthoringViewModel
                 return;
             }
 
-            // Leave the last event on the chart for visual review.
-            UseResearchOutcomeGalleryMatch(matches[Math.Min(labeled, matches.Count) - 1]);
+            // One Charts window for review — not one window per sample.
+            FocusResearchGalleryMatch(matches[Math.Min(labeled, matches.Count) - 1], openChart: true, announce: false);
             AiStatus = labeled >= 4
-                ? $"Auto-labeled {labeled} {displayName} samples from Simulated history. Click Run research experiment."
+                ? $"Auto-labeled {labeled} {displayName} samples from Simulated history. Pick a box to focus; then Run research experiment."
                 : $"Auto-labeled {labeled} sample(s) from Simulated history (need {4 - labeled} more for the experiment). Click another suggestion or label manually.";
             Status = AiStatus;
             Append(new AuthoringMessage(CodegenRole.Assistant, AiStatus));

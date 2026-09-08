@@ -1167,8 +1167,59 @@
                                   AutomationProperties.Name="Auto-label top gallery matches" />
                           <TextBlock Text="{Binding ResearchOutcomeGalleryResult.Explanation}"
                                      Classes="caption" TextWrapping="Wrap" />
+                          <TextBlock Text="All hits stay in this Research tab. Click a box to focus that event in one Charts window (scores on the card)."
+                                     Classes="caption" TextWrapping="Wrap"
+                                     IsVisible="{Binding HasResearchGalleryCards}" />
+                          <ItemsControl ItemsSource="{Binding ResearchGalleryCards}"
+                                        IsVisible="{Binding HasResearchGalleryCards}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                              </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate>
+                                <Button Classes="ghost" Margin="0,0,8,8" Padding="0"
+                                        Command="{Binding DataContext.UseResearchOutcomeGalleryMatchCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding Match}"
+                                        AutomationProperties.Name="Focus research gallery card">
+                                  <Border Width="210" MinHeight="108" Padding="10,8"
+                                          CornerRadius="6"
+                                          BorderThickness="1"
+                                          Background="{StaticResource Background.Elevated}"
+                                          BorderBrush="{StaticResource Border.Brush}">
+                                    <Border.Styles>
+                                      <Style Selector="Border">
+                                        <Setter Property="Opacity" Value="0.92" />
+                                      </Style>
+                                    </Border.Styles>
+                                    <StackPanel Spacing="3">
+                                      <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Grid.Column="0" Text="{Binding Symbol}"
+                                                   FontWeight="SemiBold" FontSize="13" />
+                                        <TextBlock Grid.Column="1" Text="{Binding ReturnText}"
+                                                   FontFamily="{StaticResource Font.Data}"
+                                                   FontWeight="SemiBold" />
+                                      </Grid>
+                                      <TextBlock Text="{Binding Hint}" Classes="caption" TextTrimming="CharacterEllipsis" />
+                                      <TextBlock Classes="caption">
+                                        <Run Text="{Binding TimeframeText}" /><Run Text=" · " />
+                                        <Run Text="{Binding WhenText}" />
+                                      </TextBlock>
+                                      <TextBlock Text="{Binding ScoreText}"
+                                                 FontFamily="{StaticResource Font.Data}"
+                                                 FontSize="10.5" TextWrapping="Wrap" />
+                                      <TextBlock Text="SELECTED" Classes="eyebrow"
+                                                 IsVisible="{Binding IsSelected}"
+                                                 Foreground="{StaticResource Ai.Text.Brush}" />
+                                    </StackPanel>
+                                  </Border>
+                                </Button>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
                           <ItemsControl ItemsSource="{Binding ResearchOutcomeGalleryResult.Matches}"
-                                        IsVisible="{Binding HasResearchOutcomeGalleryMatches}">
+                                        IsVisible="{Binding !HasResearchGalleryCards}">
                             <ItemsControl.ItemTemplate>
                               <DataTemplate>
                                 <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,2">

@@ -27,7 +27,11 @@ public sealed record ResearchOutcomeGalleryMatchV1(
     DateTime OutcomeFromUtc,
     DateTime OutcomeToUtcExclusive,
     double OutcomeReturn,
-    string LabelHint);
+    string LabelHint,
+    double? Rsi14 = null,
+    double? Ema20DistancePct = null,
+    double? Atr14Pct = null,
+    string? IndicatorScoreSummary = null);
 
 public sealed record ResearchOutcomeGalleryResultV1(
     string ScanId,
@@ -195,7 +199,12 @@ public static class ResearchOutcomeEventFinderV1
     {
         var outcomeEnd = setupIndex + 2 < bars.Count
             ? bars[setupIndex + 2].OpenTimeUtc
-            : outcome.OpenTimeUtc.AddDays(1);
+            : outcome.OpenTimeUtc + setup.Size.ToTimeSpan();
+
+        var rsi = TryRsi14(bars, setupIndex);
+        var emaDist = TryEma20DistancePct(bars, setupIndex);
+        var atrPct = TryAtr14Pct(bars, setupIndex);
+        var summary = FormatIndicatorScores(rsi, emaDist, atrPct);
 
         return new ResearchOutcomeGalleryMatchV1(
             instrumentId,
@@ -208,6 +217,67 @@ public static class ResearchOutcomeEventFinderV1
             outcome.OpenTimeUtc,
             outcomeEnd,
             ret,
-            labelHint);
+            labelHint,
+            rsi,
+            emaDist,
+            atrPct,
+            summary);
+    }
+
+    private static string? FormatIndicatorScores(double? rsi, double? emaDistPct, double? atrPct)
+    {
+        var parts = new List<string>(3);
+        if (rsi is { } r) parts.Add($"RSI {r:0}");
+        if (emaDistPct is { } e) parts.Add($"EMA20 {e:+0.0;-0.0}%");
+        if (atrPct is { } a) parts.Add($"ATR {a:0.0}%");
+        return parts.Count == 0 ? null : string.Join(" · ", parts);
+    }
+
+    private static double? TryRsi14(IReadOnlyList<OhlcvBar> bars, int index)
+    {
+        const int period = 14;
+        if (index < period) return null;
+        double gain = 0, loss = 0;
+        for (var i = index - period + 1; i <= index; i++)
+        {
+            var delta = bars[i].Close - bars[i - 1].Close;
+            if (delta >= 0) gain += delta;
+            else loss -= delta;
+        }
+
+        if (loss <= 1e-12) return 100;
+        var rs = gain / loss;
+        return 100.0 - (100.0 / (1.0 + rs));
+    }
+
+    private static double? TryEma20DistancePct(IReadOnlyList<OhlcvBar> bars, int index)
+    {
+        const int period = 20;
+        if (index + 1 < period || bars[index].Close <= 0) return null;
+        double ema = 0;
+        for (var i = 0; i < period; i++)
+            ema += bars[i].Close;
+        ema /= period;
+        var k = 2.0 / (period + 1);
+        for (var i = period; i <= index; i++)
+            ema = bars[i].Close * k + ema * (1 - k);
+        return (bars[index].Close / ema - 1.0) * 100.0;
+    }
+
+    private static double? TryAtr14Pct(IReadOnlyList<OhlcvBar> bars, int index)
+    {
+        const int period = 14;
+        if (index < period || bars[index].Close <= 0) return null;
+        double sum = 0;
+        for (var i = index - period + 1; i <= index; i++)
+        {
+            var prevClose = bars[i - 1].Close;
+            var tr = Math.Max(
+                bars[i].High - bars[i].Low,
+                Math.Max(Math.Abs(bars[i].High - prevClose), Math.Abs(bars[i].Low - prevClose)));
+            sum += tr;
+        }
+
+        return sum / period / bars[index].Close * 100.0;
     }
 }

@@ -351,9 +351,12 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     [ObservableProperty] private ChartPatternSearchResultV1? _chartPatternSearchResult;
     [ObservableProperty] private bool _isScanningResearchGallery;
     [ObservableProperty] private ResearchOutcomeGalleryResultV1? _researchOutcomeGalleryResult;
+    [ObservableProperty] private ResearchGalleryCardViewModel? _selectedResearchGalleryCard;
 
     public ObservableCollection<ResearchQuickSuggestionV1> ResearchQuickSuggestions { get; } = [];
+    public ObservableCollection<ResearchGalleryCardViewModel> ResearchGalleryCards { get; } = [];
     public bool HasResearchQuickSuggestions => ResearchQuickSuggestions.Count > 0;
+    public bool HasResearchGalleryCards => ResearchGalleryCards.Count > 0;
 
     public bool HasChartReferences => ChartReferences.Count > 0;
     public bool HasChartReferenceInspections => ChartReferenceInspections.Count > 0;
@@ -439,6 +442,24 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     {
         OnPropertyChanged(nameof(HasResearchOutcomeGalleryResult));
         OnPropertyChanged(nameof(HasResearchOutcomeGalleryMatches));
+        RebuildResearchGalleryCards(value);
+    }
+
+    private void RebuildResearchGalleryCards(ResearchOutcomeGalleryResultV1? result)
+    {
+        ResearchGalleryCards.Clear();
+        SelectedResearchGalleryCard = null;
+        if (result is null) return;
+        foreach (var match in result.Matches)
+            ResearchGalleryCards.Add(new ResearchGalleryCardViewModel(match));
+        OnPropertyChanged(nameof(HasResearchGalleryCards));
+    }
+
+    private void SelectResearchGalleryCard(ResearchOutcomeGalleryMatchV1? match)
+    {
+        foreach (var card in ResearchGalleryCards)
+            card.IsSelected = match is not null && ReferenceEquals(card.Match, match);
+        SelectedResearchGalleryCard = ResearchGalleryCards.FirstOrDefault(card => card.IsSelected);
     }
 
     partial void OnIsScanningResearchGalleryChanged(bool value) => SendCommand.NotifyCanExecuteChanged();
@@ -2763,7 +2784,17 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     }
 
     [RelayCommand]
-    private void UseResearchOutcomeGalleryMatch(ResearchOutcomeGalleryMatchV1? match)
+    private void UseResearchOutcomeGalleryMatch(ResearchOutcomeGalleryMatchV1? match) =>
+        FocusResearchGalleryMatch(match, openChart: true, announce: true);
+
+    /// <summary>
+    /// Bind selection + optional single Charts focus. Auto-collect uses openChart=false so the
+    /// Research tab boxes stay the primary UI instead of spawning many chart windows.
+    /// </summary>
+    private void FocusResearchGalleryMatch(
+        ResearchOutcomeGalleryMatchV1? match,
+        bool openChart,
+        bool announce)
     {
         if (match is null || ResearchOutcomeGalleryResult is null ||
             !ResearchOutcomeGalleryResult.Matches.Contains(match))
@@ -2779,20 +2810,34 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             new DateTimeOffset(DateTime.SpecifyKind(match.OutcomeToUtcExclusive, DateTimeKind.Utc)),
             StrategyDataRequirement.L1 | StrategyDataRequirement.Bars);
         SetResearchChartSelection(selection);
-        HostChartOverlayPreviewRequested?.Invoke(
-            this,
-            new HostChartOverlayPreviewRequestedEventArgs(
-                Array.Empty<string>(),
-                startResearchCapture: false,
-                preferredSymbol: match.CanonicalSymbol,
-                galleryMatch: match));
+        SelectResearchGalleryCard(match);
+
+        if (openChart)
+        {
+            HostChartOverlayPreviewRequested?.Invoke(
+                this,
+                new HostChartOverlayPreviewRequestedEventArgs(
+                    new[] { "ema-20", "rsi-14", "atr-14" },
+                    startResearchCapture: false,
+                    preferredSymbol: match.CanonicalSymbol,
+                    galleryMatch: match));
+        }
+
         Status =
-            $"Loaded gallery event {match.CanonicalSymbol} · {match.OutcomeReturn:P1} ({match.LabelHint}). Review capture on Charts, then Send to Builder / label B/C/N.";
-        Append(AuthoringMessage.Tool(
-            "Ok",
-            "Gallery event loaded",
-            $"{match.CanonicalSymbol} · {match.LabelHint} · return {match.OutcomeReturn:P2} · " +
-            $"{match.ObservationFromUtc:u} → outcome {match.OutcomeFromUtc:u}"));
+            $"Focused gallery event {match.CanonicalSymbol} · {match.OutcomeReturn:P1} ({match.LabelHint})" +
+            (string.IsNullOrWhiteSpace(match.IndicatorScoreSummary)
+                ? "."
+                : $" · {match.IndicatorScoreSummary}.");
+        if (announce)
+        {
+            Append(AuthoringMessage.Tool(
+                "Ok",
+                "Gallery event focused",
+                $"{match.CanonicalSymbol} · {match.LabelHint} · return {match.OutcomeReturn:P2} · " +
+                $"{match.IndicatorScoreSummary ?? "no scores"} · " +
+                $"{match.ObservationFromUtc:u} → outcome {match.OutcomeFromUtc:u}"));
+        }
+
         Save();
     }
 
