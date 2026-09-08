@@ -95,6 +95,7 @@ public static class MarketDataPipelineServiceCollectionExtensions
 
         services.AddSingleton<IMarketDataIngest, MarketDataIngestService>();
         services.AddSingleton<IChartPatternSearchV1, ChartPatternSearchV1>();
+        services.AddSingleton<IResearchOutcomeGalleryScanV1, ResearchOutcomeGalleryScanV1>();
 
         // Backs the manual File → Start QuestDB command (launch Docker Desktop + container, re-arm live).
         // Exposed via IQuestDbLauncher too, so store-agnostic layers (the login screen) can warm it up.

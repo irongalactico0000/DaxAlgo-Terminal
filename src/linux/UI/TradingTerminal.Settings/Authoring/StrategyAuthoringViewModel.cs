@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -13,6 +14,7 @@ using TradingTerminal.Core.Brokers;
 using TradingTerminal.Core.Domain;
 using TradingTerminal.Core.MarketData;
 using TradingTerminal.Core.Strategies.Authoring;
+using TradingTerminal.Core.Strategies;
 using TradingTerminal.Core.Strategies.Definition;
 using TradingTerminal.Core.Strategies.Generation;
 using TradingTerminal.Infrastructure.Backtest;
@@ -59,6 +61,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     private readonly IAuthoringChartReferenceRepository _chartReferenceRepository;
     private readonly IChartReferenceInspectorV1? _chartReferenceInspector;
     private readonly IChartPatternSearchV1? _chartPatternSearch;
+    private readonly IResearchOutcomeGalleryScanV1? _researchOutcomeGalleryScan;
     private readonly IAuthoredUnitIntentClassifierV1? _authoredUnitIntentClassifier;
     private readonly IAuthoredUnitSpecificationGeneratorV1? _authoredUnitSpecificationGenerator;
     private readonly IAuthoredUnitSourceGeneratorV1? _authoredUnitSourceGenerator;
@@ -110,6 +113,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         IAuthoringChartReferenceRepository? chartReferenceRepository = null,
         IChartReferenceInspectorV1? chartReferenceInspector = null,
         IChartPatternSearchV1? chartPatternSearch = null,
+        IResearchOutcomeGalleryScanV1? researchOutcomeGalleryScan = null,
         IAuthoredUnitIntentClassifierV1? authoredUnitIntentClassifier = null,
         IAuthoredUnitSpecificationGeneratorV1? authoredUnitSpecificationGenerator = null,
         IInstrumentRegistry? instrumentRegistry = null,
@@ -136,6 +140,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         _chartReferenceRepository = chartReferenceRepository ?? new FileAuthoringChartReferenceRepository();
         _chartReferenceInspector = chartReferenceInspector;
         _chartPatternSearch = chartPatternSearch;
+        _researchOutcomeGalleryScan = researchOutcomeGalleryScan;
         _authoredUnitIntentClassifier = authoredUnitIntentClassifier;
         _authoredUnitSpecificationGenerator = authoredUnitSpecificationGenerator;
         _authoredUnitSourceGenerator = authoredUnitSourceGenerator;
@@ -343,6 +348,8 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     [ObservableProperty] private bool _isSearchingChartPatterns;
     [ObservableProperty] private BarSize _selectedChartPatternTimeframe = BarSize.OneHour;
     [ObservableProperty] private ChartPatternSearchResultV1? _chartPatternSearchResult;
+    [ObservableProperty] private bool _isScanningResearchGallery;
+    [ObservableProperty] private ResearchOutcomeGalleryResultV1? _researchOutcomeGalleryResult;
 
     public bool HasChartReferences => ChartReferences.Count > 0;
     public bool HasChartReferenceInspections => ChartReferenceInspections.Count > 0;
@@ -355,6 +362,8 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             inspection.PatternFingerprint is not null));
     public bool HasChartPatternSearchResult => ChartPatternSearchResult is not null;
     public bool HasChartPatternMatches => ChartPatternSearchResult?.Matches.Count > 0;
+    public bool HasResearchOutcomeGalleryResult => ResearchOutcomeGalleryResult is not null;
+    public bool HasResearchOutcomeGalleryMatches => ResearchOutcomeGalleryResult?.Matches.Count > 0;
     public bool HasSelectedChartPattern => ChartPatternSelections.Count > 0;
     public string SelectedChartPatternText => ChartPatternSelections.LastOrDefault() is { } selection
         ? $"Selected {selection.Match.CanonicalSymbol} · score {selection.Match.Score:0.0} · {selection.Match.Timeframe.ToDisplayString()}"
@@ -421,6 +430,14 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         OnPropertyChanged(nameof(HasChartPatternSearchResult));
         OnPropertyChanged(nameof(HasChartPatternMatches));
     }
+
+    partial void OnResearchOutcomeGalleryResultChanged(ResearchOutcomeGalleryResultV1? value)
+    {
+        OnPropertyChanged(nameof(HasResearchOutcomeGalleryResult));
+        OnPropertyChanged(nameof(HasResearchOutcomeGalleryMatches));
+    }
+
+    partial void OnIsScanningResearchGalleryChanged(bool value) => SendCommand.NotifyCanExecuteChanged();
 
     private bool CanInspectChartReferences() =>
         HasUninspectedChartReferences &&
@@ -1238,6 +1255,12 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
 
     /// <summary>The conversation the user reads — their turns, and the model's replies verbatim.</summary>
     public ObservableCollection<AuthoringMessage> Messages { get; }
+
+    /// <summary>
+    /// Raised when chat resolves famous-indicator overlays from the host catalog so the shell can
+    /// open the research chart with those same native toggles enabled.
+    /// </summary>
+    public event EventHandler<HostChartOverlayPreviewRequestedEventArgs>? HostChartOverlayPreviewRequested;
 
     /// <summary>What the builder is doing right now ("Asking Claude…", "Compiling 3 file(s)…") — the
     /// live feedback that a long generation is actually progressing.</summary>
@@ -2413,10 +2436,38 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         var provider = ResolveClient(choice) ?? choice.Client;
         var effectiveRequest = AuthoredUnitSpecification is { Kind: AuthoredUnitKindV1.Visualizer } existing
             ? $"{existing.RawRequest}\nRevision requested by user: {prompt}"
-            : prompt;
+            : BuildInitialAuthoredUnitRequest(prompt);
         if (_authoredUnitIntentClassifier is null || _authoredUnitSpecificationGenerator is null)
         {
             await SendCandidateTurnAsync(choice, prompt);
+            return;
+        }
+
+        var chartChoice = AuthoredChartChoiceCatalogV1.Resolve(
+            effectiveRequest,
+            prompt,
+            LoadUserChartIndicators());
+        if (chartChoice.NeedsClarification &&
+            chartChoice.ClarificationQuestion is { Length: > 0 } catalogQuestion)
+        {
+            Composer = string.Empty;
+            Append(new AuthoringMessage(CodegenRole.User, prompt));
+            Append(new AuthoringMessage(CodegenRole.Assistant, catalogQuestion));
+            AwaitingAnswer = true;
+            AiStatus = "Pick one or more host chart overlays or research scans from the catalog before generation continues.";
+            Save();
+            return;
+        }
+
+        // Famous-indicator / research-scan picks go host-first. Do not wait for model JSON that has
+        // historically failed ConfirmedStrategyIntent / drawing deserialization.
+        if ((chartChoice.HasOverlays || chartChoice.HasResearchScans) &&
+            !AuthoredChartChoiceCatalogV1.LooksLikeTradingRequest(effectiveRequest))
+        {
+            if (chartChoice.HasOverlays)
+                await CompleteHostOverlayVisualizerAsync(choice, prompt, effectiveRequest, chartChoice);
+            else
+                await CompleteHostResearchScanAsync(prompt, chartChoice);
             return;
         }
 
@@ -2477,6 +2528,23 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
 
         Composer = string.Empty;
         Append(new AuthoringMessage(CodegenRole.User, prompt));
+        if (chartChoice.HasOverlays || chartChoice.HasResearchScans)
+        {
+            Append(AuthoringMessage.Tool(
+                "Ok",
+                "Host chart choices resolved",
+                AuthoredChartChoiceCatalogV1.DescribeSelection(chartChoice)));
+            foreach (var scan in chartChoice.ResearchScans)
+                Append(new AuthoringMessage(CodegenRole.Assistant, scan.ClarificationHint));
+            if (chartChoice.HasOverlays)
+            {
+                HostChartOverlayPreviewRequested?.Invoke(
+                    this,
+                    new HostChartOverlayPreviewRequestedEventArgs(
+                        chartChoice.Overlays.Select(static item => item.Id).ToArray()));
+            }
+        }
+
         InvalidateDerivedArtifactState(markUnregistered: true);
         IsGenerating = true;
         AiStatus = "Freezing the visualizer's asset, timeframe, data streams, parameters, and drawing contract…";
@@ -2491,7 +2559,8 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
                     instruments,
                     ChartReferences: ChartReferences.Select(static item => item.Reference).ToArray(),
                     ChartReferenceInspections: ChartReferenceInspections.ToArray(),
-                    ChartPatternSelections: ChartPatternSelections.ToArray()),
+                    ChartPatternSelections: ChartPatternSelections.ToArray(),
+                    SelectedChartOverlayIds: chartChoice.Overlays.Select(static item => item.Id).ToArray()),
                 CancellationToken.None);
             InputTokens += result.Usage.InputTokens;
             OutputTokens += result.Usage.OutputTokens;
@@ -2539,6 +2608,230 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             IsGenerating = false;
             Save();
         }
+    }
+
+    private Task CompleteHostOverlayVisualizerAsync(
+        AiProviderChoice choice,
+        string prompt,
+        string effectiveRequest,
+        AuthoredChartChoiceResolutionV1 chartChoice)
+    {
+        Composer = string.Empty;
+        Append(new AuthoringMessage(CodegenRole.User, prompt));
+        Append(AuthoringMessage.Tool(
+            "Ok",
+            "Host chart choices resolved",
+            AuthoredChartChoiceCatalogV1.DescribeSelection(chartChoice)));
+        foreach (var scan in chartChoice.ResearchScans)
+            Append(new AuthoringMessage(CodegenRole.Assistant, scan.ClarificationHint));
+
+        HostChartOverlayPreviewRequested?.Invoke(
+            this,
+            new HostChartOverlayPreviewRequestedEventArgs(
+                chartChoice.Overlays.Select(static item => item.Id).ToArray(),
+                startResearchCapture: chartChoice.HasResearchScans));
+
+        InvalidateDerivedArtifactState(markUnregistered: true);
+        var instruments = BuildAuthoredUnitInstrumentCandidates(effectiveRequest);
+        var specification = AuthoredChartChoiceCatalogV1.TryCreateHostVisualizerSpecification(
+            StrategyId.Trim(),
+            effectiveRequest,
+            instruments,
+            chartChoice.Overlays);
+
+        if (specification is null)
+        {
+            AiStatus = "Host overlays were applied to the live chart, but no launch-valid visualizer contract could be frozen from the current instrument catalog.";
+            Append(AuthoringMessage.Tool("Warn", "Host visualizer contract incomplete", AiStatus));
+            AwaitingAnswer = false;
+            Save();
+            return Task.CompletedTask;
+        }
+
+        AuthoredUnitSpecification = specification;
+        var hash = AuthoredUnitSpecificationCanonicalJsonV1.Hash(specification);
+        Append(new AuthoringMessage(
+            CodegenRole.Assistant,
+            $"Opened the live chart with {AuthoredChartChoiceCatalogV1.DescribeSelection(chartChoice)}. " +
+            $"Frozen a display-only host contract for {string.Join(", ", specification.Instruments.Select(static item => item.UserText))} " +
+            $"with {specification.Drawing.Layers.Count} drawing layer(s) — no model JSON required."));
+        Append(AuthoringMessage.Tool(
+            "Ok",
+            "Host visualizer contract frozen",
+            $"No order target · launch-valid · specification hash {hash[..12]}… · chart overlays previewed on the native Charts window."));
+        AiStatus = chartChoice.HasResearchScans
+            ? "Live chart overlays are on and research capture is armed. Scanning S&P 100 for matching outcome events…"
+            : "Live chart overlays are on. Review the chart, then continue Research labels or confirm a Paper strategy separately.";
+        if (chartChoice.HasResearchScans)
+        {
+            ActiveScreen = StrategyAuthoringScreen.Research;
+            _ = RunResearchOutcomeGalleryAsync(chartChoice.ResearchScans.Select(static scan => scan.Id).ToArray());
+        }
+        AwaitingAnswer = false;
+        WorkbenchTab = 0;
+        Save();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Research-scan picks open the live host chart in observation→outcome brush mode and kick off
+    /// the S&amp;P 100 outcome gallery when a scan service is registered. Not a Paper unlock.
+    /// </summary>
+    private Task CompleteHostResearchScanAsync(string prompt, AuthoredChartChoiceResolutionV1 chartChoice)
+    {
+        Composer = string.Empty;
+        Append(new AuthoringMessage(CodegenRole.User, prompt));
+        Append(AuthoringMessage.Tool(
+            "Ok",
+            "Host research scans resolved",
+            AuthoredChartChoiceCatalogV1.DescribeSelection(chartChoice)));
+        foreach (var scan in chartChoice.ResearchScans)
+            Append(new AuthoringMessage(CodegenRole.Assistant, scan.ClarificationHint));
+
+        ActiveScreen = StrategyAuthoringScreen.Research;
+        HostChartOverlayPreviewRequested?.Invoke(
+            this,
+            new HostChartOverlayPreviewRequestedEventArgs(
+                Array.Empty<string>(),
+                startResearchCapture: true));
+
+        Append(new AuthoringMessage(
+            CodegenRole.Assistant,
+            $"Opened the live research chart for {AuthoredChartChoiceCatalogV1.DescribeSelection(chartChoice)}. " +
+            "Brush an observation window and a later outcome window, or pick a gallery hit below, then label B/C/N. " +
+            "Gallery hits are research evidence only — not Paper."));
+        AiStatus = "Research chart is open. Scanning S&P 100 daily history for matching outcome events…";
+        AwaitingAnswer = false;
+        WorkbenchTab = 0;
+        Save();
+        _ = RunResearchOutcomeGalleryAsync(chartChoice.ResearchScans.Select(static scan => scan.Id).ToArray());
+        return Task.CompletedTask;
+    }
+
+    private async Task RunResearchOutcomeGalleryAsync(IReadOnlyList<string> scanIds)
+    {
+        if (_researchOutcomeGalleryScan is null)
+        {
+            AiStatus = "Research chart is open for manual capture. Outcome gallery scan is not registered in this composition.";
+            return;
+        }
+
+        var primary = scanIds.FirstOrDefault(static id =>
+            id is "next-day-plus-5" or "pre-crash" or "pre-breakout");
+        if (primary is null)
+            return;
+
+        IsScanningResearchGallery = true;
+        try
+        {
+            ResearchOutcomeGalleryResult = await _researchOutcomeGalleryScan.ScanAsync(
+                new ResearchOutcomeGalleryScanRequestV1(primary),
+                CancellationToken.None);
+            var count = ResearchOutcomeGalleryResult.Matches.Count;
+            AiStatus = count == 0
+                ? $"Gallery scan finished with no hits. {ResearchOutcomeGalleryResult.Explanation} Change the Charts symbol and brush manually — capture only, no backtest."
+                : $"Gallery found {count} event(s). Opening the top hit for capture review (not a backtest).";
+            Append(AuthoringMessage.Tool(
+                count == 0 ? "Warn" : "Ok",
+                ResearchOutcomeGalleryResult.DisplayName,
+                ResearchOutcomeGalleryResult.Explanation));
+            Status = AiStatus;
+            if (count > 0)
+            {
+                // Jump off the default AAPL chart onto a real gallery event for capture.
+                UseResearchOutcomeGalleryMatch(ResearchOutcomeGalleryResult.Matches[0]);
+            }
+            Save();
+        }
+        catch (OperationCanceledException)
+        {
+            AiStatus = "Research gallery scan stopped.";
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
+        {
+            _logger.LogWarning(exception, "Research outcome gallery scan failed");
+            AiStatus = $"Research gallery scan stopped: {exception.Message}";
+        }
+        finally
+        {
+            IsScanningResearchGallery = false;
+        }
+    }
+
+    [RelayCommand]
+    private void UseResearchOutcomeGalleryMatch(ResearchOutcomeGalleryMatchV1? match)
+    {
+        if (match is null || ResearchOutcomeGalleryResult is null ||
+            !ResearchOutcomeGalleryResult.Matches.Contains(match))
+            return;
+
+        var selection = new ResearchChartSelectionV1(
+            match.InstrumentId,
+            match.CanonicalSymbol,
+            match.Timeframe,
+            new DateTimeOffset(DateTime.SpecifyKind(match.ObservationFromUtc, DateTimeKind.Utc)),
+            new DateTimeOffset(DateTime.SpecifyKind(match.ObservationToUtcExclusive, DateTimeKind.Utc)),
+            new DateTimeOffset(DateTime.SpecifyKind(match.OutcomeFromUtc, DateTimeKind.Utc)),
+            new DateTimeOffset(DateTime.SpecifyKind(match.OutcomeToUtcExclusive, DateTimeKind.Utc)),
+            StrategyDataRequirement.L1 | StrategyDataRequirement.Bars);
+        SetResearchChartSelection(selection);
+        HostChartOverlayPreviewRequested?.Invoke(
+            this,
+            new HostChartOverlayPreviewRequestedEventArgs(
+                Array.Empty<string>(),
+                startResearchCapture: false,
+                preferredSymbol: match.CanonicalSymbol,
+                galleryMatch: match));
+        Status =
+            $"Loaded gallery event {match.CanonicalSymbol} · {match.OutcomeReturn:P1} ({match.LabelHint}). Review capture on Charts, then Send to Builder / label B/C/N.";
+        Append(AuthoringMessage.Tool(
+            "Ok",
+            "Gallery event loaded",
+            $"{match.CanonicalSymbol} · {match.LabelHint} · return {match.OutcomeReturn:P2} · " +
+            $"{match.ObservationFromUtc:u} → outcome {match.OutcomeFromUtc:u}"));
+        Save();
+    }
+
+    private static IReadOnlyList<UserChartIndicatorDefinitionV1> LoadUserChartIndicators()
+    {
+        try
+        {
+            var path = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "DaxAlgo Terminal",
+                "user-indicators.json");
+            if (!File.Exists(path))
+                return Array.Empty<UserChartIndicatorDefinitionV1>();
+            return UserChartIndicatorCatalogV1.Parse(File.ReadAllText(path));
+        }
+        catch
+        {
+            return Array.Empty<UserChartIndicatorDefinitionV1>();
+        }
+    }
+
+    private string BuildInitialAuthoredUnitRequest(string prompt)
+    {
+        if (!AwaitingAnswer && !IsRetryOnlyRequest(prompt)) return prompt;
+
+        var priorRequest = Messages
+            .Reverse()
+            .Where(static message => message.IsUser)
+            .Select(static message => message.Text.Trim())
+            .FirstOrDefault(text =>
+                text.Length > 0 &&
+                !string.Equals(text, prompt, StringComparison.Ordinal) &&
+                !IsRetryOnlyRequest(text));
+
+        return string.IsNullOrWhiteSpace(priorRequest)
+            ? prompt
+            : $"{priorRequest}\nUser clarification or retry instruction: {prompt}";
+    }
+
+    private static bool IsRetryOnlyRequest(string prompt)
+    {
+        var normalized = prompt.Trim().TrimEnd('.', '!', '?').ToLowerInvariant();
+        return normalized is "retry" or "retry it" or "try again" or "again";
     }
 
     private async Task<bool> GenerateAuthoredUnitSourceAsync(

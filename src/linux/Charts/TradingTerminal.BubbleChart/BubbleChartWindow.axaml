@@ -71,7 +71,7 @@
           <AutoCompleteBox Width="330"
                            Watermark="Type an instrument..."
                            MinimumPrefixLength="0"
-                           MinimumPopulateDelay="150"
+                           MinimumPopulateDelay="0:0:0.150"
                            MaxDropDownHeight="460"
                            FilterMode="None"
                            IsTextCompletionEnabled="False"

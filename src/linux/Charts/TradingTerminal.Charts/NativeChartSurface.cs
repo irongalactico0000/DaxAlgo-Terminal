@@ -35,8 +35,16 @@ public sealed class NativeChartSurface : Control
     private static readonly IPen LinePen = Pen("#42A5F5", 1.5);
     private static readonly IPen SmaPen = Pen("#42A5F5", 1.1);
     private static readonly IPen EmaPen = Pen("#E0A000", 1.1);
+    private static readonly IPen BollingerMidPen = Pen("#AB47BC", 1.0);
+    private static readonly IPen BollingerBandPen = Pen("#AB47BC", 0.85);
     private static readonly IPen RsiPen = Pen("#AB47BC", 1.1);
     private static readonly IPen MacdPen = Pen("#42A5F5", 1.1);
+    private static readonly IPen VwapPen = Pen("#26C6DA", 1.2);
+    private static readonly IPen StochKPen = Pen("#42A5F5", 1.1);
+    private static readonly IPen StochDPen = Pen("#E0A000", 1.1);
+    private static readonly IPen AtrPen = Pen("#66BB6A", 1.1);
+    private static readonly IPen AdxPen = Pen("#EF5350", 1.1);
+    private static readonly IPen CustomPen = Pen("#90CAF9", 1.0);
     private static readonly IPen SignalPen = Pen("#E0A000", 1.1);
     private static readonly IPen ObservationSelectionPen = Pen("#8042A5F5", 1);
     private static readonly IPen OutcomeSelectionPen = Pen("#80E0A000", 1);
@@ -158,8 +166,18 @@ public sealed class NativeChartSurface : Control
         var chartWidth = Math.Max(1, Bounds.Width - AxisWidth);
         var contentHeight = Math.Max(1, Bounds.Height - TimeAxisHeight);
         var indicatorCount = (snapshot.Rsi is { Length: > 0 } ? 1 : 0) +
-                             (snapshot.Macd is { Length: > 0 } ? 1 : 0);
-        var priceFraction = indicatorCount switch { 0 => 1d, 1 => 0.72d, _ => 0.60d };
+                             (snapshot.StochasticK is { Length: > 0 } ? 1 : 0) +
+                             (snapshot.Macd is { Length: > 0 } ? 1 : 0) +
+                             (snapshot.Atr is { Length: > 0 } ? 1 : 0) +
+                             (snapshot.Adx is { Length: > 0 } ? 1 : 0) +
+                             (snapshot.CustomSeries?.Count(static item => item.OscillatorPane && item.Points.Length > 0) ?? 0);
+        var priceFraction = indicatorCount switch
+        {
+            0 => 1d,
+            1 => 0.72d,
+            2 => 0.58d,
+            _ => 0.48d,
+        };
         var pricePane = new Rect(0, 0, chartWidth, Math.Max(80, contentHeight * priceFraction));
         var indicatorHeight = indicatorCount == 0 ? 0 : (contentHeight - pricePane.Height) / indicatorCount;
         var nextTop = pricePane.Bottom;
@@ -170,24 +188,71 @@ public sealed class NativeChartSurface : Control
         DrawPrice(context, snapshot, pricePane, priceMin, priceMax, start, end);
         DrawLineSeries(context, snapshot.Sma, candles, pricePane, priceMin, priceMax, start, end, SmaPen);
         DrawLineSeries(context, snapshot.Ema, candles, pricePane, priceMin, priceMax, start, end, EmaPen);
+        DrawLineSeries(context, snapshot.Vwap, candles, pricePane, priceMin, priceMax, start, end, VwapPen);
+        DrawLineSeries(context, snapshot.BollingerMid, candles, pricePane, priceMin, priceMax, start, end, BollingerMidPen);
+        DrawLineSeries(context, snapshot.BollingerUpper, candles, pricePane, priceMin, priceMax, start, end, BollingerBandPen);
+        DrawLineSeries(context, snapshot.BollingerLower, candles, pricePane, priceMin, priceMax, start, end, BollingerBandPen);
+        if (snapshot.CustomSeries is { } customs)
+        {
+            foreach (var custom in customs.Where(static item => !item.OscillatorPane))
+                DrawLineSeries(context, custom.Points, candles, pricePane, priceMin, priceMax, start, end, CustomPen);
+        }
 
         Rect? rsiPane = null;
         Rect? macdPane = null;
+        var lastPaneBottom = pricePane.Bottom;
         if (snapshot.Rsi is { Length: > 0 })
         {
             rsiPane = new Rect(0, nextTop, chartWidth, indicatorHeight);
-            DrawRsi(context, snapshot.Rsi, candles, rsiPane.Value, start, end,
-                drawTimeLabels: snapshot.Macd is not { Length: > 0 });
+            DrawOscillatorPane(context, snapshot.Rsi, null, candles, rsiPane.Value, start, end, "RSI 14", RsiPen, null, 0, 100);
             nextTop += indicatorHeight;
+            lastPaneBottom = rsiPane.Value.Bottom;
+        }
+        if (snapshot.StochasticK is { Length: > 0 })
+        {
+            var stochPane = new Rect(0, nextTop, chartWidth, indicatorHeight);
+            DrawOscillatorPane(context, snapshot.StochasticK, snapshot.StochasticD, candles, stochPane, start, end,
+                "Stoch 14·3", StochKPen, StochDPen, 0, 100);
+            nextTop += indicatorHeight;
+            lastPaneBottom = stochPane.Bottom;
         }
         if (snapshot.Macd is { Length: > 0 })
         {
             macdPane = new Rect(0, nextTop, chartWidth, indicatorHeight);
             DrawMacd(context, snapshot.Macd, candles, macdPane.Value, start, end);
+            nextTop += indicatorHeight;
+            lastPaneBottom = macdPane.Value.Bottom;
+        }
+        if (snapshot.Atr is { Length: > 0 })
+        {
+            var atrPane = new Rect(0, nextTop, chartWidth, indicatorHeight);
+            var atrMax = snapshot.Atr.Max(static point => point.Value);
+            DrawOscillatorPane(context, snapshot.Atr, null, candles, atrPane, start, end, "ATR 14", AtrPen, null, 0, Math.Max(atrMax, 1e-6));
+            nextTop += indicatorHeight;
+            lastPaneBottom = atrPane.Bottom;
+        }
+        if (snapshot.Adx is { Length: > 0 })
+        {
+            var adxPane = new Rect(0, nextTop, chartWidth, indicatorHeight);
+            DrawOscillatorPane(context, snapshot.Adx, null, candles, adxPane, start, end, "ADX 14", AdxPen, null, 0, 100);
+            nextTop += indicatorHeight;
+            lastPaneBottom = adxPane.Bottom;
+        }
+        if (snapshot.CustomSeries is { } customOsc)
+        {
+            foreach (var custom in customOsc.Where(static item => item.OscillatorPane && item.Points.Length > 0))
+            {
+                var pane = new Rect(0, nextTop, chartWidth, indicatorHeight);
+                var max = custom.Id.Contains("atr", StringComparison.OrdinalIgnoreCase)
+                    ? Math.Max(custom.Points.Max(static point => point.Value), 1e-6)
+                    : 100d;
+                DrawOscillatorPane(context, custom.Points, null, candles, pane, start, end, custom.Label, CustomPen, null, 0, max);
+                nextTop += indicatorHeight;
+                lastPaneBottom = pane.Bottom;
+            }
         }
 
-        DrawResearchRanges(context, snapshot, start, end,
-            macdPane?.Bottom ?? rsiPane?.Bottom ?? pricePane.Bottom);
+        DrawResearchRanges(context, snapshot, start, end, lastPaneBottom);
 
         DrawCrosshairAndLegend(context, snapshot, candles, pricePane, rsiPane, macdPane,
             priceMin, priceMax, start, end);
@@ -367,6 +432,15 @@ public sealed class NativeChartSurface : Control
 
         Include(snapshot.Sma, snapshot.Candles[start].Time, snapshot.Candles[end - 1].Time, ref min, ref max);
         Include(snapshot.Ema, snapshot.Candles[start].Time, snapshot.Candles[end - 1].Time, ref min, ref max);
+        Include(snapshot.Vwap, snapshot.Candles[start].Time, snapshot.Candles[end - 1].Time, ref min, ref max);
+        Include(snapshot.BollingerMid, snapshot.Candles[start].Time, snapshot.Candles[end - 1].Time, ref min, ref max);
+        Include(snapshot.BollingerUpper, snapshot.Candles[start].Time, snapshot.Candles[end - 1].Time, ref min, ref max);
+        Include(snapshot.BollingerLower, snapshot.Candles[start].Time, snapshot.Candles[end - 1].Time, ref min, ref max);
+        if (snapshot.CustomSeries is { } customs)
+        {
+            foreach (var custom in customs.Where(static item => !item.OscillatorPane))
+                Include(custom.Points, snapshot.Candles[start].Time, snapshot.Candles[end - 1].Time, ref min, ref max);
+        }
         if (!double.IsFinite(min) || !double.IsFinite(max))
             return (0, 1);
         if (max <= min)
@@ -556,22 +630,43 @@ public sealed class NativeChartSurface : Control
         context.DrawGeometry(null, pen, geometry);
     }
 
-    private static void DrawRsi(DrawingContext context, ChartLinePoint[] rsi, ChartCandle[] candles,
-        Rect pane, int start, int end, bool drawTimeLabels)
+    private static void DrawOscillatorPane(
+        DrawingContext context,
+        ChartLinePoint[] primary,
+        ChartLinePoint[]? secondary,
+        ChartCandle[] candles,
+        Rect pane,
+        int start,
+        int end,
+        string title,
+        IPen primaryPen,
+        IPen? secondaryPen,
+        double min,
+        double max)
     {
         context.DrawLine(BorderPen, pane.TopLeft, pane.TopRight);
         context.DrawLine(BorderPen, pane.TopRight, pane.BottomRight);
-        var y70 = Y(70, pane, 0, 100);
-        var y30 = Y(30, pane, 0, 100);
-        var y50 = Y(50, pane, 0, 100);
-        context.DrawLine(RsiUpperPen, new Point(0, y70), new Point(pane.Right, y70));
-        context.DrawLine(GridPen, new Point(0, y50), new Point(pane.Right, y50));
-        context.DrawLine(RsiLowerPen, new Point(0, y30), new Point(pane.Right, y30));
-        DrawText(context, "RSI 14", new Point(8, pane.Top + 5), DimTextBrush, 10);
-        DrawText(context, "70", new Point(pane.Right + 5, y70 - 6), DimTextBrush, 9);
-        DrawText(context, "30", new Point(pane.Right + 5, y30 - 6), DimTextBrush, 9);
-        DrawLineSeries(context, rsi, candles, pane, 0, 100, start, end, RsiPen);
-        if (drawTimeLabels) DrawTimeAxis(context, pane, candles, start, end);
+        if (max <= 100.0001 && min >= -0.0001)
+        {
+            var y70 = Y(70, pane, min, max);
+            var y50 = Y(50, pane, min, max);
+            var y30 = Y(30, pane, min, max);
+            context.DrawLine(RsiUpperPen, new Point(0, y70), new Point(pane.Right, y70));
+            context.DrawLine(GridPen, new Point(0, y50), new Point(pane.Right, y50));
+            context.DrawLine(RsiLowerPen, new Point(0, y30), new Point(pane.Right, y30));
+        }
+
+        DrawText(context, title, new Point(8, pane.Top + 5), DimTextBrush, 10);
+        DrawLineSeries(context, primary, candles, pane, min, max, start, end, primaryPen);
+        if (secondary is { Length: > 0 } && secondaryPen is not null)
+            DrawLineSeries(context, secondary, candles, pane, min, max, start, end, secondaryPen);
+        DrawTimeAxis(context, pane, candles, start, end);
+    }
+
+    private static void DrawRsi(DrawingContext context, ChartLinePoint[] rsi, ChartCandle[] candles,
+        Rect pane, int start, int end, bool drawTimeLabels)
+    {
+        DrawOscillatorPane(context, rsi, null, candles, pane, start, end, "RSI 14", RsiPen, null, 0, 100);
     }
 
     private static void DrawMacd(DrawingContext context, MacdPoint[] points, ChartCandle[] candles,

@@ -84,6 +84,7 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
             ?? Timeframes.First(t => t.BarSize == BarSize.OneMinute);
         Instruments = new ObservableCollection<TradableInstrument>();
         PresetNames = new ObservableCollection<string>(_presetStore.Names);
+        LoadUserIndicators();
 
         if (embed is not null)
         {
@@ -91,6 +92,23 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
             return; // no picker ⇒ no broker-universe swap; the host owns the selection
         }
         _ = LoadInstrumentsAsync();
+    }
+
+    private void LoadUserIndicators()
+    {
+        var store = new FileUserChartIndicatorStore();
+        UserIndicatorsPath = store.FilePath;
+        UserIndicators.Clear();
+        foreach (var definition in store.LoadOrSeed())
+        {
+            var toggle = new UserChartIndicatorToggle(definition);
+            toggle.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(UserChartIndicatorToggle.IsEnabled))
+                    QueueReload();
+            };
+            UserIndicators.Add(toggle);
+        }
     }
 
     public ObservableCollection<ChartTimeframe> Timeframes { get; }
@@ -108,7 +126,128 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _showEma = true;
     [ObservableProperty] private bool _showRsi;
     [ObservableProperty] private bool _showMacd;
+    [ObservableProperty] private bool _showBollinger;
+    [ObservableProperty] private bool _showStochastic;
+    [ObservableProperty] private bool _showAtr;
+    [ObservableProperty] private bool _showVwap;
+    [ObservableProperty] private bool _showAdx;
+    [ObservableProperty] private int _emaPeriod = 50;
     [ObservableProperty] private string _status = "Loading instruments…";
+    [ObservableProperty] private string _userIndicatorsPath = string.Empty;
+
+    public ObservableCollection<UserChartIndicatorToggle> UserIndicators { get; } = [];
+
+    /// <summary>
+    /// Applies host chat-catalog overlay ids (see <c>AuthoredChartChoiceCatalogV1</c>) onto the
+    /// native chart toggles so famous indicators render immediately without waiting for authored
+    /// visualizer codegen. Unknown ids are ignored; candles-only clears indicator overlays.
+    /// </summary>
+    public void ApplyHostOverlayIds(IEnumerable<string> overlayIds)
+    {
+        var state = TradingTerminal.Core.Strategies.Generation.NativeChartOverlaySelectionV1
+            .FromHostOverlayIds(overlayIds);
+        ShowSma = state.ShowSma;
+        ShowEma = state.ShowEma;
+        ShowRsi = state.ShowRsi;
+        ShowMacd = state.ShowMacd;
+        ShowBollinger = state.ShowBollinger;
+        ShowStochastic = state.ShowStochastic;
+        ShowAtr = state.ShowAtr;
+        ShowVwap = state.ShowVwap;
+        ShowAdx = state.ShowAdx;
+        if (state.EmaPeriod > 0)
+            EmaPeriod = state.EmaPeriod;
+
+        var idSet = overlayIds
+            .Where(static id => !string.IsNullOrWhiteSpace(id))
+            .Select(static id => id.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var user in UserIndicators)
+            user.IsEnabled = idSet.Contains(user.Definition.Id) ||
+                             (user.Definition.Alias is { } alias && idSet.Contains(alias));
+    }
+
+    private string? _pendingHostPreferredSymbol;
+    private BarSize? _pendingHostBarSize;
+    private ChartTimeRange? _pendingHostObservation;
+    private ChartTimeRange? _pendingHostOutcome;
+
+    /// <summary>Selects an instrument by symbol when the host research gallery hands off a match.</summary>
+    public void ApplyHostPreferredSymbol(string? symbol)
+    {
+        if (string.IsNullOrWhiteSpace(symbol))
+            return;
+
+        _pendingHostPreferredSymbol = symbol.Trim();
+        TryApplyPendingHostInstrument();
+    }
+
+    /// <summary>
+    /// Host gallery handoff: switch symbol/timeframe and pre-fill observation→outcome ranges for capture.
+    /// </summary>
+    public void ApplyHostResearchCapture(
+        string? symbol,
+        BarSize timeframe,
+        DateTime observationFromUtc,
+        DateTime observationToUtcExclusive,
+        DateTime outcomeFromUtc,
+        DateTime outcomeToUtcExclusive)
+    {
+        _pendingHostPreferredSymbol = string.IsNullOrWhiteSpace(symbol) ? _pendingHostPreferredSymbol : symbol.Trim();
+        _pendingHostBarSize = timeframe;
+        _pendingHostObservation = new ChartTimeRange(
+            new DateTimeOffset(DateTime.SpecifyKind(observationFromUtc, DateTimeKind.Utc)),
+            new DateTimeOffset(DateTime.SpecifyKind(observationToUtcExclusive, DateTimeKind.Utc)));
+        _pendingHostOutcome = new ChartTimeRange(
+            new DateTimeOffset(DateTime.SpecifyKind(outcomeFromUtc, DateTimeKind.Utc)),
+            new DateTimeOffset(DateTime.SpecifyKind(outcomeToUtcExclusive, DateTimeKind.Utc)));
+        TryApplyPendingHostInstrument();
+        TryApplyPendingHostTimeframe();
+        // Ranges apply after history loads so the brush overlays the correct bars.
+    }
+
+    private void TryApplyPendingHostInstrument()
+    {
+        if (_pendingHostPreferredSymbol is null || _allInstruments.Count == 0)
+            return;
+
+        var symbol = _pendingHostPreferredSymbol;
+        var match = _allInstruments.FirstOrDefault(item =>
+            string.Equals(item.Contract.Symbol, symbol, StringComparison.OrdinalIgnoreCase) ||
+            item.DisplayName.Contains(symbol, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+            return;
+
+        _pendingHostPreferredSymbol = null;
+        SelectedInstrument = match;
+        InstrumentSearchText = match.DisplayName;
+    }
+
+    private void TryApplyPendingHostTimeframe()
+    {
+        if (_pendingHostBarSize is not { } size)
+            return;
+        var tf = Timeframes.FirstOrDefault(item => item.BarSize == size);
+        if (tf is null)
+            return;
+        _pendingHostBarSize = null;
+        SelectedTimeframe = tf;
+    }
+
+    private void TryApplyPendingHostResearchRanges()
+    {
+        if (_pendingHostObservation is null || _pendingHostOutcome is null || !HasData)
+            return;
+
+        ResearchObservationRange = _pendingHostObservation;
+        ResearchOutcomeRange = _pendingHostOutcome;
+        ResearchSelectionStep = ChartResearchSelectionStep.None;
+        _pendingHostObservation = null;
+        _pendingHostOutcome = null;
+        Status =
+            $"Host gallery capture loaded for {SelectedInstrument?.Contract.Symbol}. Review observation→outcome, then Send to Builder.";
+        NotifyResearchSelectionStateChanged();
+    }
 
     /// <summary>Display pause: live candle pushes stop; the hub subscription keeps running so
     /// resume is instant (a dirty flag triggers one exact catch-up reload).</summary>
@@ -149,6 +288,12 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
     partial void OnShowEmaChanged(bool value) => QueueReload();
     partial void OnShowRsiChanged(bool value) => QueueReload();
     partial void OnShowMacdChanged(bool value) => QueueReload();
+    partial void OnShowBollingerChanged(bool value) => QueueReload();
+    partial void OnShowStochasticChanged(bool value) => QueueReload();
+    partial void OnShowAtrChanged(bool value) => QueueReload();
+    partial void OnShowVwapChanged(bool value) => QueueReload();
+    partial void OnShowAdxChanged(bool value) => QueueReload();
+    partial void OnEmaPeriodChanged(int value) => QueueReload();
 
     partial void OnIsPausedChanged(bool value)
     {
@@ -197,15 +342,15 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
                 return;
             }
             _allInstruments = list;
-            SelectedInstrument =
-                (SelectedInstrument?.Contract.Symbol is { } prev
-                    ? _allInstruments.FirstOrDefault(i => i.Contract.Symbol == prev) : null)
-                ?? InstrumentPickerFilter.Remembered(InstrumentPersistKey, _allInstruments, i => i.Contract.Symbol)
+            TryApplyPendingHostInstrument();
+            SelectedInstrument ??=
+                InstrumentPickerFilter.Remembered(InstrumentPersistKey, _allInstruments, i => i.Contract.Symbol)
                 ?? _allInstruments.FirstOrDefault(i => i.Contract.Symbol == "SPY")
                 ?? _allInstruments.FirstOrDefault(i => i.Contract.Symbol == "AAPL")
                 ?? _allInstruments.FirstOrDefault();
             ApplyFilter();
             Status = $"{_allInstruments.Count} instruments.";
+            TryApplyPendingHostTimeframe();
         }
         catch (Exception ex)
         {
@@ -272,6 +417,11 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
                 volume[i] = new ChartVolume(t, b.Volume, b.Close >= b.Open ? "#26a69a80" : "#ef535080");
             }
 
+            var bollinger = ShowBollinger ? Bollinger(bars, 20, 2d) : null;
+            (ChartLinePoint[] K, ChartLinePoint[] D)? stochastic = ShowStochastic
+                ? Stochastic(bars, 14, 3)
+                : null;
+            var custom = BuildCustomSeries(bars);
             var snapshot = new ChartSnapshot(
                 Symbol: instrument.DisplayName,
                 Timeframe: tf.Label,
@@ -279,15 +429,25 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
                 Candles: candles,
                 Volume: volume,
                 Sma: ShowSma ? Sma(bars, 20) : null,
-                Ema: ShowEma ? Ema(bars, 50) : null,
+                Ema: ShowEma ? Ema(bars, EmaPeriod <= 0 ? 50 : EmaPeriod) : null,
                 Rsi: ShowRsi ? Rsi(bars, 14) : null,
-                Macd: ShowMacd ? Macd(bars, 12, 26, 9) : null);
+                Macd: ShowMacd ? Macd(bars, 12, 26, 9) : null,
+                BollingerMid: bollinger?.Mid,
+                BollingerUpper: bollinger?.Upper,
+                BollingerLower: bollinger?.Lower,
+                StochasticK: stochastic?.K,
+                StochasticD: stochastic?.D,
+                Atr: ShowAtr ? Atr(bars, 14) : null,
+                Vwap: ShowVwap ? Vwap(bars) : null,
+                Adx: ShowAdx ? Adx(bars, 14) : null,
+                CustomSeries: custom);
 
             if (ct.IsCancellationRequested) return;
             _lastBars = bars;
             _lastSnapshot = snapshot;
             HasData = bars.Count > 0;
             SnapshotReady?.Invoke(this, snapshot);
+            TryApplyPendingHostResearchRanges();
             Status = bars.Count == 0
                 ? $"No history for {instrument.DisplayName} — is the broker connected and streaming?"
                 : $"{instrument.DisplayName} · {tf.Label} · {bars.Count} bars";
@@ -351,7 +511,7 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
         if (name.Length == 0) return;
         _presetStore.Save(name, new ChartsPreset(
             SelectedInstrument?.Contract.Symbol, SelectedTimeframe?.Label, SelectedChartType,
-            ShowSma, ShowEma, ShowRsi, ShowMacd));
+            ShowSma, ShowEma, ShowRsi, ShowMacd, ShowBollinger, EmaPeriod));
         RefreshPresetNames(selected: name);
         _logger.LogInformation("Charts: preset '{Name}' saved", name);
     }
@@ -387,6 +547,9 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
             ShowEma = preset.ShowEma;
             ShowRsi = preset.ShowRsi;
             ShowMacd = preset.ShowMacd;
+            ShowBollinger = preset.ShowBollinger;
+            if (preset.EmaPeriod > 0)
+                EmaPeriod = preset.EmaPeriod;
         }
         finally
         {
@@ -510,7 +673,211 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
         return pts.ToArray();
     }
 
-    private static double Round(double v) => Math.Round(v, 6);
+    private static BollingerBands Bollinger(IReadOnlyList<Bar> bars, int period, double stdDev)
+    {
+        var mid = new List<ChartLinePoint>(bars.Count);
+        var upper = new List<ChartLinePoint>(bars.Count);
+        var lower = new List<ChartLinePoint>(bars.Count);
+        var window = new Queue<double>(period);
+        double sum = 0d;
+        double sumSq = 0d;
+        foreach (var bar in bars)
+        {
+            window.Enqueue(bar.Close);
+            sum += bar.Close;
+            sumSq += bar.Close * bar.Close;
+            if (window.Count > period)
+            {
+                var removed = window.Dequeue();
+                sum -= removed;
+                sumSq -= removed * removed;
+            }
+
+            if (window.Count < period)
+                continue;
+
+            var mean = sum / period;
+            var variance = Math.Max(0d, (sumSq / period) - (mean * mean));
+            var band = Math.Sqrt(variance) * stdDev;
+            var t = ToEpoch(bar.TimestampUtc);
+            mid.Add(new ChartLinePoint(t, Round(mean)));
+            upper.Add(new ChartLinePoint(t, Round(mean + band)));
+            lower.Add(new ChartLinePoint(t, Round(mean - band)));
+        }
+
+        return new BollingerBands(mid.ToArray(), upper.ToArray(), lower.ToArray());
+    }
+
+    private IReadOnlyList<ChartNamedSeries> BuildCustomSeries(IReadOnlyList<Bar> bars)
+    {
+        var series = new List<ChartNamedSeries>();
+        foreach (var toggle in UserIndicators.Where(static item => item.IsEnabled))
+        {
+            var def = toggle.Definition;
+            ChartLinePoint[] points = def.Kind switch
+            {
+                TradingTerminal.Core.Strategies.Generation.UserChartIndicatorKindV1.Sma => Sma(bars, def.Period),
+                TradingTerminal.Core.Strategies.Generation.UserChartIndicatorKindV1.Ema => Ema(bars, def.Period),
+                TradingTerminal.Core.Strategies.Generation.UserChartIndicatorKindV1.Rsi => Rsi(bars, def.Period),
+                TradingTerminal.Core.Strategies.Generation.UserChartIndicatorKindV1.Atr => Atr(bars, def.Period),
+                _ => Array.Empty<ChartLinePoint>(),
+            };
+            if (points.Length == 0) continue;
+            var oscillator = def.Kind is TradingTerminal.Core.Strategies.Generation.UserChartIndicatorKindV1.Rsi
+                or TradingTerminal.Core.Strategies.Generation.UserChartIndicatorKindV1.Atr;
+            series.Add(new ChartNamedSeries(def.Id, def.DisplayName, oscillator, points));
+        }
+
+        return series;
+    }
+
+    private static (ChartLinePoint[] K, ChartLinePoint[] D) Stochastic(IReadOnlyList<Bar> bars, int period, int smooth)
+    {
+        var rawK = new List<ChartLinePoint>(bars.Count);
+        for (var i = 0; i < bars.Count; i++)
+        {
+            if (i + 1 < period) continue;
+            var slice = bars.Skip(i + 1 - period).Take(period).ToArray();
+            var high = slice.Max(static bar => bar.High);
+            var low = slice.Min(static bar => bar.Low);
+            var range = high - low;
+            var k = range <= 1e-12 ? 50d : 100d * (bars[i].Close - low) / range;
+            rawK.Add(new ChartLinePoint(ToEpoch(bars[i].TimestampUtc), Round(k)));
+        }
+
+        var d = Smooth(rawK, smooth);
+        return (rawK.ToArray(), d);
+    }
+
+    private static ChartLinePoint[] Smooth(IReadOnlyList<ChartLinePoint> source, int period)
+    {
+        var ind = new SimpleMovingAverage(period);
+        var pts = new List<ChartLinePoint>(source.Count);
+        foreach (var point in source)
+        {
+            ind.Push(point.Value);
+            if (ind.IsReady)
+                pts.Add(new ChartLinePoint(point.Time, Round(ind.Value)));
+        }
+
+        return pts.ToArray();
+    }
+
+    private static ChartLinePoint[] Atr(IReadOnlyList<Bar> bars, int period)
+    {
+        var pts = new List<ChartLinePoint>(bars.Count);
+        double atr = 0;
+        for (var i = 1; i < bars.Count; i++)
+        {
+            var tr = Math.Max(
+                bars[i].High - bars[i].Low,
+                Math.Max(
+                    Math.Abs(bars[i].High - bars[i - 1].Close),
+                    Math.Abs(bars[i].Low - bars[i - 1].Close)));
+            if (i < period)
+            {
+                atr += tr;
+                if (i == period - 1)
+                {
+                    atr /= period;
+                    pts.Add(new ChartLinePoint(ToEpoch(bars[i].TimestampUtc), Round(atr)));
+                }
+
+                continue;
+            }
+
+            atr = ((atr * (period - 1)) + tr) / period;
+            pts.Add(new ChartLinePoint(ToEpoch(bars[i].TimestampUtc), Round(atr)));
+        }
+
+        return pts.ToArray();
+    }
+
+    private static ChartLinePoint[] Vwap(IReadOnlyList<Bar> bars)
+    {
+        var pts = new List<ChartLinePoint>(bars.Count);
+        double cumPv = 0;
+        double cumVol = 0;
+        DateTime? sessionDay = null;
+        foreach (var bar in bars)
+        {
+            var day = bar.TimestampUtc.Date;
+            if (sessionDay is null || day != sessionDay)
+            {
+                sessionDay = day;
+                cumPv = 0;
+                cumVol = 0;
+            }
+
+            var typical = (bar.High + bar.Low + bar.Close) / 3d;
+            var volume = Math.Max(0, bar.Volume);
+            cumPv += typical * volume;
+            cumVol += volume;
+            if (cumVol <= 0) continue;
+            pts.Add(new ChartLinePoint(ToEpoch(bar.TimestampUtc), Round(cumPv / cumVol)));
+        }
+
+        return pts.ToArray();
+    }
+
+    private static ChartLinePoint[] Adx(IReadOnlyList<Bar> bars, int period)
+    {
+        var pts = new List<ChartLinePoint>(bars.Count);
+        if (bars.Count < period + 2) return pts.ToArray();
+
+        double prevTr = 0, prevPlusDm = 0, prevMinusDm = 0, prevAdx = 0;
+        for (var i = 1; i < bars.Count; i++)
+        {
+            var upMove = bars[i].High - bars[i - 1].High;
+            var downMove = bars[i - 1].Low - bars[i].Low;
+            var plusDm = upMove > downMove && upMove > 0 ? upMove : 0;
+            var minusDm = downMove > upMove && downMove > 0 ? downMove : 0;
+            var tr = Math.Max(
+                bars[i].High - bars[i].Low,
+                Math.Max(
+                    Math.Abs(bars[i].High - bars[i - 1].Close),
+                    Math.Abs(bars[i].Low - bars[i - 1].Close)));
+
+            if (i < period)
+            {
+                prevTr += tr;
+                prevPlusDm += plusDm;
+                prevMinusDm += minusDm;
+                continue;
+            }
+
+            if (i == period)
+            {
+                prevTr += tr;
+                prevPlusDm += plusDm;
+                prevMinusDm += minusDm;
+            }
+            else
+            {
+                prevTr = prevTr - (prevTr / period) + tr;
+                prevPlusDm = prevPlusDm - (prevPlusDm / period) + plusDm;
+                prevMinusDm = prevMinusDm - (prevMinusDm / period) + minusDm;
+            }
+
+            if (prevTr <= 1e-12) continue;
+            var plusDi = 100d * prevPlusDm / prevTr;
+            var minusDi = 100d * prevMinusDm / prevTr;
+            var diSum = plusDi + minusDi;
+            var dx = diSum <= 1e-12 ? 0 : 100d * Math.Abs(plusDi - minusDi) / diSum;
+            if (i == period * 2 - 1)
+                prevAdx = dx;
+            else if (i > period * 2 - 1)
+                prevAdx = ((prevAdx * (period - 1)) + dx) / period;
+            else
+                continue;
+
+            pts.Add(new ChartLinePoint(ToEpoch(bars[i].TimestampUtc), Round(prevAdx)));
+        }
+
+        return pts.ToArray();
+    }
+
+    private static double Round(double value) => Math.Round(value, 6, MidpointRounding.AwayFromZero);
 
     public void Dispose()
     {
@@ -550,13 +917,19 @@ public sealed record ChartsPreset(
     bool ShowSma,
     bool ShowEma,
     bool ShowRsi,
-    bool ShowMacd);
+    bool ShowMacd,
+    bool ShowBollinger = false,
+    int EmaPeriod = 50);
 
 // ── JSON bridge DTOs (camelCase via the window's serializer) → Lightweight Charts shapes ─────────
 public sealed record ChartCandle(long Time, double Open, double High, double Low, double Close);
 public sealed record ChartVolume(long Time, double Value, string Color);
 public sealed record ChartLinePoint(long Time, double Value);
 public sealed record MacdPoint(long Time, double Macd, double Signal, double Hist);
+public sealed record BollingerBands(
+    ChartLinePoint[] Mid,
+    ChartLinePoint[] Upper,
+    ChartLinePoint[] Lower);
 public sealed record ChartSnapshot(
     string Symbol,
     string Timeframe,
@@ -566,4 +939,35 @@ public sealed record ChartSnapshot(
     ChartLinePoint[]? Sma,
     ChartLinePoint[]? Ema,
     ChartLinePoint[]? Rsi,
-    MacdPoint[]? Macd);
+    MacdPoint[]? Macd,
+    ChartLinePoint[]? BollingerMid = null,
+    ChartLinePoint[]? BollingerUpper = null,
+    ChartLinePoint[]? BollingerLower = null,
+    ChartLinePoint[]? StochasticK = null,
+    ChartLinePoint[]? StochasticD = null,
+    ChartLinePoint[]? Atr = null,
+    ChartLinePoint[]? Vwap = null,
+    ChartLinePoint[]? Adx = null,
+    IReadOnlyList<ChartNamedSeries>? CustomSeries = null);
+
+/// <summary>A named custom/user indicator series drawn on price or a 0–100 oscillator pane.</summary>
+public sealed record ChartNamedSeries(
+    string Id,
+    string Label,
+    bool OscillatorPane,
+    ChartLinePoint[] Points);
+
+/// <summary>One user-defined indicator checkbox row on the Charts options rail.</summary>
+public sealed partial class UserChartIndicatorToggle : ObservableObject
+{
+    public UserChartIndicatorToggle(TradingTerminal.Core.Strategies.Generation.UserChartIndicatorDefinitionV1 definition)
+    {
+        Definition = definition ?? throw new ArgumentNullException(nameof(definition));
+    }
+
+    public TradingTerminal.Core.Strategies.Generation.UserChartIndicatorDefinitionV1 Definition { get; }
+
+    public string DisplayName => Definition.DisplayName;
+
+    [ObservableProperty] private bool _isEnabled;
+}

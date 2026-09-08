@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
@@ -315,15 +316,107 @@ public partial class MainWindow : Window
         Vm?.ActivityLog.Append("Charts", "INFO", "Opened Charts.");
     }
 
+    /// <summary>
+    /// Dev/smoke entry used by <c>--preview-overlays=...</c> so chat-catalog ids can open the live
+    /// native chart without depending on Avalonia menu automation.
+    /// </summary>
+    public void PreviewHostChartOverlays(IReadOnlyList<string> overlayIds, bool startResearchCapture = false)
+    {
+        try
+        {
+            OpenResearchChart(hostOverlayIds: overlayIds, startResearchCapture: startResearchCapture);
+            Vm?.ActivityLog.Append(
+                "Charts",
+                "INFO",
+                startResearchCapture
+                    ? $"Previewed host research chart (overlays: {string.Join(", ", overlayIds)})."
+                    : $"Previewed host chart overlays: {string.Join(", ", overlayIds)}.");
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                File.AppendAllText(
+                    "/tmp/daxalgo-preview-overlays.log",
+                    $"{DateTime.UtcNow:O} PreviewHostChartOverlays FAILED: {ex}\n");
+            }
+            catch
+            {
+                // ignore diagnostic write failures
+            }
+
+            Vm?.ActivityLog.Append(
+                "Charts",
+                "ERROR",
+                $"Host chart overlay preview failed: {ex.Message}");
+        }
+    }
+
     private void OpenResearchChart(
         TradingTerminal.App.Authoring.StrategyAuthoringViewModel? targetViewModel = null,
-        Settings.StrategyAuthoringWindow? targetWindow = null)
+        Settings.StrategyAuthoringWindow? targetWindow = null,
+        IReadOnlyList<string>? hostOverlayIds = null,
+        bool startResearchCapture = false,
+        string? preferredSymbol = null,
+        TradingTerminal.Core.Strategies.Generation.ResearchOutcomeGalleryMatchV1? galleryMatch = null)
     {
-        if ((Application.Current as App)?.Services is not { } services) return;
+        static void PreviewLog(string message)
+        {
+            try
+            {
+                File.AppendAllText(
+                    "/tmp/daxalgo-preview-overlays.log",
+                    $"{DateTime.UtcNow:O} OpenResearchChart: {message}\n");
+            }
+            catch
+            {
+                // Preview diagnostics must never break chart open.
+            }
+        }
+
+        if ((Application.Current as App)?.Services is not { } services)
+        {
+            PreviewLog("aborted — Application.Current.Services unavailable");
+            return;
+        }
+
+        PreviewLog(
+            hostOverlayIds is { Count: > 0 }
+                ? $"resolving Charts services for overlays [{string.Join(',', hostOverlayIds)}]"
+                : "resolving Charts services");
 
         var chartViewModel = services.GetRequiredService<TradingTerminal.Charts.ChartsViewModel>();
+        PreviewLog("ChartsViewModel resolved");
+        if (hostOverlayIds is { Count: > 0 })
+        {
+            chartViewModel.ApplyHostOverlayIds(hostOverlayIds);
+            PreviewLog(
+                $"overlays applied SMA={chartViewModel.ShowSma} EMA={chartViewModel.ShowEma}/{chartViewModel.EmaPeriod} RSI={chartViewModel.ShowRsi} MACD={chartViewModel.ShowMacd} BB={chartViewModel.ShowBollinger}");
+        }
+
+        if (galleryMatch is not null)
+        {
+            chartViewModel.ApplyHostResearchCapture(
+                galleryMatch.CanonicalSymbol,
+                galleryMatch.Timeframe,
+                galleryMatch.ObservationFromUtc,
+                galleryMatch.ObservationToUtcExclusive,
+                galleryMatch.OutcomeFromUtc,
+                galleryMatch.OutcomeToUtcExclusive);
+            PreviewLog($"gallery capture applied: {galleryMatch.CanonicalSymbol} return={galleryMatch.OutcomeReturn:P1}");
+        }
+        else if (!string.IsNullOrWhiteSpace(preferredSymbol))
+        {
+            chartViewModel.ApplyHostPreferredSymbol(preferredSymbol);
+            PreviewLog($"preferred symbol applied: {preferredSymbol}");
+        }
+
         var chartWindow = services.GetRequiredService<TradingTerminal.Charts.ChartsWindow>();
+        PreviewLog("ChartsWindow resolved");
         chartWindow.DataContext = chartViewModel;
+        // ChartsWindow.axaml used CenterOwner; without an owner Avalonia can leave the window
+        // off-screen / non-visible on macOS. Force CenterScreen and Show(owner).
+        chartWindow.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         EventHandler<TradingTerminal.Charts.ResearchChartSelectionRequestedEventArgs>? selectionHandler = null;
         selectionHandler = (_, args) =>
@@ -343,8 +436,48 @@ public partial class MainWindow : Window
             chartWindow.Close();
         };
         chartViewModel.ResearchSelectionRequested += selectionHandler;
-        chartWindow.Closed += (_, _) => chartViewModel.ResearchSelectionRequested -= selectionHandler;
-        ShowDisposing(chartWindow, chartViewModel);
+        chartWindow.Closed += (_, _) =>
+        {
+            PreviewLog("Charts window closed");
+            chartViewModel.ResearchSelectionRequested -= selectionHandler;
+        };
+        if (chartViewModel is IDisposable disposable)
+            chartWindow.Closed += (_, _) => disposable.Dispose();
+        chartWindow.Show(this);
+        chartWindow.Activate();
+        if (startResearchCapture)
+            ArmHostResearchCapture(chartViewModel, PreviewLog);
+        PreviewLog(
+            $"Show(owner)+Activate Charts IsVisible={chartWindow.IsVisible} Width={chartWindow.Width} Height={chartWindow.Height} researchCapture={startResearchCapture}");
+    }
+
+    private static void ArmHostResearchCapture(
+        TradingTerminal.Charts.ChartsViewModel chartViewModel,
+        Action<string> previewLog)
+    {
+        void StartCapture()
+        {
+            chartViewModel.SeedCaptureWindowsFromRecentBars();
+            previewLog(
+                chartViewModel.CanSendResearchSelection
+                    ? "research capture seeded (observation+outcome visible)"
+                    : "research capture armed (observation brush)");
+        }
+
+        if (chartViewModel.HasData)
+        {
+            StartCapture();
+            return;
+        }
+
+        EventHandler<TradingTerminal.Charts.ChartSnapshot>? snapshotHandler = null;
+        snapshotHandler = (_, _) =>
+        {
+            chartViewModel.SnapshotReady -= snapshotHandler;
+            StartCapture();
+        };
+        chartViewModel.SnapshotReady += snapshotHandler;
+        previewLog("research capture waiting for chart history SnapshotReady");
     }
 
     private Settings.StrategyAuthoringWindow CreateAuthoringWindow(
@@ -361,17 +494,36 @@ public partial class MainWindow : Window
         EventHandler? requestHandler = null;
         EventHandler? validationHandler = null;
         EventHandler? paperHandler = null;
+        EventHandler<TradingTerminal.Core.Strategies.Generation.HostChartOverlayPreviewRequestedEventArgs>? overlayHandler = null;
         requestHandler = (_, _) => OpenResearchChart(viewModel, window);
         validationHandler = (_, _) => OpenAuthoringHistoricalValidation(viewModel);
         paperHandler = (_, _) => _ = OpenAuthoringPaperAsync(viewModel);
+        overlayHandler = (_, args) =>
+        {
+            OpenResearchChart(
+                viewModel,
+                window,
+                args.OverlayIds,
+                startResearchCapture: args.StartResearchCapture && args.GalleryMatch is null,
+                preferredSymbol: args.PreferredSymbol,
+                galleryMatch: args.GalleryMatch);
+            Vm?.ActivityLog.Append(
+                "Charts",
+                "INFO",
+                args.StartResearchCapture
+                    ? $"Previewing host research chart from chat (overlays: {(args.OverlayIds.Count == 0 ? "none" : string.Join(", ", args.OverlayIds))}; symbol: {args.PreferredSymbol ?? "default"})."
+                    : $"Previewing host chart overlays from chat: {string.Join(", ", args.OverlayIds)}.");
+        };
         window.ResearchChartRequested += requestHandler;
         window.HistoricalValidationRequested += validationHandler;
         window.PaperHandoffRequested += paperHandler;
+        viewModel.HostChartOverlayPreviewRequested += overlayHandler;
         window.Closed += (_, _) =>
         {
             window.ResearchChartRequested -= requestHandler;
             window.HistoricalValidationRequested -= validationHandler;
             window.PaperHandoffRequested -= paperHandler;
+            viewModel.HostChartOverlayPreviewRequested -= overlayHandler;
         };
     }
 

@@ -202,6 +202,9 @@ public sealed record AuthoredUnitInstrumentCandidateV1(
 /// Exact evidence supplied to authored-unit specification generation. For a visualizer the confirmed
 /// strategy intent is null. For a strategy it is mandatory and the resulting classification binding
 /// must be byte-for-byte identical to the confirmed intent's binding.
+/// When <paramref name="SelectedChartOverlayIds"/> is set, those ids must come from
+/// <see cref="AuthoredChartChoiceCatalogV1"/> and the host freezes the matching drawing layers after
+/// model output so chat-selected famous indicators cannot drift into unsupported type ids.
 /// </summary>
 public sealed record AuthoredUnitSpecificationGenerationRequestV1(
     string UnitId,
@@ -211,7 +214,8 @@ public sealed record AuthoredUnitSpecificationGenerationRequestV1(
     IReadOnlyList<AuthoredChartReferenceV1>? ChartReferences = null,
     IReadOnlyList<AuthoredChartReferenceInspectionV1>? ChartReferenceInspections = null,
     IReadOnlyList<ChartPatternSelectionV1>? ChartPatternSelections = null,
-    ResearchExperimentEvidenceV1? ResearchExperiment = null);
+    ResearchExperimentEvidenceV1? ResearchExperiment = null,
+    IReadOnlyList<string>? SelectedChartOverlayIds = null);
 
 public sealed record AuthoredUnitSpecificationGenerationIssueV1(
     string Code,

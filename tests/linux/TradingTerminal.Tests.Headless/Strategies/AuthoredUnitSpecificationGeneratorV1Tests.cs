@@ -12,6 +12,34 @@ namespace TradingTerminal.Tests.Headless.Strategies;
 public sealed class AuthoredUnitSpecificationGeneratorV1Tests
 {
     [Fact]
+    public async Task Host_selected_overlays_overwrite_model_drawing_with_catalog_layers()
+    {
+        var aapl = Candidate(7, "AAPL", AssetClass.Equity, BrokerKind.InteractiveBrokers);
+        var modelDrawing = Visualizer(
+            "aapl-rsi",
+            "Show AAPL with RSI.",
+            aapl,
+            [CandleLayer()]);
+        var provider = new FixedProvider(modelDrawing);
+
+        var result = await new AuthoredUnitSpecificationGeneratorV1().GenerateAsync(
+            provider,
+            new AuthoredUnitSpecificationGenerationRequestV1(
+                modelDrawing.UnitId,
+                modelDrawing.RawRequest,
+                [aapl],
+                SelectedChartOverlayIds: ["rsi-14"]));
+
+        Assert.True(result.Success);
+        Assert.Contains(
+            result.Specification!.Drawing.Layers,
+            static layer => layer.TypeId == "indicator.rsi@1" && layer.PaneId == "rsi");
+        Assert.Contains(
+            result.Specification.Drawing.Panes,
+            static pane => pane.PaneId == "rsi" && pane.Role == AuthoredChartPaneRoleV1.Indicator);
+    }
+
+    [Fact]
     public async Task Plain_candle_request_becomes_a_launchable_visualizer()
     {
         var btc = Candidate(42, "BTC-USD", AssetClass.Crypto, BrokerKind.Coinbase);
@@ -33,6 +61,29 @@ public sealed class AuthoredUnitSpecificationGeneratorV1Tests
         Assert.Equal(AuthoredUnitKindV1.Visualizer, result.Specification!.Kind);
         Assert.Equal(StrategyDataRequirement.Bars, result.Specification.DataRequirement);
         Assert.Contains("kind \"visualizer\"", provider.LastRequest!.SystemContext, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task String_null_intent_is_treated_as_json_null_for_a_visualizer()
+    {
+        var spx = Candidate(77, "SPX", AssetClass.Index, BrokerKind.InteractiveBrokers);
+        var specification = Visualizer(
+            "spx-event-chart",
+            "Show historical S&P 500 charts that rose at least 5% the next day.",
+            spx,
+            [CandleLayer()]);
+        var json = AuthoredUnitSpecificationCanonicalJsonV1.Serialize(specification)
+            .Replace("\"confirmedStrategyIntent\":null", "\"confirmedStrategyIntent\":\"null\"", StringComparison.Ordinal);
+
+        var result = await new AuthoredUnitSpecificationGeneratorV1().GenerateAsync(
+            new RawProvider(json),
+            new AuthoredUnitSpecificationGenerationRequestV1(
+                specification.UnitId,
+                specification.RawRequest,
+                [spx]));
+
+        Assert.True(result.Success);
+        Assert.Null(result.Specification!.ConfirmedStrategyIntent);
     }
 
     [Fact]
@@ -424,5 +475,17 @@ public sealed class AuthoredUnitSpecificationGeneratorV1Tests
                 [],
                 new CodegenUsage(10, 20)));
         }
+    }
+
+    private sealed class RawProvider(string json) : IStrategyCodegenClient
+    {
+        public string ProviderId => "raw-authored-unit";
+        public string DisplayName => "Raw authored unit";
+        public bool IsAvailable => true;
+
+        public Task<StrategyCodegenResponse> GenerateAsync(
+            StrategyCodegenRequest request,
+            CancellationToken ct = default) =>
+            Task.FromResult(StrategyCodegenResponse.Reply(json));
     }
 }

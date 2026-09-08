@@ -105,6 +105,11 @@ public partial class ChartsPanel : UserControl
             _viewModel.ShowEma = false;
             _viewModel.ShowRsi = false;
             _viewModel.ShowMacd = false;
+            _viewModel.ShowBollinger = false;
+            _viewModel.ShowStochastic = false;
+            _viewModel.ShowAtr = false;
+            _viewModel.ShowVwap = false;
+            _viewModel.ShowAdx = false;
         }
     }
 

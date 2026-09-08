@@ -47,6 +47,23 @@ public sealed class AuthoredUnitIntentClassifierV1Tests
         Assert.Empty(result.Issues);
     }
 
+    [Fact]
+    public async Task String_null_clarification_is_treated_as_no_question()
+    {
+        var provider = new FixedClassifierProvider(new AuthoredUnitIntentClassificationV1(
+            AuthoredUnitKindV1.Visualizer,
+            "high",
+            "The request only asks to display historical chart data.",
+            "null"));
+
+        var result = await new AuthoredUnitIntentClassifierV1().ClassifyAsync(
+            provider,
+            "Show historical charts that rose at least 5% the next day");
+
+        Assert.True(result.Success);
+        Assert.Null(result.Classification!.ClarificationQuestion);
+    }
+
     private sealed class FixedClassifierProvider(AuthoredUnitIntentClassificationV1 classification)
         : IStrategyCodegenClient
     {

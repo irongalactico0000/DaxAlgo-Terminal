@@ -20,7 +20,7 @@
           <AutoCompleteBox Width="376"
                            Watermark="Type an instrument…"
                            MinimumPrefixLength="0"
-                           MinimumPopulateDelay="150"
+                           MinimumPopulateDelay="0:0:0.150"
                            MaxDropDownHeight="420"
                            FilterMode="None"
                            IsTextCompletionEnabled="False"
@@ -141,10 +141,26 @@
             <StackPanel x:Name="IndicatorsPanel" Spacing="5">
               <TextBlock Text="INDICATORS" FontSize="10" FontWeight="SemiBold" Foreground="#787B86" />
               <CheckBox Content="SMA (20)" IsChecked="{Binding ShowSma}" />
-              <CheckBox Content="EMA (50)" IsChecked="{Binding ShowEma}" />
+              <CheckBox Content="EMA" IsChecked="{Binding ShowEma}" />
               <CheckBox Content="RSI (14)" IsChecked="{Binding ShowRsi}" />
               <CheckBox Content="MACD (12·26·9)" IsChecked="{Binding ShowMacd}" />
-              <TextBlock Text="RSI and MACD open their own panes below price."
+              <CheckBox Content="Bollinger (20,2)" IsChecked="{Binding ShowBollinger}" />
+              <CheckBox Content="Stochastic (14·3)" IsChecked="{Binding ShowStochastic}" />
+              <CheckBox Content="ATR (14)" IsChecked="{Binding ShowAtr}" />
+              <CheckBox Content="VWAP" IsChecked="{Binding ShowVwap}" />
+              <CheckBox Content="ADX (14)" IsChecked="{Binding ShowAdx}" />
+              <TextBlock Text="USER INDICATORS" Margin="0,8,0,0" FontSize="10" FontWeight="SemiBold" Foreground="#787B86"
+                         IsVisible="{Binding UserIndicators.Count}" />
+              <ItemsControl ItemsSource="{Binding UserIndicators}" IsVisible="{Binding UserIndicators.Count}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <CheckBox Content="{Binding DisplayName}" IsChecked="{Binding IsEnabled}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Text="{Binding UserIndicatorsPath, StringFormat=Edit {0} to add SMA/EMA/RSI/ATR of any period.}"
+                         Margin="0,3,0,0" FontSize="10" Foreground="#787B86" TextWrapping="Wrap" />
+              <TextBlock Text="Oscillators open panes below price. Chat catalog picks toggle these same overlays."
                          Margin="0,3,0,0" FontSize="10" Foreground="#787B86" TextWrapping="Wrap" />
             </StackPanel>
           </StackPanel>

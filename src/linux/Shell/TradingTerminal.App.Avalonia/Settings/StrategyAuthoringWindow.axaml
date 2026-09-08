@@ -326,7 +326,7 @@
       <Grid Grid.Column="1" Margin="16,10,12,12" RowDefinitions="Auto,*,Auto,Auto"
             IsVisible="{Binding IsDesignScreen}"
             AutomationProperties.Name="Design and Confirm screen">
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="2,0,2,8"
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="2,0,2,8"
               IsVisible="{Binding HasConversation}">
           <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
             <TextBlock Text="{Binding DisplayName}" Classes="header" FontSize="14"
@@ -336,7 +336,9 @@
                          Foreground="{StaticResource Ai.Text.Brush}" />
             </Border>
           </StackPanel>
-          <Border Grid.Column="1" Classes="chip" BorderBrush="{StaticResource Ai.Glow.Brush}"
+          <Button Grid.Column="1" Classes="ghost" Content="Copy chat" Margin="0,0,8,0"
+                  Padding="8,3" Click="OnCopyChat" ToolTip.Tip="Copy the full visible transcript" />
+          <Border Grid.Column="2" Classes="chip" BorderBrush="{StaticResource Ai.Glow.Brush}"
                   IsVisible="{Binding IsGenerating}">
             <TextBlock FontFamily="{StaticResource Font.Data}" FontSize="10"
                        Foreground="{StaticResource Ai.Text.Brush}">
@@ -355,19 +357,19 @@
                   <Grid>
                     <Border Classes="message userMessage" HorizontalAlignment="Right"
                             IsVisible="{Binding IsUser}">
-                      <TextBlock Text="{Binding Text}" TextWrapping="Wrap" LineHeight="18" />
+                      <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" LineHeight="18" />
                     </Border>
                     <Border Classes="message assistantMessage" HorizontalAlignment="Left"
                             IsVisible="{Binding IsAssistant}">
-                      <TextBlock Text="{Binding Text}" TextWrapping="Wrap" LineHeight="18" />
+                      <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" LineHeight="18" />
                     </Border>
                     <Border Classes="message systemMessage" HorizontalAlignment="Left"
                             IsVisible="{Binding IsSystem}">
                       <StackPanel Spacing="3">
                         <TextBlock Text="{Binding ToolTitle}" FontSize="9" FontWeight="Bold"
                                    Foreground="{StaticResource Ai.Text.Brush}" />
-                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding ToolDetail}" Classes="caption" TextWrapping="Wrap" />
+                        <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                        <SelectableTextBlock Text="{Binding ToolDetail}" Classes="caption" TextWrapping="Wrap" />
                         <ItemsControl ItemsSource="{Binding PlanTasks}">
                           <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -1113,6 +1115,53 @@
                                     IsEnabled="{Binding HasResearchChartSelection}"
                                     Margin="0,0,0,4" />
                           </WrapPanel>
+                        </StackPanel>
+                      </Border>
+
+                      <Border Background="{StaticResource Background.Elevated}"
+                              BorderBrush="{StaticResource Border.Brush}" BorderThickness="1"
+                              CornerRadius="5" Padding="9,8"
+                              IsVisible="{Binding HasResearchOutcomeGalleryResult}"
+                              AutomationProperties.Name="Research outcome gallery">
+                        <StackPanel Spacing="6">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Spacing="2">
+                              <TextBlock Text="OUTCOME GALLERY (S&amp;P 100)" Classes="eyebrow" />
+                              <TextBlock Text="{Binding ResearchOutcomeGalleryResult.DisplayName}"
+                                         FontWeight="SemiBold" />
+                            </StackPanel>
+                            <Border Grid.Column="1" Classes="chip"
+                                    IsVisible="{Binding IsScanningResearchGallery}">
+                              <TextBlock Text="SCANNING…" FontFamily="{StaticResource Font.Data}" />
+                            </Border>
+                          </Grid>
+                          <TextBlock Text="{Binding ResearchOutcomeGalleryResult.Explanation}"
+                                     Classes="caption" TextWrapping="Wrap" />
+                          <ItemsControl ItemsSource="{Binding ResearchOutcomeGalleryResult.Matches}"
+                                        IsVisible="{Binding HasResearchOutcomeGalleryMatches}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate>
+                                <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,2">
+                                  <TextBlock Grid.Column="0" Text="{Binding CanonicalSymbol}"
+                                             FontWeight="SemiBold" Margin="0,0,8,0" />
+                                  <TextBlock Grid.Column="1" Classes="caption" Margin="0,0,8,0">
+                                    <Run Text="{Binding OutcomeReturn, StringFormat={}{0:P1}}" />
+                                  </TextBlock>
+                                  <TextBlock Grid.Column="2" Classes="caption" TextWrapping="Wrap">
+                                    <Run Text="{Binding LabelHint}" /><Run Text=" · " />
+                                    <Run Text="{Binding OutcomeFromUtc, StringFormat={}{0:yyyy-MM-dd}}" />
+                                  </TextBlock>
+                                  <Button Grid.Column="3" Classes="ghost" Content="Use"
+                                          Command="{Binding DataContext.UseResearchOutcomeGalleryMatchCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                          CommandParameter="{Binding}"
+                                          AutomationProperties.Name="Use research gallery match" />
+                                </Grid>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <TextBlock Text="No gallery hits yet — brush manually on the host chart, or wait for more local/broker daily history."
+                                     Classes="caption" TextWrapping="Wrap"
+                                     IsVisible="{Binding !HasResearchOutcomeGalleryMatches}" />
                         </StackPanel>
                       </Border>
 

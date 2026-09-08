@@ -61,7 +61,8 @@ public sealed class AuthoredUnitIntentClassifierV1 : IAuthoredUnitIntentClassifi
                 out var parseError))
             return Failed("UNIT_CLASSIFICATION_JSON_INVALID", parseError, usage);
 
-        var issues = Validate(classification!);
+        classification = Normalize(classification!);
+        var issues = Validate(classification);
         return new AuthoredUnitIntentClassificationResultV1(
             issues.Count == 0 ? classification : null,
             issues,
@@ -83,6 +84,16 @@ public sealed class AuthoredUnitIntentClassifierV1 : IAuthoredUnitIntentClassifi
         return issues;
     }
 
+    private static AuthoredUnitIntentClassificationV1 Normalize(
+        AuthoredUnitIntentClassificationV1 classification)
+    {
+        var question = classification.ClarificationQuestion?.Trim();
+        if (string.Equals(question, "null", StringComparison.OrdinalIgnoreCase))
+            question = null;
+
+        return classification with { ClarificationQuestion = question };
+    }
+
     private const string SystemContext = """
         Decide whether a DaxAlgo request is a data-only visualizer or a trading strategy. Return exactly
         one JSON object with: kind ("visualizer" or "strategy"), confidence ("low", "medium", or
@@ -92,6 +103,11 @@ public sealed class AuthoredUnitIntentClassifierV1 : IAuthoredUnitIntentClassifi
         layout, visual similarity, or a chart of a historically similar instrument/index. Phrases such
         as "show", "display", "chart", and "find a similar chart" remain visualizer unless the user
         also asks for a trading decision or position change.
+
+        A historical research scan that finds and displays events by a future-outcome label (for
+        example, constituents whose next-day return exceeded a threshold) is also display-only. It
+        labels examples for research; it does not become a strategy until the user later defines a
+        rule that changes a Paper position.
 
         Strategy means the unit can change a virtual position/target: buy, sell, enter, exit, rebalance,
         quote, execute, trade, size, stop-loss, take-profit, or an explicit strategy rule intended for

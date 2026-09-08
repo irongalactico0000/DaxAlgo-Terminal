@@ -50,6 +50,35 @@ public sealed partial class ChartsViewModel
         Status = "Research capture: drag the observation window.";
     }
 
+    /// <summary>
+    /// Seeds observation→outcome from the two most recent completed bars so capture is visible
+    /// immediately (host research-scan path). User can re-brush or Send to Builder.
+    /// </summary>
+    public void SeedCaptureWindowsFromRecentBars()
+    {
+        if (_lastBars.Count < 3)
+        {
+            if (StartResearchSelectionCommand.CanExecute(null))
+                StartResearchSelectionCommand.Execute(null);
+            return;
+        }
+
+        var setup = _lastBars[^3];
+        var outcome = _lastBars[^2];
+        var next = _lastBars[^1];
+        ResearchObservationRange = new ChartTimeRange(
+            new DateTimeOffset(DateTime.SpecifyKind(setup.TimestampUtc, DateTimeKind.Utc)),
+            new DateTimeOffset(DateTime.SpecifyKind(outcome.TimestampUtc, DateTimeKind.Utc)));
+        ResearchOutcomeRange = new ChartTimeRange(
+            new DateTimeOffset(DateTime.SpecifyKind(outcome.TimestampUtc, DateTimeKind.Utc)),
+            new DateTimeOffset(DateTime.SpecifyKind(next.TimestampUtc, DateTimeKind.Utc)));
+        ResearchSelectionStep = ChartResearchSelectionStep.None;
+        Status =
+            $"Capture ready on {SelectedInstrument?.Contract.Symbol}: observation→outcome seeded from recent bars. " +
+            "Send to Builder to label B/C/N, or Cancel and re-brush. No backtest.";
+        NotifyResearchSelectionStateChanged();
+    }
+
     [RelayCommand]
     private void CancelResearchSelection()
     {

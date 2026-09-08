@@ -101,6 +101,33 @@ public partial class StrategyAuthoringWindow : Window
 
     private void OnPaperHandoffRequested(object? sender, RoutedEventArgs e) =>
         PaperHandoffRequested?.Invoke(this, EventArgs.Empty);
+
+    private async void OnCopyChat(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not StrategyAuthoringViewModel viewModel) return;
+
+        var transcript = string.Join(
+            Environment.NewLine + Environment.NewLine,
+            viewModel.Messages.Select(FormatChatEntry));
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (string.IsNullOrWhiteSpace(transcript) || clipboard is null) return;
+        await clipboard.SetTextAsync(transcript);
+    }
+
+    private static string FormatChatEntry(AuthoringMessage message)
+    {
+        if (message.IsUser) return $"User: {message.Text}";
+        if (message.IsAssistant) return $"Assistant: {message.Text}";
+
+        var body = message.Kind == AuthoringMessage.KindPlan
+            ? message.PlanSnapshotText()
+            : string.Join(
+                Environment.NewLine,
+                new[] { message.ToolTitle, message.Text, message.ToolDetail }
+                    .Where(static value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.Ordinal));
+        return $"System: {body}";
+    }
 }
 
 /// <summary>Lets the Avalonia parameter workbench select the correct editor without UI-specific VM code.</summary>

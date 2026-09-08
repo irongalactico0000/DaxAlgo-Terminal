@@ -2,6 +2,8 @@ using TradingTerminal.Core.Brokers;
 using TradingTerminal.Core.Strategies.Authoring;
 using TradingTerminal.Core.Strategies.Definition;
 using TradingTerminal.Core.Strategies.Generation;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace TradingTerminal.Infrastructure.Strategies.Authoring;
 
@@ -60,19 +62,94 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
                 raw);
         }
 
+        var normalizedRaw = NormalizeCommonModelJsonMistakes(raw);
         if (!StrategyModelJsonV1.TryDeserialize<AuthoredUnitSpecificationV1>(
-                raw,
+                normalizedRaw,
                 MaxResponseCharacters,
                 out var specification,
                 out var parseError))
         {
-            return Failed([Issue("UNIT_JSON_INVALID", "response", parseError)], usage, raw);
+            StrategyCodegenResponse repairResponse;
+            try
+            {
+                repairResponse = await provider.GenerateAsync(
+                    new StrategyCodegenRequest(
+                        SystemContext,
+                        [
+                            new CodegenMessage(CodegenRole.User, CreateUserMessage(request)),
+                            new CodegenMessage(CodegenRole.Assistant, raw ?? string.Empty),
+                            new CodegenMessage(CodegenRole.User, CreateRepairMessage(parseError)),
+                        ])
+                    {
+                        OutputContract = StrategyCodegenOutputContract.RawJsonObject,
+                    },
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                return Failed(
+                    [Issue("UNIT_JSON_REPAIR_PROVIDER_EXCEPTION", "response",
+                        $"The malformed response could not be repaired: {exception.Message}")],
+                    usage,
+                    raw);
+            }
+
+            usage = usage.Add(repairResponse.Usage);
+            var repairRaw = repairResponse.RawText ?? repairResponse.Code;
+            if (!repairResponse.Success)
+            {
+                return Failed(
+                    [Issue("UNIT_JSON_REPAIR_PROVIDER_FAILED", "response",
+                        "The malformed response could not be repaired: " +
+                        (repairResponse.Error ?? "The provider returned no repair result."))],
+                    usage,
+                    repairRaw ?? raw);
+            }
+
+            var normalizedRepairRaw = NormalizeCommonModelJsonMistakes(repairRaw);
+            if (!StrategyModelJsonV1.TryDeserialize<AuthoredUnitSpecificationV1>(
+                    normalizedRepairRaw,
+                    MaxResponseCharacters,
+                    out specification,
+                    out var repairParseError))
+            {
+                return Failed(
+                    [Issue("UNIT_JSON_INVALID_AFTER_REPAIR", "response", repairParseError)],
+                    usage,
+                    repairRaw);
+            }
+
+            raw = repairRaw;
         }
 
-        issues = ValidateOutput(request, specification!);
+        specification = ApplyHostOwnedChartOverlays(request, specification!);
+        issues = ValidateOutput(request, specification);
         return issues.Count == 0
             ? new AuthoredUnitSpecificationGenerationResultV1(specification, [], usage, raw)
             : Failed(issues, usage, raw);
+    }
+
+    internal static AuthoredUnitSpecificationV1 ApplyHostOwnedChartOverlays(
+        AuthoredUnitSpecificationGenerationRequestV1 request,
+        AuthoredUnitSpecificationV1 specification)
+    {
+        if (request.SelectedChartOverlayIds is not { Count: > 0 } selectedIds)
+            return specification;
+
+        var overlays = AuthoredChartChoiceCatalogV1.Overlays
+            .Where(overlay => selectedIds.Contains(overlay.Id, StringComparer.Ordinal))
+            .ToArray();
+        if (overlays.Length == 0)
+            return specification;
+
+        return specification with
+        {
+            Drawing = AuthoredChartChoiceCatalogV1.ComposeDrawing(overlays),
+        };
     }
 
     internal static IReadOnlyList<AuthoredUnitSpecificationGenerationIssueV1> ValidateRequest(
@@ -99,6 +176,23 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
                 catch (ArgumentException exception)
                 {
                     issues.Add(Issue("UNIT_RESEARCH_EVIDENCE_INVALID", "researchExperiment", exception.Message));
+                }
+            }
+        }
+
+        if (request.SelectedChartOverlayIds is { Count: > 0 } selectedOverlays)
+        {
+            var known = AuthoredChartChoiceCatalogV1.Overlays
+                .Select(static item => item.Id)
+                .ToHashSet(StringComparer.Ordinal);
+            foreach (var id in selectedOverlays.Where(static item => !string.IsNullOrWhiteSpace(item)))
+            {
+                if (!known.Contains(id))
+                {
+                    issues.Add(Issue(
+                        "UNIT_CHART_OVERLAY_UNKNOWN",
+                        "selectedChartOverlayIds",
+                        $"Overlay '{id}' is not in the host chart-choice catalog."));
                 }
             }
         }
@@ -311,7 +405,8 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
             request.ChartReferences ?? [],
             request.ChartReferenceInspections ?? [],
             request.ChartPatternSelections ?? [],
-            request.ResearchExperiment));
+            request.ResearchExperiment,
+            request.SelectedChartOverlayIds ?? []));
 
     private const string SystemContext = """
         You translate a user's chart/strategy request into exactly one JSON object matching
@@ -327,6 +422,9 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
         - researchExperiment is exploratory labeled-event evidence. Use its formula and selected
           features as a hypothesis only; never describe its holdout metric as a historical backtest
           or permission for Paper execution.
+        - When selectedChartOverlayIds is non-empty, prefer those host overlays (candles, SMA/EMA,
+          RSI, MACD, Bollinger). The host will overwrite drawing with the exact catalog layers after
+          your response; still emit a valid drawing object.
 
         Reference handling:
         - Copy chartReferences exactly and use sourceKind "text" when empty, otherwise
@@ -348,14 +446,80 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
         "00:01:00") or null. dataRequirement is a comma-separated enum string such as "bars" or
         "bars, l1". Arrays must always be present.
 
-        Drawing contains panes and layers. Use stable ids. A candle chart needs a price pane and a
-        price.candles@1 candles layer. Indicators need explicit indicator layers and parameters. An
+        Drawing must be one JSON object in this exact shape (never a string or array):
+        "drawing":{"panes":[{"paneId":"price","role":"price","order":0,"title":"Price"}],
+        "layers":[{"layerId":"candles","paneId":"price","kind":"candles",
+        "typeId":"price.candles@1","parameters":{},"sourceReferenceId":null}]}. Use stable ids.
+        A candle chart needs a price pane and a price.candles@1 candles layer. Indicators need
+        explicit indicatorLine or histogram layers, stable typeIds such as indicator.ema@1, and
+        string-valued parameters such as {"period":"20"}. An
         order book requires depth; footprint/tape requires tradeTape. A visualizer never has a book or
-        target output. For a visualizer, confirmedStrategyIntent is null. For a strategy, copy the
+        target output. For a visualizer, confirmedStrategyIntent is JSON null, never the string
+        "null". For a strategy, copy the
         supplied confirmedStrategyIntent exactly and implement every applicable reviewed requirement;
         do not reduce it to the classification label or rawRequest summary. Return the JSON object only,
         with no markdown or prose.
         """;
+
+    private static string CreateRepairMessage(string parseError) =>
+        "Repair only the JSON contract shape in your previous response. Preserve the requested " +
+        "meaning and all host-owned values from the original input. The drawing field must be one " +
+        "object containing panes and layers arrays; it must not be a string or array. Return exactly " +
+        "one complete AuthoredUnitSpecificationV1 JSON object with no markdown or prose. " +
+        $"The parser reported: {parseError}";
+
+    private static string? NormalizeCommonModelJsonMistakes(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return raw;
+
+        var text = raw.Trim();
+        if (!text.StartsWith('{') || !text.EndsWith('}')) return raw;
+
+        try
+        {
+            if (JsonNode.Parse(text) is not JsonObject root) return raw;
+            NormalizeNullString(root, "strategyClassification");
+            NormalizeNullString(root, "confirmedStrategyIntent");
+            NormalizeEmbeddedObject(root, "drawing");
+            return root.ToJsonString();
+        }
+        catch (JsonException)
+        {
+            return raw;
+        }
+    }
+
+    private static void NormalizeEmbeddedObject(JsonObject root, string propertyName)
+    {
+        if (root[propertyName] is not JsonValue value ||
+            !value.TryGetValue<string>(out var text) ||
+            string.IsNullOrWhiteSpace(text))
+            return;
+
+        var trimmed = text.Trim();
+        if (!trimmed.StartsWith('{') || !trimmed.EndsWith('}')) return;
+
+        try
+        {
+            if (JsonNode.Parse(trimmed) is JsonObject embedded)
+                root[propertyName] = embedded;
+        }
+        catch (JsonException)
+        {
+            // Leave malformed embedded JSON intact so the bounded repair call receives the exact
+            // parser failure instead of the host guessing at a chart composition.
+        }
+    }
+
+    private static void NormalizeNullString(JsonObject root, string propertyName)
+    {
+        if (root[propertyName] is JsonValue value &&
+            value.TryGetValue<string>(out var text) &&
+            string.Equals(text?.Trim(), "null", StringComparison.OrdinalIgnoreCase))
+        {
+            root[propertyName] = null;
+        }
+    }
 
     private static bool SameReference(AuthoredChartReferenceV1 reference, string id, string hash) =>
         string.Equals(reference.ReferenceId, id, StringComparison.Ordinal) &&
@@ -430,7 +594,8 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
         IReadOnlyList<AuthoredChartReferenceV1> ChartReferences,
         IReadOnlyList<AuthoredChartReferenceInspectionV1> ChartReferenceInspections,
         IReadOnlyList<ChartPatternSelectionV1> ChartPatternSelections,
-        ResearchExperimentEvidenceV1? ResearchExperiment);
+        ResearchExperimentEvidenceV1? ResearchExperiment,
+        IReadOnlyList<string> SelectedChartOverlayIds);
 
     private sealed record BrokerDataCapabilityV1(
         BrokerKind Broker,

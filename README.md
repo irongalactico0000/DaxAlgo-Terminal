@@ -70,6 +70,15 @@ For the shortest supported trial, open **New strategy**, search for `smoke`, cho
 **Graph · Typed → Use selected in editor → Run exact-hash synthetic smoke**. This exercises deterministic
 synthetic QuoteL1 events for the exact selected hash; it is not a historical Backtest Studio run.
 
+## Charts indicators
+
+Built-in overlays match common quant platforms (SMA/EMA, RSI, MACD, Bollinger, Stochastic, ATR,
+VWAP, ADX). Chat can pick them from the host catalog; they render on the native Charts window.
+
+Users add custom SMA/EMA/RSI/ATR periods in
+`%LocalAppData%/DaxAlgo Terminal/user-indicators.json` (seeded on first Charts open).
+See [chart indicators](docs/chart-indicators.md).
+
 ## Remaining release boundary
 
 Windows-hosted builds and tests verify source and packaging invariants, not macOS delivery. Before

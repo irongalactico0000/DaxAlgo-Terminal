@@ -180,9 +180,76 @@ public partial class App : Application
                 {
                     DataContext = Services!.GetRequiredService<MainWindowViewModel>(),
                 };
-                main.Opened += (_, _) => Services
-                    .GetRequiredService<TradingTerminal.App.Support.ISupportPrompt>()
-                    .MaybeShowOnLaunch(main);
+                main.Opened += (_, _) =>
+                {
+                    try
+                    {
+                        var previewArg = args.FirstOrDefault(argument =>
+                            argument.StartsWith("--preview-overlays=", StringComparison.OrdinalIgnoreCase));
+                        var previewResearchCapture = args.Any(argument =>
+                            string.Equals(argument, "--preview-research-capture", StringComparison.OrdinalIgnoreCase));
+                        if (previewArg is not null || previewResearchCapture)
+                        {
+                            var overlayIds = previewArg is null
+                                ? Array.Empty<string>()
+                                : previewArg
+                                    .Split('=', 2, StringSplitOptions.TrimEntries)[1]
+                                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                            if (overlayIds.Length > 0 || previewResearchCapture)
+                            {
+                                File.WriteAllText(
+                                    "/tmp/daxalgo-preview-overlays.log",
+                                    $"scheduled overlays=[{string.Join(',', overlayIds)}] researchCapture={previewResearchCapture} at {DateTime.UtcNow:O}\n");
+                                _ = Dispatcher.UIThread.InvokeAsync(async () =>
+                                {
+                                    try
+                                    {
+                                        await Task.Delay(750);
+                                        File.AppendAllText(
+                                            "/tmp/daxalgo-preview-overlays.log",
+                                            $"invoking PreviewHostChartOverlays at {DateTime.UtcNow:O}\n");
+                                        main.PreviewHostChartOverlays(overlayIds, startResearchCapture: previewResearchCapture);
+                                        File.AppendAllText(
+                                            "/tmp/daxalgo-preview-overlays.log",
+                                            $"completed PreviewHostChartOverlays at {DateTime.UtcNow:O}\n");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        File.AppendAllText(
+                                            "/tmp/daxalgo-preview-overlays.log",
+                                            $"deferred failure: {ex}\n");
+                                        (main.DataContext as MainWindowViewModel)?.ActivityLog.Append(
+                                            "Charts",
+                                            "ERROR",
+                                            $"Deferred host overlay preview failed: {ex.Message}");
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        File.AppendAllText("/tmp/daxalgo-preview-overlays.log", $"opened handler failure: {ex}\n");
+                    }
+
+                    // Skip Support modal during chart smoke previews so Charts stays frontmost.
+                    var isOverlayPreview = args.Any(argument =>
+                        argument.StartsWith("--preview-overlays=", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(argument, "--preview-research-capture", StringComparison.OrdinalIgnoreCase));
+                    if (!isOverlayPreview)
+                    {
+                        try
+                        {
+                            Services
+                                .GetRequiredService<TradingTerminal.App.Support.ISupportPrompt>()
+                                .MaybeShowOnLaunch(main);
+                        }
+                        catch
+                        {
+                            // Support prompt must never block shell startup.
+                        }
+                    }
+                };
                 return main;
             }
 
