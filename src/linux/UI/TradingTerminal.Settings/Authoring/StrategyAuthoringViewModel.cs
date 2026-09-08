@@ -460,6 +460,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         foreach (var card in ResearchGalleryCards)
             card.IsSelected = match is not null && ReferenceEquals(card.Match, match);
         SelectedResearchGalleryCard = ResearchGalleryCards.FirstOrDefault(card => card.IsSelected);
+        RefreshResearchQuickSuggestions();
     }
 
     partial void OnIsScanningResearchGalleryChanged(bool value) => SendCommand.NotifyCanExecuteChanged();
@@ -1548,6 +1549,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     {
         SendCommand.NotifyCanExecuteChanged();
         RegenerateRecoveredCandidatesCommand.NotifyCanExecuteChanged();
+        RefreshResearchQuickSuggestions();
     }
 
     private bool CanSend => !IsGenerating && !IsInspectingChartReferences && !IsSearchingChartPatterns &&

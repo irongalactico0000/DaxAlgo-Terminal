@@ -79,10 +79,9 @@ Users add custom SMA/EMA/RSI/ATR periods in
 `%LocalAppData%/DaxAlgo Terminal/user-indicators.json` (seeded on first Charts open).
 See [chart indicators](docs/chart-indicators.md).
 
-Strategy Builder chips (left → right = next click):
-1. **Capture before +5% jump** — Dolpago-style: find the move, capture the bar *before* it with RSI/EMA/ATR scores, auto-label 4 samples
-2. Before crash / before breakout
-3. After 4 samples, **▶ Run chronological experiment** appears first
+Strategy Builder chips are **one capture workflow** with conditions, not separate strategies:
+type a need (e.g. “before crash”, “rsi before jump”) and matching chips appear; idle defaults to
+before-+5% capture. After 4 samples, **▶ Run chronological experiment** leads.
 
 Then Build → Validate → Paper (Simulated only).
 
