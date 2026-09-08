@@ -361,7 +361,28 @@
                     </Border>
                     <Border Classes="message assistantMessage" HorizontalAlignment="Left"
                             IsVisible="{Binding IsAssistant}">
-                      <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" LineHeight="18" />
+                      <StackPanel Spacing="6">
+                        <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" LineHeight="18" />
+                        <ItemsControl ItemsSource="{Binding FollowUps}"
+                                      IsVisible="{Binding HasFollowUps}"
+                                      AutomationProperties.Name="Turn follow-up suggestions">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <Button Classes="ghost" Margin="0,0,6,4" Padding="8,4"
+                                      Command="{Binding DataContext.ApplyResearchQuickSuggestionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                      CommandParameter="{Binding}"
+                                      ToolTip.Tip="{Binding Hint}">
+                                <TextBlock Text="{Binding Title}" FontSize="11" />
+                              </Button>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
                     </Border>
                     <Border Classes="message systemMessage" HorizontalAlignment="Left"
                             IsVisible="{Binding IsSystem}">
@@ -533,7 +554,7 @@
             <ItemsControl Grid.Row="0" ItemsSource="{Binding ResearchQuickSuggestions}"
                           IsVisible="{Binding HasResearchQuickSuggestions}"
                           Margin="0,0,0,8"
-                          AutomationProperties.Name="Research quick suggestions">
+                          AutomationProperties.Name="Current turn follow-up suggestions">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                   <WrapPanel Orientation="Horizontal" />
@@ -542,12 +563,12 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <Button Margin="0,0,6,4" Padding="10,5"
-                          Classes="aiAction"
+                          Classes="ghost"
                           Command="{Binding DataContext.ApplyResearchQuickSuggestionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                           CommandParameter="{Binding}"
                           ToolTip.Tip="{Binding Hint}"
                           AutomationProperties.Name="{Binding Title}">
-                    <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" TextWrapping="NoWrap" />
+                    <TextBlock Text="{Binding Title}" FontSize="11" TextWrapping="NoWrap" />
                   </Button>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>

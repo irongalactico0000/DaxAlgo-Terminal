@@ -21,4 +21,13 @@ public enum ResearchQuickSuggestionKindV1
 
     /// <summary>Run the observation-only chronological research experiment (needs ≥4 samples).</summary>
     RunResearchExperiment,
+
+    /// <summary>Open exact historical validation for the registered build.</summary>
+    RunHistoricalValidation,
+
+    /// <summary>Open Paper stage / bind handoff when validation evidence exists.</summary>
+    OpenPaperHandoff,
+
+    /// <summary>Focus the top research gallery match in one Charts window.</summary>
+    FocusFirstGalleryMatch,
 }

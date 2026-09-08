@@ -143,7 +143,7 @@ public sealed partial class StrategyAuthoringViewModel
             ResearchExperimentEvidence = evidence;
             ApplyResearchDatasetWorkspaceChange(dataset, "Produced chronological research feature evidence");
             Status = $"Research evidence ready: {evidence.Formula}. Historical validation is still required before Paper.";
-            RefreshResearchQuickSuggestions();
+            PublishTurnFollowUps(lastUserText: "research experiment complete");
             Save();
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -203,7 +203,7 @@ public sealed partial class StrategyAuthoringViewModel
         Save();
         if (!_suppressGalleryAdvance)
             TryAdvanceToNextUnusedGalleryMatch();
-        RefreshResearchQuickSuggestions();
+        PublishTurnFollowUps(lastUserText: null);
     }
 
     private bool _suppressGalleryAdvance;
@@ -337,7 +337,7 @@ public sealed partial class StrategyAuthoringViewModel
                 : $"Captured {labeled} before-jump sample(s) (need {4 - labeled} more). Click chip 1 again or label another box.";
             Status = AiStatus;
             Append(new AuthoringMessage(CodegenRole.Assistant, AiStatus));
-            RefreshResearchQuickSuggestions();
+            PublishTurnFollowUps(lastUserText: displayName);
             Save();
         }
         catch (OperationCanceledException)
@@ -371,13 +371,45 @@ public sealed partial class StrategyAuthoringViewModel
             if (!CanRunResearchExperiment)
             {
                 AiStatus = ResearchEventSampleCount < 4
-                    ? $"Need {4 - ResearchEventSampleCount} more before-move sample(s). Type a condition (jump / crash / breakout) or click a capture chip."
+                    ? $"Need {4 - ResearchEventSampleCount} more before-move sample(s). Ask in chat (e.g. before jump) or wait for capture follow-ups."
                     : "Research experiment is not ready yet.";
                 return;
             }
 
             await RunResearchExperimentCommand.ExecuteAsync(null);
-            RefreshResearchQuickSuggestions();
+            PublishTurnFollowUps(lastUserText: "run chronological experiment");
+            return;
+        }
+
+        if (suggestion.Kind == ResearchQuickSuggestionKindV1.RunHistoricalValidation)
+        {
+            if (OpenValidateScreenCommand.CanExecute(null))
+                OpenValidateScreenCommand.Execute(null);
+            AiStatus = "Validate is open — click Run historical validation for the exact-hash replay.";
+            Status = AiStatus;
+            return;
+        }
+
+        if (suggestion.Kind == ResearchQuickSuggestionKindV1.OpenPaperHandoff)
+        {
+            if (OpenPaperScreenCommand.CanExecute(null))
+                OpenPaperScreenCommand.Execute(null);
+            AiStatus = "Paper stage is open — click Bind selected Paper book (Simulated only).";
+            Status = AiStatus;
+            return;
+        }
+
+        if (suggestion.Kind == ResearchQuickSuggestionKindV1.FocusFirstGalleryMatch)
+        {
+            var first = ResearchOutcomeGalleryResult?.Matches.FirstOrDefault();
+            if (first is null)
+            {
+                AiStatus = "No gallery hits to open yet.";
+                return;
+            }
+
+            FocusResearchGalleryMatch(first, openChart: true, announce: true);
+            PublishTurnFollowUps(lastUserText: "open gallery hit");
             return;
         }
 
@@ -419,27 +451,66 @@ public sealed partial class StrategyAuthoringViewModel
                 CodegenRole.Assistant,
                 $"Opened the live chart with {AuthoredChartChoiceCatalogV1.DescribeSelection(chartChoice)}. No AI key required for this preview."));
             AiStatus = "Chart overlays applied from the suggestion chip.";
+            PublishTurnFollowUps(prompt);
             Save();
             return;
         }
 
         Composer = prompt;
         AiStatus = "Suggestion loaded in the composer — press Send when ready.";
+        PublishTurnFollowUps(prompt);
     }
 
-    public void RefreshResearchQuickSuggestions()
+    private string? _lastFollowUpUserText;
+
+    /// <summary>
+    /// ChatGPT-style follow-ups for the latest turn only. Idle / unrelated chat → empty.
+    /// </summary>
+    public void PublishTurnFollowUps(string? lastUserText)
     {
+        if (!string.IsNullOrWhiteSpace(lastUserText))
+            _lastFollowUpUserText = lastUserText.Trim();
+
+        var planned = ResearchSuggestionPlannerV1.PlanForTurn(new ResearchSuggestionPlannerV1.TurnContext(
+            LastUserText: lastUserText ?? _lastFollowUpUserText,
+            SampleCount: ResearchEventSampleCount,
+            CanRunExperiment: CanRunResearchExperiment,
+            HasExperimentEvidence: HasResearchExperimentEvidence,
+            HasGalleryMatches: HasResearchOutcomeGalleryMatches,
+            HasFocusedGalleryMatch: SelectedResearchGalleryCard is not null || PendingResearchChartSelection is not null,
+            CanRunHistoricalValidation: CanRunHistoricalValidation,
+            CanOpenPaperScreen: CanOpenPaperScreen,
+            IsRegistered: IsRegistered));
+
         ResearchQuickSuggestions.Clear();
-        var planned = ResearchSuggestionPlannerV1.Plan(
-            sampleCount: ResearchEventSampleCount,
-            canRunExperiment: CanRunResearchExperiment,
-            hasExperimentEvidence: HasResearchExperimentEvidence,
-            hasFocusedGalleryMatch: SelectedResearchGalleryCard is not null || PendingResearchChartSelection is not null,
-            composerOrNeedText: Composer);
         foreach (var suggestion in planned)
             ResearchQuickSuggestions.Add(suggestion);
         OnPropertyChanged(nameof(HasResearchQuickSuggestions));
+
+        for (var i = Messages.Count - 1; i >= 0; i--)
+        {
+            var message = Messages[i];
+            if (message.IsUser) break;
+            if (message.IsAssistant || message.IsSystem)
+            {
+                message.SetFollowUps(planned);
+                break;
+            }
+        }
     }
+
+    public void ClearTurnFollowUps()
+    {
+        _lastFollowUpUserText = null;
+        ResearchQuickSuggestions.Clear();
+        OnPropertyChanged(nameof(HasResearchQuickSuggestions));
+        foreach (var message in Messages)
+            message.SetFollowUps(null);
+    }
+
+    /// <summary>Idle refresh: no forced chips unless a prior turn left stage next-steps.</summary>
+    public void RefreshResearchQuickSuggestions() =>
+        PublishTurnFollowUps(lastUserText: null);
 
     private void ApplyResearchDatasetWorkspaceChange(
         ResearchDatasetDefinitionV1? dataset,

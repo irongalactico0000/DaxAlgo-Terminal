@@ -183,7 +183,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
                 .OrderBy(static label => label, StringComparer.Ordinal),
         ];
         RefreshStarterBriefs();
-        RefreshResearchQuickSuggestions();
+        ClearTurnFollowUps();
 
         // The hero empty state ↔ transcript switch watches the count; the VM owns the collection,
         // so the self-subscription cannot outlive it.
@@ -460,7 +460,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         foreach (var card in ResearchGalleryCards)
             card.IsSelected = match is not null && ReferenceEquals(card.Match, match);
         SelectedResearchGalleryCard = ResearchGalleryCards.FirstOrDefault(card => card.IsSelected);
-        RefreshResearchQuickSuggestions();
+        PublishTurnFollowUps(lastUserText: null);
     }
 
     partial void OnIsScanningResearchGalleryChanged(bool value) => SendCommand.NotifyCanExecuteChanged();
@@ -1549,7 +1549,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     {
         SendCommand.NotifyCanExecuteChanged();
         RegenerateRecoveredCandidatesCommand.NotifyCanExecuteChanged();
-        RefreshResearchQuickSuggestions();
+        // Follow-ups stay turn-scoped — do not invent chips while typing.
     }
 
     private bool CanSend => !IsGenerating && !IsInspectingChartReferences && !IsSearchingChartPatterns &&
@@ -1648,6 +1648,8 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
 
         var prompt = Composer.Trim();
         if (prompt.Length == 0) return;
+
+        ClearTurnFollowUps();
 
         // Backtesting is a separate, explicit action. A short navigation request must never become
         // the next four-lane strategy prompt and silently replace the user's actual strategy brief.
@@ -2481,7 +2483,8 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             Append(new AuthoringMessage(CodegenRole.User, prompt));
             Append(new AuthoringMessage(CodegenRole.Assistant, catalogQuestion));
             AwaitingAnswer = true;
-            AiStatus = "Pick one or more host chart overlays or research scans from the catalog before generation continues.";
+            AiStatus = "Pick a numbered host chart choice, or use a follow-up under this reply.";
+            PublishTurnFollowUps(prompt);
             Save();
             return;
         }
@@ -2697,6 +2700,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         AwaitingAnswer = false;
         WorkbenchTab = 0;
         Save();
+        PublishTurnFollowUps(prompt);
         return Task.CompletedTask;
     }
 
@@ -2731,6 +2735,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         AwaitingAnswer = false;
         WorkbenchTab = 0;
         Save();
+        PublishTurnFollowUps(prompt);
         _ = RunResearchOutcomeGalleryAsync(chartChoice.ResearchScans.Select(static scan => scan.Id).ToArray());
         return Task.CompletedTask;
     }
@@ -2768,6 +2773,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
                 // Jump off the default AAPL chart onto a real gallery event for capture.
                 UseResearchOutcomeGalleryMatch(ResearchOutcomeGalleryResult.Matches[0]);
             }
+            PublishTurnFollowUps(lastUserText: null);
             Save();
         }
         catch (OperationCanceledException)
@@ -4808,6 +4814,18 @@ public sealed partial class AuthoringMessage : ObservableObject
 
     public IReadOnlyList<BuildTask>? PlanTasks { get; private init; }
     public IReadOnlyList<FileChangeSummary>? FileChanges { get; private init; }
+
+    /// <summary>ChatGPT-style follow-ups for this assistant/tool turn only (0–3).</summary>
+    public IReadOnlyList<ResearchQuickSuggestionV1>? FollowUps { get; private set; }
+
+    public bool HasFollowUps => FollowUps is { Count: > 0 };
+
+    public void SetFollowUps(IReadOnlyList<ResearchQuickSuggestionV1>? followUps)
+    {
+        FollowUps = followUps is { Count: > 0 } ? followUps : null;
+        OnPropertyChanged(nameof(FollowUps));
+        OnPropertyChanged(nameof(HasFollowUps));
+    }
 
     /// <summary>The live plan flattened to glyph lines for persistence (and for a restored render).</summary>
     public string PlanSnapshotText() => PlanTasks is null
