@@ -1159,7 +1159,7 @@
                               </DataTemplate>
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
-                          <TextBlock Text="No gallery hits yet — brush manually on the host chart, or wait for more local/broker daily history."
+                          <TextBlock Text="No gallery hits yet — brush manually on the host chart, or wait for local 1H/daily history to load."
                                      Classes="caption" TextWrapping="Wrap"
                                      IsVisible="{Binding !HasResearchOutcomeGalleryMatches}" />
                         </StackPanel>

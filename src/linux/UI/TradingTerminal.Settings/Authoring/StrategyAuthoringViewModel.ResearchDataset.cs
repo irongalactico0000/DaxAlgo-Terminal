@@ -192,9 +192,50 @@ public sealed partial class StrategyAuthoringViewModel
         ResearchDatasetDefinition = updated;
         PendingResearchChartSelection = null;
         ApplyResearchDatasetWorkspaceChange(updated, $"Added {label} research event sample");
-        Status = $"Added {label} sample. Future outcome data is excluded from feature computation.";
+        var remaining = Math.Max(0, 4 - updated.Samples.Count);
+        Status = remaining > 0
+            ? $"Added {label} sample ({updated.Samples.Count}/4 for research experiment). Future outcome excluded from features."
+            : $"Added {label} sample. Dataset has {updated.Samples.Count} events — run the research experiment when ready.";
         Save();
+        TryAdvanceToNextUnusedGalleryMatch();
     }
+
+    /// <summary>
+    /// After B/C/N, load the next unused gallery hit onto Charts so the original
+    /// research→label loop does not stall on a single event.
+    /// </summary>
+    private void TryAdvanceToNextUnusedGalleryMatch()
+    {
+        if (ResearchOutcomeGalleryResult is not { Matches.Count: > 0 } gallery)
+            return;
+
+        var usedKeys = new HashSet<string>(StringComparer.Ordinal);
+        if (ResearchDatasetDefinition is { Samples: { } samples })
+        {
+            foreach (var sample in samples)
+            {
+                usedKeys.Add(GalleryMatchKey(
+                    sample.Selection.CanonicalSymbol,
+                    sample.Selection.ObservationFromUtc.UtcDateTime,
+                    sample.Selection.OutcomeFromUtc.UtcDateTime));
+            }
+        }
+
+        var next = gallery.Matches.FirstOrDefault(match =>
+            !usedKeys.Contains(GalleryMatchKey(
+                match.CanonicalSymbol,
+                match.ObservationFromUtc,
+                match.OutcomeFromUtc)));
+        if (next is null)
+            return;
+
+        UseResearchOutcomeGalleryMatch(next);
+        Status =
+            $"{Status} Opened next gallery event {next.CanonicalSymbol} · {next.OutcomeReturn:P1} for labeling.";
+    }
+
+    private static string GalleryMatchKey(string symbol, DateTime observationFromUtc, DateTime outcomeFromUtc) =>
+        $"{symbol}|{observationFromUtc:O}|{outcomeFromUtc:O}";
 
     private void ApplyResearchDatasetWorkspaceChange(
         ResearchDatasetDefinitionV1? dataset,
