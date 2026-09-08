@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using TradingTerminal.Core.Domain;
 using TradingTerminal.Core.Strategies;
+using TradingTerminal.Core.Strategies.Authoring;
 using TradingTerminal.Core.Strategies.Generation;
 
 namespace TradingTerminal.App.Authoring;
@@ -157,7 +158,9 @@ public sealed partial class StrategyAuthoringViewModel
 
     private bool CanRunResearchExperimentAction() => CanRunResearchExperiment;
 
-    private void CommitResearchSelection(ResearchEventLabelKindV1 label)
+    private void CommitResearchSelection(
+        ResearchEventLabelKindV1 label,
+        ResearchEventLabelSourceV1 source = ResearchEventLabelSourceV1.Manual)
     {
         if (PendingResearchChartSelection is not { } selection || IsGenerating) return;
 
@@ -176,7 +179,7 @@ public sealed partial class StrategyAuthoringViewModel
             selection,
             label,
             null,
-            ResearchEventLabelSourceV1.Manual));
+            source));
         var requiredData = samples.Aggregate(
             StrategyDataRequirement.None,
             static (value, item) => value | item.Selection.RequiredData);
@@ -197,8 +200,11 @@ public sealed partial class StrategyAuthoringViewModel
             ? $"Added {label} sample ({updated.Samples.Count}/4 for research experiment). Future outcome excluded from features."
             : $"Added {label} sample. Dataset has {updated.Samples.Count} events — run the research experiment when ready.";
         Save();
-        TryAdvanceToNextUnusedGalleryMatch();
+        if (!_suppressGalleryAdvance)
+            TryAdvanceToNextUnusedGalleryMatch();
     }
+
+    private bool _suppressGalleryAdvance;
 
     /// <summary>
     /// After B/C/N, load the next unused gallery hit onto Charts so the original
@@ -236,6 +242,209 @@ public sealed partial class StrategyAuthoringViewModel
 
     private static string GalleryMatchKey(string symbol, DateTime observationFromUtc, DateTime outcomeFromUtc) =>
         $"{symbol}|{observationFromUtc:O}|{outcomeFromUtc:O}";
+
+    /// <summary>
+    /// Scan local Simulated history for the chosen research outcome, open Charts on hits, and
+    /// auto-label up to four samples so the user can click Run research experiment next.
+    /// </summary>
+    [RelayCommand]
+    private async Task AutoCollectLocalResearchSamplesAsync(string? scanId)
+    {
+        var primary = string.IsNullOrWhiteSpace(scanId) ? "next-day-plus-5" : scanId.Trim();
+        if (!ResearchOutcomeEventFinderV1.TryDescribeScan(primary, out var displayName, out _))
+        {
+            AiStatus = $"Unknown research scan '{primary}'.";
+            return;
+        }
+
+        if (_researchOutcomeGalleryScan is null)
+        {
+            AiStatus = "Outcome gallery scan is not registered in this composition.";
+            return;
+        }
+
+        ActiveScreen = StrategyAuthoringScreen.Research;
+        Append(new AuthoringMessage(
+            CodegenRole.User,
+            $"Auto-collect research samples from my local Simulated history ({displayName})."));
+        HostChartOverlayPreviewRequested?.Invoke(
+            this,
+            new HostChartOverlayPreviewRequestedEventArgs(
+                Array.Empty<string>(),
+                startResearchCapture: true));
+
+        IsScanningResearchGallery = true;
+        AiStatus = $"Scanning local Simulated history for {displayName}…";
+        try
+        {
+            ResearchOutcomeGalleryResult = await _researchOutcomeGalleryScan.ScanAsync(
+                new ResearchOutcomeGalleryScanRequestV1(primary),
+                CancellationToken.None);
+            var matches = ResearchOutcomeGalleryResult.Matches;
+            Append(AuthoringMessage.Tool(
+                matches.Count == 0 ? "Warn" : "Ok",
+                ResearchOutcomeGalleryResult.DisplayName,
+                ResearchOutcomeGalleryResult.Explanation));
+
+            if (matches.Count == 0)
+            {
+                AiStatus =
+                    $"No {displayName} hits in local history. Chart is open for manual brush — or try another suggestion chip.";
+                Status = AiStatus;
+                Save();
+                return;
+            }
+
+            var label = primary switch
+            {
+                "pre-crash" => ResearchEventLabelKindV1.PreCrash,
+                "pre-breakout" => ResearchEventLabelKindV1.PreBreakout,
+                _ => ResearchEventLabelKindV1.PreBreakout,
+            };
+
+            var labeled = 0;
+            _suppressGalleryAdvance = true;
+            try
+            {
+                foreach (var match in matches.Take(4))
+                {
+                    UseResearchOutcomeGalleryMatch(match);
+                    if (PendingResearchChartSelection is null)
+                        continue;
+                    CommitResearchSelection(label, ResearchEventLabelSourceV1.RuleSuggestedHumanReviewed);
+                    labeled++;
+                }
+            }
+            finally
+            {
+                _suppressGalleryAdvance = false;
+            }
+
+            if (labeled == 0)
+            {
+                AiStatus = "Gallery found events but none could be committed as research samples.";
+                Status = AiStatus;
+                Save();
+                return;
+            }
+
+            // Leave the last event on the chart for visual review.
+            UseResearchOutcomeGalleryMatch(matches[Math.Min(labeled, matches.Count) - 1]);
+            AiStatus = labeled >= 4
+                ? $"Auto-labeled {labeled} {displayName} samples from Simulated history. Click Run research experiment."
+                : $"Auto-labeled {labeled} sample(s) from Simulated history (need {4 - labeled} more for the experiment). Click another suggestion or label manually.";
+            Status = AiStatus;
+            Append(new AuthoringMessage(CodegenRole.Assistant, AiStatus));
+            RefreshResearchQuickSuggestions();
+            Save();
+        }
+        catch (OperationCanceledException)
+        {
+            AiStatus = "Research auto-collect stopped.";
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
+        {
+            _logger.LogWarning(exception, "Research auto-collect failed");
+            AiStatus = $"Research auto-collect stopped: {exception.Message}";
+        }
+        finally
+        {
+            IsScanningResearchGallery = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ApplyResearchQuickSuggestionAsync(ResearchQuickSuggestionV1? suggestion)
+    {
+        if (suggestion is null) return;
+
+        if (suggestion.Kind == ResearchQuickSuggestionKindV1.AutoCollectLocalGallery)
+        {
+            await AutoCollectLocalResearchSamplesAsync(suggestion.ScanId);
+            return;
+        }
+
+        var prompt = suggestion.Prompt?.Trim() ?? suggestion.Title;
+        if (prompt.Length == 0) return;
+
+        var chartChoice = AuthoredChartChoiceCatalogV1.Resolve(
+            prompt,
+            prompt,
+            LoadUserChartIndicators());
+        if (chartChoice.NeedsClarification &&
+            chartChoice.ClarificationQuestion is { Length: > 0 } catalogQuestion)
+        {
+            Composer = string.Empty;
+            Append(new AuthoringMessage(CodegenRole.User, prompt));
+            Append(new AuthoringMessage(CodegenRole.Assistant, catalogQuestion));
+            AwaitingAnswer = true;
+            AiStatus = "Pick a numbered host chart choice, or click another suggestion chip.";
+            Save();
+            return;
+        }
+
+        if (chartChoice.HasResearchScans && !AuthoredChartChoiceCatalogV1.LooksLikeTradingRequest(prompt))
+        {
+            await CompleteHostResearchScanAsync(prompt, chartChoice);
+            return;
+        }
+
+        if (chartChoice.HasOverlays && !AuthoredChartChoiceCatalogV1.LooksLikeTradingRequest(prompt))
+        {
+            Composer = string.Empty;
+            Append(new AuthoringMessage(CodegenRole.User, prompt));
+            HostChartOverlayPreviewRequested?.Invoke(
+                this,
+                new HostChartOverlayPreviewRequestedEventArgs(
+                    chartChoice.Overlays.Select(static item => item.Id).ToArray(),
+                    startResearchCapture: false));
+            Append(new AuthoringMessage(
+                CodegenRole.Assistant,
+                $"Opened the live chart with {AuthoredChartChoiceCatalogV1.DescribeSelection(chartChoice)}. No AI key required for this preview."));
+            AiStatus = "Chart overlays applied from the suggestion chip.";
+            Save();
+            return;
+        }
+
+        Composer = prompt;
+        AiStatus = "Suggestion loaded in the composer — press Send when ready.";
+    }
+
+    public void RefreshResearchQuickSuggestions()
+    {
+        ResearchQuickSuggestions.Clear();
+        ResearchQuickSuggestions.Add(new ResearchQuickSuggestionV1(
+            "auto-plus5",
+            "Auto: +5% from my Simulated data",
+            "Scan local AAPL/1H history, open Charts, label 4 samples",
+            ResearchQuickSuggestionKindV1.AutoCollectLocalGallery,
+            ScanId: "next-day-plus-5"));
+        ResearchQuickSuggestions.Add(new ResearchQuickSuggestionV1(
+            "auto-crash",
+            "Auto: crashes from my Simulated data",
+            "Scan local history for ≤−5% next-bar events and label",
+            ResearchQuickSuggestionKindV1.AutoCollectLocalGallery,
+            ScanId: "pre-crash"));
+        ResearchQuickSuggestions.Add(new ResearchQuickSuggestionV1(
+            "auto-breakout",
+            "Auto: breakouts from my Simulated data",
+            "Scan local history for tight-range → +3% and label",
+            ResearchQuickSuggestionKindV1.AutoCollectLocalGallery,
+            ScanId: "pre-breakout"));
+        ResearchQuickSuggestions.Add(new ResearchQuickSuggestionV1(
+            "ema-rsi",
+            "Show EMA + RSI",
+            "Open Charts with EMA and RSI overlays",
+            ResearchQuickSuggestionKindV1.SendPrompt,
+            Prompt: "chart with EMA and RSI"));
+        ResearchQuickSuggestions.Add(new ResearchQuickSuggestionV1(
+            "famous",
+            "Famous indicators",
+            "List host catalog overlays to click by number",
+            ResearchQuickSuggestionKindV1.SendPrompt,
+            Prompt: "show famous indicators"));
+        OnPropertyChanged(nameof(HasResearchQuickSuggestions));
+    }
 
     private void ApplyResearchDatasetWorkspaceChange(
         ResearchDatasetDefinitionV1? dataset,

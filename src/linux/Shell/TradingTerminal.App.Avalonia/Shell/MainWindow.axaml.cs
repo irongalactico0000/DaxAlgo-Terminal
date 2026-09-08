@@ -352,6 +352,21 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Opens Strategy Builder and auto-labels research samples from local Simulated history
+    /// (<c>--preview-research-auto</c> smoke / clickable suggestion chips).
+    /// </summary>
+    public async Task PreviewResearchAutoCollectAsync(string scanId = "next-day-plus-5")
+    {
+        if ((Application.Current as App)?.Services is not { } sp) return;
+        var vm = sp.GetRequiredService<TradingTerminal.App.Authoring.StrategyAuthoringViewModel>();
+        var window = CreateAuthoringWindow(vm);
+        WireResearchChartRequest(vm, window);
+        ShowDisposing(window, vm);
+        Vm?.ActivityLog.Append("Tools", "INFO", $"Opened Strategy authoring for research auto-collect ({scanId}).");
+        await vm.AutoCollectLocalResearchSamplesCommand.ExecuteAsync(scanId);
+    }
+
     private void OpenResearchChart(
         TradingTerminal.App.Authoring.StrategyAuthoringViewModel? targetViewModel = null,
         Settings.StrategyAuthoringWindow? targetWindow = null,

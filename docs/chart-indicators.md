@@ -18,6 +18,8 @@ DaxAlgo Terminal Charts ships these host-owned overlays (aligned with common Tra
 
 Chat (Vibe Quant) lists the same catalog when you ask for “famous indicators”. Picks toggle the live Charts window — they do **not** place Paper orders.
 
+Under the composer, clickable chips include **Auto: +5% / crashes / breakouts from my Simulated data**. Those scan local history, open Charts on gallery hits, and auto-label up to four samples for the research experiment.
+
 ## User-defined indicators
 
 Edit:

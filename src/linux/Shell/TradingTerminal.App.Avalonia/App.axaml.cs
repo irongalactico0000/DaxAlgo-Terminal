@@ -188,30 +188,52 @@ public partial class App : Application
                             argument.StartsWith("--preview-overlays=", StringComparison.OrdinalIgnoreCase));
                         var previewResearchCapture = args.Any(argument =>
                             string.Equals(argument, "--preview-research-capture", StringComparison.OrdinalIgnoreCase));
-                        if (previewArg is not null || previewResearchCapture)
+                        var previewResearchAuto = args.FirstOrDefault(argument =>
+                            argument.StartsWith("--preview-research-auto", StringComparison.OrdinalIgnoreCase));
+                        if (previewArg is not null || previewResearchCapture || previewResearchAuto is not null)
                         {
                             var overlayIds = previewArg is null
                                 ? Array.Empty<string>()
                                 : previewArg
                                     .Split('=', 2, StringSplitOptions.TrimEntries)[1]
                                     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                            if (overlayIds.Length > 0 || previewResearchCapture)
+                            var autoScanId = previewResearchAuto is null
+                                ? null
+                                : previewResearchAuto.Contains('=', StringComparison.Ordinal)
+                                    ? previewResearchAuto.Split('=', 2, StringSplitOptions.TrimEntries)[1]
+                                    : "next-day-plus-5";
+                            if (string.IsNullOrWhiteSpace(autoScanId))
+                                autoScanId = "next-day-plus-5";
+                            if (overlayIds.Length > 0 || previewResearchCapture || autoScanId is not null)
                             {
                                 File.WriteAllText(
                                     "/tmp/daxalgo-preview-overlays.log",
-                                    $"scheduled overlays=[{string.Join(',', overlayIds)}] researchCapture={previewResearchCapture} at {DateTime.UtcNow:O}\n");
+                                    $"scheduled overlays=[{string.Join(',', overlayIds)}] researchCapture={previewResearchCapture} researchAuto={autoScanId} at {DateTime.UtcNow:O}\n");
                                 _ = Dispatcher.UIThread.InvokeAsync(async () =>
                                 {
                                     try
                                     {
                                         await Task.Delay(750);
-                                        File.AppendAllText(
-                                            "/tmp/daxalgo-preview-overlays.log",
-                                            $"invoking PreviewHostChartOverlays at {DateTime.UtcNow:O}\n");
-                                        main.PreviewHostChartOverlays(overlayIds, startResearchCapture: previewResearchCapture);
-                                        File.AppendAllText(
-                                            "/tmp/daxalgo-preview-overlays.log",
-                                            $"completed PreviewHostChartOverlays at {DateTime.UtcNow:O}\n");
+                                        if (autoScanId is not null)
+                                        {
+                                            File.AppendAllText(
+                                                "/tmp/daxalgo-preview-overlays.log",
+                                                $"invoking PreviewResearchAutoCollectAsync({autoScanId}) at {DateTime.UtcNow:O}\n");
+                                            await main.PreviewResearchAutoCollectAsync(autoScanId);
+                                            File.AppendAllText(
+                                                "/tmp/daxalgo-preview-overlays.log",
+                                                $"completed PreviewResearchAutoCollectAsync at {DateTime.UtcNow:O}\n");
+                                        }
+                                        else
+                                        {
+                                            File.AppendAllText(
+                                                "/tmp/daxalgo-preview-overlays.log",
+                                                $"invoking PreviewHostChartOverlays at {DateTime.UtcNow:O}\n");
+                                            main.PreviewHostChartOverlays(overlayIds, startResearchCapture: previewResearchCapture);
+                                            File.AppendAllText(
+                                                "/tmp/daxalgo-preview-overlays.log",
+                                                $"completed PreviewHostChartOverlays at {DateTime.UtcNow:O}\n");
+                                        }
                                     }
                                     catch (Exception ex)
                                     {
@@ -235,7 +257,8 @@ public partial class App : Application
                     // Skip Support modal during chart smoke previews so Charts stays frontmost.
                     var isOverlayPreview = args.Any(argument =>
                         argument.StartsWith("--preview-overlays=", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(argument, "--preview-research-capture", StringComparison.OrdinalIgnoreCase));
+                        string.Equals(argument, "--preview-research-capture", StringComparison.OrdinalIgnoreCase) ||
+                        argument.StartsWith("--preview-research-auto", StringComparison.OrdinalIgnoreCase));
                     if (!isOverlayPreview)
                     {
                         try

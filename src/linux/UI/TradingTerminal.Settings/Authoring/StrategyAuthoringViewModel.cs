@@ -183,6 +183,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
                 .OrderBy(static label => label, StringComparer.Ordinal),
         ];
         RefreshStarterBriefs();
+        RefreshResearchQuickSuggestions();
 
         // The hero empty state ↔ transcript switch watches the count; the VM owns the collection,
         // so the self-subscription cannot outlive it.
@@ -350,6 +351,9 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     [ObservableProperty] private ChartPatternSearchResultV1? _chartPatternSearchResult;
     [ObservableProperty] private bool _isScanningResearchGallery;
     [ObservableProperty] private ResearchOutcomeGalleryResultV1? _researchOutcomeGalleryResult;
+
+    public ObservableCollection<ResearchQuickSuggestionV1> ResearchQuickSuggestions { get; } = [];
+    public bool HasResearchQuickSuggestions => ResearchQuickSuggestions.Count > 0;
 
     public bool HasChartReferences => ChartReferences.Count > 0;
     public bool HasChartReferenceInspections => ChartReferenceInspections.Count > 0;

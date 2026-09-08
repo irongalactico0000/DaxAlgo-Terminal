@@ -529,16 +529,38 @@
         </StackPanel>
 
         <Border Grid.Row="3" Classes="composer" Padding="11,9" Margin="0,10,0,0">
-          <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto">
-            <TextBox x:Name="ComposerBox" Grid.Row="0" MinHeight="58" MaxHeight="190"
+          <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+            <ItemsControl Grid.Row="0" ItemsSource="{Binding ResearchQuickSuggestions}"
+                          IsVisible="{Binding HasResearchQuickSuggestions}"
+                          Margin="0,0,0,8"
+                          AutomationProperties.Name="Research quick suggestions">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Classes="pill aiPill" Margin="0,0,6,4"
+                          Command="{Binding DataContext.ApplyResearchQuickSuggestionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                          CommandParameter="{Binding}"
+                          ToolTip.Tip="{Binding Hint}"
+                          AutomationProperties.Name="{Binding Title}">
+                    <TextBlock Text="{Binding Title}" FontSize="10.5" TextWrapping="NoWrap" />
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBox x:Name="ComposerBox" Grid.Row="1" MinHeight="58" MaxHeight="190"
                      AcceptsReturn="True" TextWrapping="Wrap"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                      Background="Transparent" BorderThickness="0" Padding="2"
-                     FontSize="12.5" Watermark="Describe a chart or strategy — optionally attach a reference. ⌘/Ctrl+Enter sends."
+                     FontSize="12.5" Watermark="Describe a chart or strategy — or click a suggestion above. ⌘/Ctrl+Enter sends."
                      Text="{Binding Composer, Mode=TwoWay}"
                      KeyDown="OnComposerKeyDown" />
 
-            <ItemsControl Grid.Row="1" ItemsSource="{Binding ChartReferences}"
+            <ItemsControl Grid.Row="2" ItemsSource="{Binding ChartReferences}"
                           IsVisible="{Binding HasChartReferences}" Margin="0,7,0,0">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
@@ -561,7 +583,7 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <ItemsControl Grid.Row="2" ItemsSource="{Binding ChartReferenceInspections}"
+            <ItemsControl Grid.Row="3" ItemsSource="{Binding ChartReferenceInspections}"
                           IsVisible="{Binding HasChartReferenceInspections}" Margin="0,3,0,0">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
@@ -571,7 +593,7 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <Border Grid.Row="3" Background="{StaticResource Warning.Soft}"
+            <Border Grid.Row="4" Background="{StaticResource Warning.Soft}"
                     BorderBrush="{StaticResource Warning.Brush}" BorderThickness="1"
                     CornerRadius="4" Padding="7,4" Margin="0,3,0,0"
                     IsVisible="{Binding HasUnresolvedChartReferences}"
@@ -636,7 +658,7 @@
               </StackPanel>
             </Border>
 
-            <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+            <Grid Grid.Row="5" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
               <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
                          IsEnabled="{Binding !IsGenerating}">
                 <Button Classes="pill aiPill" Margin="0,0,6,4"
@@ -1126,7 +1148,7 @@
                         <StackPanel Spacing="6">
                           <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Grid.Column="0" Spacing="2">
-                              <TextBlock Text="OUTCOME GALLERY (S&amp;P 100)" Classes="eyebrow" />
+                              <TextBlock Text="OUTCOME GALLERY (LOCAL HISTORY)" Classes="eyebrow" />
                               <TextBlock Text="{Binding ResearchOutcomeGalleryResult.DisplayName}"
                                          FontWeight="SemiBold" />
                             </StackPanel>
@@ -1135,6 +1157,14 @@
                               <TextBlock Text="SCANNING…" FontFamily="{StaticResource Font.Data}" />
                             </Border>
                           </Grid>
+                          <Button Classes="aiAction"
+                                  Content="Auto-label top 4 from this gallery"
+                                  HorizontalAlignment="Left"
+                                  Command="{Binding AutoCollectLocalResearchSamplesCommand}"
+                                  CommandParameter="{Binding ResearchOutcomeGalleryResult.ScanId}"
+                                  IsEnabled="{Binding !IsScanningResearchGallery}"
+                                  ToolTip.Tip="Re-scan if needed and auto-label up to four matches using the scan’s outcome type."
+                                  AutomationProperties.Name="Auto-label top gallery matches" />
                           <TextBlock Text="{Binding ResearchOutcomeGalleryResult.Explanation}"
                                      Classes="caption" TextWrapping="Wrap" />
                           <ItemsControl ItemsSource="{Binding ResearchOutcomeGalleryResult.Matches}"

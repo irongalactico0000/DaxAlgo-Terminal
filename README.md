@@ -79,6 +79,10 @@ Users add custom SMA/EMA/RSI/ATR periods in
 `%LocalAppData%/DaxAlgo Terminal/user-indicators.json` (seeded on first Charts open).
 See [chart indicators](docs/chart-indicators.md).
 
+Strategy Builder shows clickable suggestion chips under the composer, including **Auto: +5% /
+crashes / breakouts from my Simulated data** — those scan local history (daily preferred, then 1H),
+open Charts on hits, and auto-label up to four research samples so you can run the experiment next.
+
 ## Remaining release boundary
 
 Windows-hosted builds and tests verify source and packaging invariants, not macOS delivery. Before
