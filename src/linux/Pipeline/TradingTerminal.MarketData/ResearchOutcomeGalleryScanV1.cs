@@ -6,11 +6,23 @@ using TradingTerminal.Core.Strategies.Generation;
 namespace TradingTerminal.Infrastructure.MarketData;
 
 /// <summary>
-/// Scans S&amp;P 100 symbols present in the instrument registry against local (and optionally
-/// broker-hydrated) daily bars for research outcome events. Research evidence only — not Paper.
+/// Scans S&amp;P 100 (then wider registry) symbols against local bars for research outcome
+/// events. Prefers daily history, then falls back to 1H / 15m so Simulated Mac installs still
+/// get gallery hits. Research evidence only — not Paper.
 /// </summary>
 public sealed class ResearchOutcomeGalleryScanV1 : IResearchOutcomeGalleryScanV1
 {
+    /// <summary>
+    /// Prefer daily (scan labels say “next day”), then fall back to coarser local history so
+    /// Mac/Simulated installs that only keep 1H bars still produce gallery hits for capture.
+    /// </summary>
+    private static readonly BarSize[] PreferredBarSizes =
+    [
+        BarSize.OneDay,
+        BarSize.OneHour,
+        BarSize.FifteenMinutes,
+    ];
+
     private readonly IMarketDataStore _store;
     private readonly IInstrumentRegistry _registry;
     private readonly IMarketDataRepository? _repository;
@@ -53,89 +65,71 @@ public sealed class ResearchOutcomeGalleryScanV1 : IResearchOutcomeGalleryScanV1
         var names = Sp100Sp500Catalog.Sp100
             .ToDictionary(static item => item.Symbol, static item => item.Name, StringComparer.OrdinalIgnoreCase);
 
-        var eligible = _registry.All()
-            .Where(instrument => !instrument.Id.IsNone)
-            .Where(instrument => universe.Contains(instrument.CanonicalSymbol))
+        var all = _registry.All()
+            .Where(static instrument => !instrument.Id.IsNone)
             .OrderBy(static instrument => instrument.CanonicalSymbol, StringComparer.Ordinal)
             .ThenBy(static instrument => instrument.Id.Value)
             .ToArray();
-
+        var sp100Eligible = all
+            .Where(instrument => universe.Contains(instrument.CanonicalSymbol))
+            .ToArray();
+        // Scan S&P 100 first; if none have usable local bars, widen to the rest of the registry
+        // (Simulated Mac installs often only keep AAPL/MSFT hourly history).
+        var eligible = sp100Eligible.Length > 0 ? sp100Eligible : all;
         var matches = new List<ResearchOutcomeGalleryMatchV1>();
         var withHistory = 0;
         var hydrationAttempts = 0;
         var hydrationSuccesses = 0;
         var hydrationFailures = 0;
+        var timeframeCounts = new Dictionary<BarSize, int>();
 
-        foreach (var instrument in eligible)
+        async Task ScanBatchAsync(IReadOnlyList<Instrument> batch)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var recent = await _store.GetRecentBarsAsync(
-                instrument.Id,
-                BarSize.OneDay,
-                request.LookbackBars,
-                request.PreferredSource,
-                cancellationToken).ConfigureAwait(false);
-
-            var usable = SelectOneProvenance(recent, request.PreferredSource, request.LookbackBars);
-            if (usable.Count < ResearchOutcomeEventFinderV1.MinimumBars &&
-                request.HydrateMissingHistory &&
-                _repository is not null &&
-                _selector is not null)
+            foreach (var instrument in batch)
             {
-                if (hydrationAttempts < request.MaxRemoteHydrations &&
-                    TryResolveHistoricalRoute(instrument, request.PreferredSource, out var broker, out var contract))
-                {
-                    hydrationAttempts++;
-                    try
-                    {
-                        var duration = TimeSpan.FromDays(request.LookbackBars + 5);
-                        var fetched = await _repository.GetHistoricalBarsAsync(
-                            contract,
-                            broker,
-                            BarSize.OneDay,
-                            duration,
-                            cancellationToken).ConfigureAwait(false);
-                        var canonical = fetched.Select(bar => OhlcvBar.FromBar(
-                            bar,
-                            instrument.Id,
-                            BarSize.OneDay,
-                            broker,
-                            isFinal: true)).ToArray();
-                        usable = SelectOneProvenance(canonical, broker, request.LookbackBars);
-                        if (usable.Count >= ResearchOutcomeEventFinderV1.MinimumBars)
-                            hydrationSuccesses++;
-                        else
-                            hydrationFailures++;
-                    }
-                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    catch (Exception exception) when (exception is
-                        InvalidOperationException or
-                        NotSupportedException or
-                        TimeoutException or
-                        IOException or
-                        HttpRequestException)
-                    {
-                        hydrationFailures++;
-                    }
-                }
+                cancellationToken.ThrowIfCancellationRequested();
+                var (usable, sizeUsed, hydAttempt, hydOk, hydFail) = await LoadUsableBarsAsync(
+                    instrument,
+                    request,
+                    cancellationToken).ConfigureAwait(false);
+                hydrationAttempts += hydAttempt;
+                hydrationSuccesses += hydOk;
+                hydrationFailures += hydFail;
+
+                if (usable.Count < ResearchOutcomeEventFinderV1.MinimumBars || sizeUsed is null)
+                    continue;
+
+                withHistory++;
+                timeframeCounts[sizeUsed.Value] = timeframeCounts.GetValueOrDefault(sizeUsed.Value) + 1;
+                var symbol = instrument.CanonicalSymbol;
+                names.TryGetValue(symbol, out var companyName);
+                companyName ??= symbol;
+                matches.AddRange(ResearchOutcomeEventFinderV1.FindEvents(
+                    request.ScanId,
+                    instrument.Id,
+                    symbol,
+                    companyName,
+                    usable));
             }
+        }
 
-            if (usable.Count < ResearchOutcomeEventFinderV1.MinimumBars)
-                continue;
+        await ScanBatchAsync(eligible).ConfigureAwait(false);
+        if (withHistory == 0 && sp100Eligible.Length > 0 && !ReferenceEquals(eligible, all))
+        {
+            eligible = all;
+            await ScanBatchAsync(all.Where(instrument => !universe.Contains(instrument.CanonicalSymbol)).ToArray())
+                .ConfigureAwait(false);
+        }
 
-            withHistory++;
-            var symbol = instrument.CanonicalSymbol;
-            names.TryGetValue(symbol, out var companyName);
-            companyName ??= symbol;
-            matches.AddRange(ResearchOutcomeEventFinderV1.FindEvents(
-                request.ScanId,
-                instrument.Id,
-                symbol,
-                companyName,
-                usable));
+        // Simulated series often calm near the tip — if we have history but no threshold events,
+        // one deeper local pass (still capped) recovers older ±5% / breakout windows.
+        if (matches.Count == 0 && withHistory > 0 && request.LookbackBars < 3_000)
+        {
+            request = request with { LookbackBars = 3_000, HydrateMissingHistory = false };
+            matches.Clear();
+            withHistory = 0;
+            timeframeCounts.Clear();
+            await ScanBatchAsync(eligible).ConfigureAwait(false);
         }
 
         var ranked = matches
@@ -149,10 +143,15 @@ public sealed class ResearchOutcomeGalleryScanV1 : IResearchOutcomeGalleryScanV1
             ? string.Empty
             : $" Missing local history triggered {hydrationAttempts} connected-broker request(s): " +
               $"{hydrationSuccesses} supplied enough bars and {hydrationFailures} did not.";
+        var timeframes = timeframeCounts.Count == 0
+            ? "no usable local bars"
+            : string.Join(", ", timeframeCounts
+                .OrderBy(static pair => Array.IndexOf(PreferredBarSizes, pair.Key))
+                .Select(static pair => $"{pair.Value}×{pair.Key.ToDisplayString()}"));
         var explanation =
-            $"{prefix} across S&P 100 symbols present in the instrument registry. " +
+            $"{prefix} across registry symbols (S&P 100 preferred; daily bars preferred, then 1H / 15m local history). " +
             $"Found {ranked.Length} event(s) from {withHistory} of {eligible.Length} eligible symbols " +
-            $"(lookback {request.LookbackBars} daily bars).{hydration} " +
+            $"(lookback {request.LookbackBars} bars; history used: {timeframes}).{hydration} " +
             "Gallery hits are research evidence for B/C/N labeling — not a trading signal and not Paper approval.";
 
         return new ResearchOutcomeGalleryResultV1(
@@ -167,8 +166,86 @@ public sealed class ResearchOutcomeGalleryScanV1 : IResearchOutcomeGalleryScanV1
             hydrationFailures);
     }
 
+    private async Task<(IReadOnlyList<OhlcvBar> Bars, BarSize? Size, int HydAttempts, int HydOk, int HydFail)>
+        LoadUsableBarsAsync(
+            Instrument instrument,
+            ResearchOutcomeGalleryScanRequestV1 request,
+            CancellationToken cancellationToken)
+    {
+        var hydAttempts = 0;
+        var hydOk = 0;
+        var hydFail = 0;
+
+        foreach (var size in PreferredBarSizes)
+        {
+            var recent = await _store.GetRecentBarsAsync(
+                instrument.Id,
+                size,
+                request.LookbackBars,
+                request.PreferredSource,
+                cancellationToken).ConfigureAwait(false);
+
+            var usable = SelectOneProvenance(recent, size, request.PreferredSource, request.LookbackBars);
+            if (usable.Count >= ResearchOutcomeEventFinderV1.MinimumBars)
+                return (usable, size, hydAttempts, hydOk, hydFail);
+
+            // Remote hydrate only for daily — that is the intended research contract.
+            if (size != BarSize.OneDay ||
+                !request.HydrateMissingHistory ||
+                _repository is null ||
+                _selector is null ||
+                hydAttempts >= request.MaxRemoteHydrations ||
+                !TryResolveHistoricalRoute(instrument, request.PreferredSource, out var broker, out var contract))
+            {
+                continue;
+            }
+
+            hydAttempts++;
+            try
+            {
+                var duration = TimeSpan.FromDays(request.LookbackBars + 5);
+                var fetched = await _repository.GetHistoricalBarsAsync(
+                    contract,
+                    broker,
+                    BarSize.OneDay,
+                    duration,
+                    cancellationToken).ConfigureAwait(false);
+                var canonical = fetched.Select(bar => OhlcvBar.FromBar(
+                    bar,
+                    instrument.Id,
+                    BarSize.OneDay,
+                    broker,
+                    isFinal: true)).ToArray();
+                usable = SelectOneProvenance(canonical, BarSize.OneDay, broker, request.LookbackBars);
+                if (usable.Count >= ResearchOutcomeEventFinderV1.MinimumBars)
+                {
+                    hydOk++;
+                    return (usable, BarSize.OneDay, hydAttempts, hydOk, hydFail);
+                }
+
+                hydFail++;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception) when (exception is
+                InvalidOperationException or
+                NotSupportedException or
+                TimeoutException or
+                IOException or
+                HttpRequestException)
+            {
+                hydFail++;
+            }
+        }
+
+        return (Array.Empty<OhlcvBar>(), null, hydAttempts, hydOk, hydFail);
+    }
+
     private static IReadOnlyList<OhlcvBar> SelectOneProvenance(
         IReadOnlyList<OhlcvBar> bars,
+        BarSize size,
         BrokerKind? preferred,
         int take)
     {
@@ -176,7 +253,7 @@ public sealed class ResearchOutcomeGalleryScanV1 : IResearchOutcomeGalleryScanV1
             return Array.Empty<OhlcvBar>();
 
         IEnumerable<OhlcvBar> ordered = bars
-            .Where(static bar => bar.Size == BarSize.OneDay)
+            .Where(bar => bar.Size == size)
             .OrderBy(static bar => bar.OpenTimeUtc);
 
         if (preferred is { } broker)

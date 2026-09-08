@@ -10,7 +10,7 @@ namespace TradingTerminal.Core.Strategies.Generation;
 /// </summary>
 public sealed record ResearchOutcomeGalleryScanRequestV1(
     string ScanId,
-    int LookbackBars = 260,
+    int LookbackBars = 1_500,
     int MaxResults = 12,
     bool HydrateMissingHistory = true,
     int MaxRemoteHydrations = 40,

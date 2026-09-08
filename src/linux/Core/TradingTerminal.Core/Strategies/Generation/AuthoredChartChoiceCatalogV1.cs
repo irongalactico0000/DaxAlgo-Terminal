@@ -206,7 +206,7 @@ public static class AuthoredChartChoiceCatalogV1
             "Next-day +5% gallery",
             "charts that rose ≥5% the next day",
             ["+5%", "5%", "next day", "next-day", "plus 5", "rose 5"],
-            "This is a research scan, not a trading rule. The host opens the research chart and scans S&P 100 daily history for next-day +5% events. Label B/C/N after reviewing a gallery hit or a manual brush."),
+            "This is a research scan, not a trading rule. The host opens the research chart and scans local history (daily preferred, then 1H) for next-bar ≥+5% events. Label B/C/N after reviewing a gallery hit or a manual brush."),
         new(
             "pre-breakout",
             "Pre-breakout windows",
@@ -218,7 +218,7 @@ public static class AuthoredChartChoiceCatalogV1
             "Pre-crash windows",
             "windows just before a crash",
             ["pre-crash", "pre crash", "before crash", "폭락 직전"],
-            "Research scan: host gallery looks for next-day ≤−5% events on S&P 100 daily history. Label after review — not Paper."),
+            "Research scan: host gallery looks for next-bar ≤−5% events on local history (daily preferred, then 1H). Label after review — not Paper."),
     ];
 
     public static IReadOnlyList<AuthoredChartOverlayChoiceV1> MergeWithUserIndicators(

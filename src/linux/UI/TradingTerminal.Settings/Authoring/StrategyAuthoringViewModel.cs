@@ -2700,7 +2700,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             $"Opened the live research chart for {AuthoredChartChoiceCatalogV1.DescribeSelection(chartChoice)}. " +
             "Brush an observation window and a later outcome window, or pick a gallery hit below, then label B/C/N. " +
             "Gallery hits are research evidence only — not Paper."));
-        AiStatus = "Research chart is open. Scanning S&P 100 daily history for matching outcome events…";
+        AiStatus = "Research chart is open. Scanning local history for matching outcome events…";
         AwaitingAnswer = false;
         WorkbenchTab = 0;
         Save();
