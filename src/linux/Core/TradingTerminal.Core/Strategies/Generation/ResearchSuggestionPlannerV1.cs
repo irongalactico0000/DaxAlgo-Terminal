@@ -145,7 +145,7 @@ public static partial class ResearchSuggestionPlannerV1
          need.Contains("catalog", StringComparison.OrdinalIgnoreCase) ||
          need.Contains("지표 목록", StringComparison.Ordinal));
 
-    [GeneratedRegex(@"(\+?\s*5\s*%|jump|rally|shoot|before\s+up)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"(\+\s*5\s*%|jump|rally|shoot|before\s+up)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex JumpPattern();
 
     [GeneratedRegex(@"(\-\s*5\s*%|crash|dump|drop|before\s+down)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
