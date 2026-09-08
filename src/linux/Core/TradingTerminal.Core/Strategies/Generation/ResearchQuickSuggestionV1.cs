@@ -18,4 +18,7 @@ public enum ResearchQuickSuggestionKindV1
 
     /// <summary>Scan local Simulated history and auto-label gallery hits for capture.</summary>
     AutoCollectLocalGallery,
+
+    /// <summary>Run the observation-only chronological research experiment (needs ≥4 samples).</summary>
+    RunResearchExperiment,
 }

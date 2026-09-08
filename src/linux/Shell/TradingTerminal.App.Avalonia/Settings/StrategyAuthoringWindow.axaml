@@ -541,12 +541,13 @@
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <Button Classes="pill aiPill" Margin="0,0,6,4"
+                  <Button Margin="0,0,6,4" Padding="10,5"
+                          Classes="aiAction"
                           Command="{Binding DataContext.ApplyResearchQuickSuggestionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                           CommandParameter="{Binding}"
                           ToolTip.Tip="{Binding Hint}"
                           AutomationProperties.Name="{Binding Title}">
-                    <TextBlock Text="{Binding Title}" FontSize="10.5" TextWrapping="NoWrap" />
+                    <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" TextWrapping="NoWrap" />
                   </Button>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>

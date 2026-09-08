@@ -143,6 +143,7 @@ public sealed partial class StrategyAuthoringViewModel
             ResearchExperimentEvidence = evidence;
             ApplyResearchDatasetWorkspaceChange(dataset, "Produced chronological research feature evidence");
             Status = $"Research evidence ready: {evidence.Formula}. Historical validation is still required before Paper.";
+            RefreshResearchQuickSuggestions();
             Save();
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -202,6 +203,7 @@ public sealed partial class StrategyAuthoringViewModel
         Save();
         if (!_suppressGalleryAdvance)
             TryAdvanceToNextUnusedGalleryMatch();
+        RefreshResearchQuickSuggestions();
     }
 
     private bool _suppressGalleryAdvance;
@@ -331,8 +333,8 @@ public sealed partial class StrategyAuthoringViewModel
             // One Charts window for review — not one window per sample.
             FocusResearchGalleryMatch(matches[Math.Min(labeled, matches.Count) - 1], openChart: true, announce: false);
             AiStatus = labeled >= 4
-                ? $"Auto-labeled {labeled} {displayName} samples from Simulated history. Pick a box to focus; then Run research experiment."
-                : $"Auto-labeled {labeled} sample(s) from Simulated history (need {4 - labeled} more for the experiment). Click another suggestion or label manually.";
+                ? $"Captured {labeled} before-jump samples (observation = state before the move; scores on each box). Click ▶ Run chronological experiment."
+                : $"Captured {labeled} before-jump sample(s) (need {4 - labeled} more). Click chip 1 again or label another box.";
             Status = AiStatus;
             Append(new AuthoringMessage(CodegenRole.Assistant, AiStatus));
             RefreshResearchQuickSuggestions();
@@ -361,6 +363,21 @@ public sealed partial class StrategyAuthoringViewModel
         if (suggestion.Kind == ResearchQuickSuggestionKindV1.AutoCollectLocalGallery)
         {
             await AutoCollectLocalResearchSamplesAsync(suggestion.ScanId);
+            return;
+        }
+
+        if (suggestion.Kind == ResearchQuickSuggestionKindV1.RunResearchExperiment)
+        {
+            if (!CanRunResearchExperiment)
+            {
+                AiStatus = ResearchEventSampleCount < 4
+                    ? $"Need {4 - ResearchEventSampleCount} more before-jump sample(s) first — click “1 · Capture before +5% jump”."
+                    : "Research experiment is not ready yet.";
+                return;
+            }
+
+            await RunResearchExperimentCommand.ExecuteAsync(null);
+            RefreshResearchQuickSuggestions();
             return;
         }
 
@@ -413,34 +430,48 @@ public sealed partial class StrategyAuthoringViewModel
     public void RefreshResearchQuickSuggestions()
     {
         ResearchQuickSuggestions.Clear();
+
+        // Dolpago-style loop: capture states *before* the move, then experiment.
+        // First chip is always the next one-click action for the current situation.
+        if (ResearchEventSampleCount >= 4 &&
+            CanRunResearchExperiment &&
+            !HasResearchExperimentEvidence)
+        {
+            ResearchQuickSuggestions.Add(new ResearchQuickSuggestionV1(
+                "run-experiment",
+                "▶ Run chronological experiment",
+                "You already have 4+ before-jump samples — extract observation-only features next",
+                ResearchQuickSuggestionKindV1.RunResearchExperiment));
+        }
+
         ResearchQuickSuggestions.Add(new ResearchQuickSuggestionV1(
-            "auto-plus5",
-            "Auto: +5% from my Simulated data",
-            "Scan local AAPL/1H history, open Charts, label 4 samples",
+            "auto-before-jump",
+            "1 · Capture before +5% jump",
+            "Like Dolpago: find next-bar ≥+5% moves, capture the bar *before* the jump (observation) with RSI/EMA/ATR scores, auto-label 4 samples",
             ResearchQuickSuggestionKindV1.AutoCollectLocalGallery,
             ScanId: "next-day-plus-5"));
         ResearchQuickSuggestions.Add(new ResearchQuickSuggestionV1(
-            "auto-crash",
-            "Auto: crashes from my Simulated data",
-            "Scan local history for ≤−5% next-bar events and label",
+            "auto-before-crash",
+            "2 · Capture before crash (−5%)",
+            "Find next-bar ≤−5% moves and capture the state just before the drop",
             ResearchQuickSuggestionKindV1.AutoCollectLocalGallery,
             ScanId: "pre-crash"));
         ResearchQuickSuggestions.Add(new ResearchQuickSuggestionV1(
-            "auto-breakout",
-            "Auto: breakouts from my Simulated data",
-            "Scan local history for tight-range → +3% and label",
+            "auto-before-breakout",
+            "3 · Capture before breakout",
+            "Tight prior range then ≥+3% — capture the pre-breakout window",
             ResearchQuickSuggestionKindV1.AutoCollectLocalGallery,
             ScanId: "pre-breakout"));
         ResearchQuickSuggestions.Add(new ResearchQuickSuggestionV1(
-            "ema-rsi",
-            "Show EMA + RSI",
-            "Open Charts with EMA and RSI overlays",
+            "indicators-before-jump",
+            "Show indicators on focused chart",
+            "Open the single Charts window with EMA + RSI + ATR on the selected before-jump box",
             ResearchQuickSuggestionKindV1.SendPrompt,
-            Prompt: "chart with EMA and RSI"));
+            Prompt: "chart with EMA RSI ATR"));
         ResearchQuickSuggestions.Add(new ResearchQuickSuggestionV1(
             "famous",
-            "Famous indicators",
-            "List host catalog overlays to click by number",
+            "Famous indicators list",
+            "List host catalog overlays to pick by number",
             ResearchQuickSuggestionKindV1.SendPrompt,
             Prompt: "show famous indicators"));
         OnPropertyChanged(nameof(HasResearchQuickSuggestions));
