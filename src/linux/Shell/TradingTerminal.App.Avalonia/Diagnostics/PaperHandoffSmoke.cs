@@ -120,6 +120,20 @@ internal static class PaperHandoffSmoke
                     ? $"PASS  BOOK POSITION visible qty={viewModel.BookPosition}"
                     : $"FAIL  BookPosition={viewModel.BookPosition}; LastMessage={viewModel.LastMessage}");
                 exitCode = qtyOk ? 0 : 1;
+
+                // Optional hold so an owning agent can screenshot BOOK POSITION before teardown.
+                if (int.TryParse(
+                        Environment.GetEnvironmentVariable("DAXALGO_SMOKE_HOLD_MS"),
+                        out var holdMs) &&
+                    holdMs > 0)
+                {
+                    var holdDeadline = DateTime.UtcNow.AddMilliseconds(Math.Min(holdMs, 60_000));
+                    while (DateTime.UtcNow < holdDeadline)
+                    {
+                        await PumpAsync().ConfigureAwait(true);
+                        await Task.Delay(200).ConfigureAwait(true);
+                    }
+                }
             }
         }
         catch (Exception exception)
