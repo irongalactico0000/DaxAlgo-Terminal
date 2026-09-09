@@ -123,6 +123,7 @@ public sealed class ResearchOutcomeGalleryScanV1 : IResearchOutcomeGalleryScanV1
 
         // Simulated series often calm near the tip — if we have history but no threshold events,
         // one deeper local pass (still capped) recovers older ±5% / breakout windows.
+        var allowSimulatedRefresh = request.HydrateMissingHistory;
         if (matches.Count == 0 && withHistory > 0 && request.LookbackBars < 3_000)
         {
             request = request with { LookbackBars = 3_000, HydrateMissingHistory = false };
@@ -130,6 +131,46 @@ public sealed class ResearchOutcomeGalleryScanV1 : IResearchOutcomeGalleryScanV1
             withHistory = 0;
             timeframeCounts.Clear();
             await ScanBatchAsync(eligible).ConfigureAwait(false);
+        }
+
+        // DevSim local store is often a calm random walk that never hits ±5%. When the store
+        // still yields zero events, force a fresh Simulated historical pull (synthetic series
+        // plants demo jumps) so the research gallery is usable offline.
+        if (matches.Count == 0 &&
+            allowSimulatedRefresh &&
+            _repository is not null &&
+            _selector is not null)
+        {
+            matches.Clear();
+            withHistory = 0;
+            timeframeCounts.Clear();
+            var refreshBatch = eligible.Take(Math.Max(1, request.MaxRemoteHydrations)).ToArray();
+            foreach (var instrument in refreshBatch)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var (usable, sizeUsed, hydAttempt, hydOk, hydFail) = await LoadUsableBarsAsync(
+                    instrument,
+                    request with { HydrateMissingHistory = true, PreferredSource = BrokerKind.Simulated },
+                    cancellationToken,
+                    preferFreshHistorical: true).ConfigureAwait(false);
+                hydrationAttempts += hydAttempt;
+                hydrationSuccesses += hydOk;
+                hydrationFailures += hydFail;
+                if (usable.Count < ResearchOutcomeEventFinderV1.MinimumBars || sizeUsed is null)
+                    continue;
+
+                withHistory++;
+                timeframeCounts[sizeUsed.Value] = timeframeCounts.GetValueOrDefault(sizeUsed.Value) + 1;
+                var symbol = instrument.CanonicalSymbol;
+                names.TryGetValue(symbol, out var companyName);
+                companyName ??= symbol;
+                matches.AddRange(ResearchOutcomeEventFinderV1.FindEvents(
+                    request.ScanId,
+                    instrument.Id,
+                    symbol,
+                    companyName,
+                    usable));
+            }
         }
 
         var ranked = matches
@@ -170,7 +211,8 @@ public sealed class ResearchOutcomeGalleryScanV1 : IResearchOutcomeGalleryScanV1
         LoadUsableBarsAsync(
             Instrument instrument,
             ResearchOutcomeGalleryScanRequestV1 request,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool preferFreshHistorical = false)
     {
         var hydAttempts = 0;
         var hydOk = 0;
@@ -178,16 +220,19 @@ public sealed class ResearchOutcomeGalleryScanV1 : IResearchOutcomeGalleryScanV1
 
         foreach (var size in PreferredBarSizes)
         {
-            var recent = await _store.GetRecentBarsAsync(
-                instrument.Id,
-                size,
-                request.LookbackBars,
-                request.PreferredSource,
-                cancellationToken).ConfigureAwait(false);
+            if (!preferFreshHistorical)
+            {
+                var recent = await _store.GetRecentBarsAsync(
+                    instrument.Id,
+                    size,
+                    request.LookbackBars,
+                    request.PreferredSource,
+                    cancellationToken).ConfigureAwait(false);
 
-            var usable = SelectOneProvenance(recent, size, request.PreferredSource, request.LookbackBars);
-            if (usable.Count >= ResearchOutcomeEventFinderV1.MinimumBars)
-                return (usable, size, hydAttempts, hydOk, hydFail);
+                var fromStore = SelectOneProvenance(recent, size, request.PreferredSource, request.LookbackBars);
+                if (fromStore.Count >= ResearchOutcomeEventFinderV1.MinimumBars)
+                    return (fromStore, size, hydAttempts, hydOk, hydFail);
+            }
 
             // Remote hydrate only for daily — that is the intended research contract.
             if (size != BarSize.OneDay ||
@@ -216,7 +261,7 @@ public sealed class ResearchOutcomeGalleryScanV1 : IResearchOutcomeGalleryScanV1
                     BarSize.OneDay,
                     broker,
                     isFinal: true)).ToArray();
-                usable = SelectOneProvenance(canonical, BarSize.OneDay, broker, request.LookbackBars);
+                var usable = SelectOneProvenance(canonical, BarSize.OneDay, broker, request.LookbackBars);
                 if (usable.Count >= ResearchOutcomeEventFinderV1.MinimumBars)
                 {
                     hydOk++;

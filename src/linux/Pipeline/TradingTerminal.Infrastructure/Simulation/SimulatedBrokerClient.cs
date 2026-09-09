@@ -92,19 +92,81 @@ internal sealed class SimulatedBrokerClient : IBrokerClient
         {
             var stored = await _store.GetRecentBarsAsync(id, barSize, count, source: null, ct).ConfigureAwait(false);
             if (stored.Count > 0)
-                return stored.Select(b => b.ToBar()).ToList();
+            {
+                var asBars = stored.Select(b => b.ToBar()).ToList();
+                // Calm stored DevSim series never trips research gallery thresholds — fall through
+                // to synthetic history with planted demo jumps when no ±5% close move exists.
+                if (HasCloseToCloseMove(asBars, threshold: 0.05))
+                    return asBars;
+            }
+
             _logger.LogInformation(
-                "Simulated replay: no stored {Size} bars for {Symbol}; serving synthetic history.",
+                "Simulated replay: stored {Size} bars for {Symbol} lack research-sized moves; serving synthetic history with demo jumps.",
                 barSize, contract.Symbol);
         }
 
         // Synthetic history: walk backwards from now so the series ends at the current bar.
+        // Inject a few deterministic ±6% closes so research gallery (+5% / pre-crash) can find
+        // events on DevSim — calm SyntheticVolatility alone never crosses those thresholds.
         var walk = NewWalk(contract.Symbol, "histbars");
         var bars = new List<Bar>(count);
         var end = DateTime.UtcNow;
         for (var i = count - 1; i >= 0; i--)
             bars.Add(walk.NextBar(end - step * i, _options.SyntheticVolatility));
+        InjectResearchDemoOutcomeJumps(bars, unchecked(_options.Seed ^ contract.Symbol.GetHashCode()));
         return bars;
+    }
+
+    private static bool HasCloseToCloseMove(IReadOnlyList<Bar> bars, double threshold)
+    {
+        for (var i = 1; i < bars.Count; i++)
+        {
+            var prior = bars[i - 1].Close;
+            if (prior <= 0) continue;
+            if (Math.Abs(bars[i].Close / prior - 1.0) >= threshold)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Plant a few large close-to-close moves in synthetic history so offline DevSim research
+    /// gallery scans are not empty. Deterministic from <paramref name="seed"/>.
+    /// </summary>
+    private static void InjectResearchDemoOutcomeJumps(List<Bar> bars, int seed)
+    {
+        if (bars.Count < 16) return;
+        var rng = new Random(seed);
+        var targets = new[]
+        {
+            Math.Clamp(bars.Count / 5, 8, bars.Count - 3),
+            Math.Clamp(bars.Count / 2, 8, bars.Count - 3),
+            Math.Clamp((bars.Count * 4) / 5, 8, bars.Count - 3),
+        };
+        foreach (var index in targets.Distinct())
+        {
+            var prior = bars[index];
+            var jump = rng.Next(2) == 0 ? 1.06 : 0.94;
+            var close = Math.Max(0.01, Math.Round(prior.Close * jump, 2));
+            var high = Math.Max(prior.High, Math.Max(prior.Open, close));
+            var low = Math.Min(prior.Low, Math.Min(prior.Open, close));
+            bars[index] = new Bar(prior.TimestampUtc, prior.Open, high, low, close, prior.Volume);
+            // Keep the walk coherent for the next bar so the chart does not gap forever.
+            if (index + 1 < bars.Count)
+            {
+                var next = bars[index + 1];
+                var nextOpen = close;
+                var nextClose = Math.Max(0.01, Math.Round(close * (1.0 + (rng.NextDouble() - 0.5) * 0.01), 2));
+                bars[index + 1] = new Bar(
+                    next.TimestampUtc,
+                    nextOpen,
+                    Math.Max(nextOpen, nextClose),
+                    Math.Min(nextOpen, nextClose),
+                    nextClose,
+                    next.Volume);
+            }
+        }
     }
 
     // ---- Streaming -----------------------------------------------------------------------

@@ -398,6 +398,21 @@ public partial class MainWindow : Window
         ShowDisposing(window, vm);
         Vm?.ActivityLog.Append("Tools", "INFO", $"Opened Strategy authoring for research auto-collect ({scanId}).");
         await vm.AutoCollectLocalResearchSamplesCommand.ExecuteAsync(scanId);
+        try
+        {
+            var gallery = vm.ResearchOutcomeGalleryResult;
+            File.AppendAllText(
+                "/tmp/daxalgo-preview-overlays.log",
+                $"{DateTime.UtcNow:O} PreviewResearchAutoCollect result: scan={scanId} " +
+                $"matches={gallery?.Matches.Count ?? -1} instrumentsScanned={gallery?.InstrumentsScanned ?? -1} " +
+                $"withHistory={gallery?.InstrumentsWithEnoughHistory ?? -1} " +
+                $"samples={vm.ResearchEventSampleCount} status={vm.AiStatus}\n" +
+                $"explanation={gallery?.Explanation}\n");
+        }
+        catch
+        {
+            // Preview diagnostics must never break auto-collect.
+        }
     }
 
     private void OpenResearchChart(
