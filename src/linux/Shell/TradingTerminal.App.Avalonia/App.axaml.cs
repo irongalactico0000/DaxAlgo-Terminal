@@ -250,7 +250,9 @@ public partial class App : Application
                                 : previewResearchAuto.Contains('=', StringComparison.Ordinal)
                                     ? previewResearchAuto.Split('=', 2, StringSplitOptions.TrimEntries)[1]
                                     : "next-day-plus-5";
-                            if (string.IsNullOrWhiteSpace(autoScanId))
+                            // Only default the scan id when --preview-research-auto was actually passed.
+                            // Empty value after '=' still means "use the default S&P +5% scan".
+                            if (previewResearchAuto is not null && string.IsNullOrWhiteSpace(autoScanId))
                                 autoScanId = "next-day-plus-5";
                             if (overlayIds.Length > 0 || previewResearchCapture || autoScanId is not null)
                             {
