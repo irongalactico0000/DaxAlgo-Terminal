@@ -26,5 +26,10 @@ public sealed class AuthoredUnitDrawingNormalizationTests
         var drawing = JsonNode.Parse(normalizedArray!)!["drawing"]!.AsObject();
         Assert.True(drawing["panes"] is JsonArray);
         Assert.True(drawing["layers"] is JsonArray { Count: >= 2 });
+
+        var garbage = """{"unitId":"u1","drawing":"not-json"}""";
+        var normalizedGarbage = AuthoredUnitSpecificationGeneratorV1.NormalizeCommonModelJsonMistakes(garbage);
+        Assert.NotNull(normalizedGarbage);
+        Assert.True(JsonNode.Parse(normalizedGarbage!)!["drawing"] is JsonObject);
     }
 }
