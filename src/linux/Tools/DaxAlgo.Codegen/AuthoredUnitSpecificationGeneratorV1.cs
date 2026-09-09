@@ -483,7 +483,11 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
         "one complete AuthoredUnitSpecificationV1 JSON object with no markdown or prose. " +
         $"The parser reported: {parseError}";
 
-    private static string? NormalizeCommonModelJsonMistakes(string? raw)
+    /// <summary>
+    /// Coerces common model JSON mistakes (string "null", stringified objects, drawing arrays)
+    /// before deserialization. Internal for focused regression tests.
+    /// </summary>
+    internal static string? NormalizeCommonModelJsonMistakes(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw)) return raw;
 
@@ -495,13 +499,124 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
             if (JsonNode.Parse(text) is not JsonObject root) return raw;
             NormalizeNullString(root, "strategyClassification");
             NormalizeNullString(root, "confirmedStrategyIntent");
-            NormalizeEmbeddedObject(root, "drawing");
+            NormalizeNullString(root, "interactionBindings");
+            NormalizeDrawingField(root);
             return root.ToJsonString();
         }
         catch (JsonException)
         {
             return raw;
         }
+    }
+
+    /// <summary>
+    /// Models often emit drawing as a JSON string, array, or the string "null". Coerce those into
+    /// the host chart object shape so visualizer freezes don't fail closed on contract noise.
+    /// </summary>
+    private static void NormalizeDrawingField(JsonObject root)
+    {
+        NormalizeNullString(root, "drawing");
+        if (root["drawing"] is null)
+        {
+            root["drawing"] = DefaultCandleDrawing();
+            return;
+        }
+
+        if (root["drawing"] is JsonValue value &&
+            value.TryGetValue<string>(out var text) &&
+            !string.IsNullOrWhiteSpace(text))
+        {
+            var trimmed = text.Trim();
+            if (string.Equals(trimmed, "null", StringComparison.OrdinalIgnoreCase))
+            {
+                root["drawing"] = DefaultCandleDrawing();
+                return;
+            }
+
+            if (trimmed.StartsWith('{') && trimmed.EndsWith('}'))
+            {
+                try
+                {
+                    if (JsonNode.Parse(trimmed) is JsonObject embedded)
+                        root["drawing"] = embedded;
+                    else if (JsonNode.Parse(trimmed) is JsonArray asArray)
+                        root["drawing"] = DrawingFromLayerArray(asArray);
+                }
+                catch (JsonException)
+                {
+                    // Leave intact for the repair call.
+                }
+            }
+            else if (trimmed.StartsWith('[') && trimmed.EndsWith(']'))
+            {
+                try
+                {
+                    if (JsonNode.Parse(trimmed) is JsonArray asArray)
+                        root["drawing"] = DrawingFromLayerArray(asArray);
+                }
+                catch (JsonException)
+                {
+                    // Leave intact for the repair call.
+                }
+            }
+        }
+        else if (root["drawing"] is JsonArray layers)
+        {
+            root["drawing"] = DrawingFromLayerArray(layers);
+        }
+
+        // Fail open to a candle-only drawing when the field still isn't an object — better a
+        // chart than a closed contract rejection on model noise.
+        if (root["drawing"] is not JsonObject)
+            root["drawing"] = DefaultCandleDrawing();
+    }
+
+    private static JsonObject DefaultCandleDrawing() =>
+        new()
+        {
+            ["panes"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["paneId"] = "price",
+                    ["role"] = "price",
+                    ["order"] = 0,
+                    ["title"] = "Price",
+                },
+            },
+            ["layers"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["layerId"] = "candles",
+                    ["paneId"] = "price",
+                    ["kind"] = "candles",
+                    ["typeId"] = "price.candles@1",
+                    ["parameters"] = new JsonObject(),
+                },
+            },
+        };
+
+    private static JsonObject DrawingFromLayerArray(JsonArray layers)
+    {
+        var drawing = DefaultCandleDrawing();
+        var outLayers = new JsonArray
+        {
+            ((JsonArray)drawing["layers"]!)[0]!.DeepClone(),
+        };
+        foreach (var node in layers)
+        {
+            if (node is not JsonObject layer) continue;
+            var layerId = layer["layerId"]?.GetValue<string>();
+            if (string.Equals(layerId, "candles", StringComparison.Ordinal))
+                continue;
+            if (layer["paneId"] is null)
+                layer["paneId"] = "price";
+            outLayers.Add(layer.DeepClone());
+        }
+
+        drawing["layers"] = outLayers;
+        return drawing;
     }
 
     private static void NormalizeEmbeddedObject(JsonObject root, string propertyName)

@@ -61,20 +61,25 @@ internal sealed class NotificationDispatcher : INotificationPublisher, IHostedSe
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        _cts?.Cancel();
+        var cts = Interlocked.Exchange(ref _cts, null);
+        try { cts?.Cancel(); }
+        catch (ObjectDisposedException) { /* already torn down */ }
         _channel.Writer.TryComplete();
         if (_loop is not null)
         {
-            try { await _loop.WaitAsync(cancellationToken); }
+            try { await _loop.WaitAsync(cancellationToken).ConfigureAwait(false); }
             catch (OperationCanceledException) { /* shutting down */ }
         }
+
+        try { cts?.Dispose(); }
+        catch (ObjectDisposedException) { /* already torn down */ }
     }
 
     private async Task RunAsync(CancellationToken ct)
     {
         try
         {
-            await foreach (var n in _channel.Reader.ReadAllAsync(ct))
+            await foreach (var n in _channel.Reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
                 if (_gate.ShouldSuppress(n, out var reason))
                 {
@@ -92,12 +97,12 @@ internal sealed class NotificationDispatcher : INotificationPublisher, IHostedSe
                 foreach (var enricher in _enrichers)
                 {
                     if (!enricher.ShouldRun(enriched)) continue;
-                    try { enriched = await enricher.EnrichAsync(enriched, ct); }
+                    try { enriched = await enricher.EnrichAsync(enriched, ct).ConfigureAwait(false); }
                     catch (Exception ex) { _logger.LogWarning(ex, "Enricher {Enricher} threw; using original", enricher.GetType().Name); }
                 }
 
                 var sends = enabled.Select(t => SendOne(t, enriched, ct));
-                await Task.WhenAll(sends);
+                await Task.WhenAll(sends).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) { /* expected on shutdown */ }
@@ -111,7 +116,7 @@ internal sealed class NotificationDispatcher : INotificationPublisher, IHostedSe
     {
         try
         {
-            await transport.SendAsync(n, ct);
+            await transport.SendAsync(n, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -121,7 +126,13 @@ internal sealed class NotificationDispatcher : INotificationPublisher, IHostedSe
 
     public void Dispose()
     {
-        _cts?.Cancel();
-        _cts?.Dispose();
+        // Prefer StopAsync for orderly shutdown. Dispose is the fail-closed path if the host
+        // tears down without awaiting StopAsync — never double-dispose the CTS.
+        var cts = Interlocked.Exchange(ref _cts, null);
+        try { cts?.Cancel(); }
+        catch (ObjectDisposedException) { /* already torn down */ }
+        _channel.Writer.TryComplete();
+        try { cts?.Dispose(); }
+        catch (ObjectDisposedException) { /* already torn down */ }
     }
 }
