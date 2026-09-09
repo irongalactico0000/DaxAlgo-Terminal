@@ -178,6 +178,28 @@ public partial class App : Application
                 return;
             }
 
+            var researchToPaperSmoke = args.FirstOrDefault(argument =>
+                argument.StartsWith("--smoke-research-to-paper", StringComparison.OrdinalIgnoreCase));
+            if (researchToPaperSmoke is not null)
+            {
+                var diagnosticsDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "DaxAlgoTerminal",
+                    "diagnostics");
+                var reportPath = researchToPaperSmoke.Contains('=', StringComparison.Ordinal)
+                    ? researchToPaperSmoke.Split('=', 2)[1]
+                    : Path.Combine(diagnosticsDirectory, "smoke-research-to-paper.txt");
+                var exitCode = await ResearchToPaperE2ESmoke.RunAsync(Services, reportPath);
+                activityLog.Append(
+                    "Diagnostics",
+                    exitCode == 0 ? "Information" : "Error",
+                    $"Research→Paper E2E smoke finished with exit code {exitCode}; report: {reportPath}");
+                startupWindow?.Close();
+                Services = null;
+                desktop.Shutdown(exitCode);
+                return;
+            }
+
             var installOpenPackage = args.FirstOrDefault(argument =>
                 argument.StartsWith("--install-open-package=", StringComparison.OrdinalIgnoreCase));
             if (installOpenPackage is not null)

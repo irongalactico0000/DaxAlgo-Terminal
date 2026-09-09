@@ -1659,6 +1659,14 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             return;
         }
 
+        // Host catalog (famous indicators / research scans) must work offline — no model call.
+        if (GenerateCandidateFirst &&
+            CurrentCandidate is null &&
+            TryRouteHostCatalogWithoutProvider(prompt))
+        {
+            return;
+        }
+
         if (_ai is null || SelectedAiProvider is not { } choice) return;
         if (!choice.IsAvailable)
         {
@@ -2460,6 +2468,97 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     /// Legacy semantic lane retained for saved sessions and deployments that have not registered the
     /// four-way coordinator yet.
     /// </summary>
+    /// <summary>
+    /// Offline host-catalog routing for famous indicators / research scans. Returns true when the
+    /// turn was fully handled without a codegen provider.
+    /// </summary>
+    private bool TryRouteHostCatalogWithoutProvider(string prompt)
+    {
+        if (string.IsNullOrWhiteSpace(StrategyId))
+            return false;
+
+        var effectiveRequest = AuthoredUnitSpecification is { Kind: AuthoredUnitKindV1.Visualizer } existing
+            ? $"{existing.RawRequest}\nRevision requested by user: {prompt}"
+            : BuildInitialAuthoredUnitRequest(prompt);
+        var chartChoice = AuthoredChartChoiceCatalogV1.Resolve(
+            effectiveRequest,
+            prompt,
+            LoadUserChartIndicators());
+
+        if (chartChoice.NeedsClarification &&
+            chartChoice.ClarificationQuestion is { Length: > 0 } catalogQuestion)
+        {
+            if (Messages.Count == 0) DeriveIdentityFrom(prompt);
+            Composer = string.Empty;
+            Append(new AuthoringMessage(CodegenRole.User, prompt));
+            Append(new AuthoringMessage(CodegenRole.Assistant, catalogQuestion));
+            AwaitingAnswer = true;
+            AiStatus = "Pick a numbered host chart choice, or use a follow-up under this reply.";
+            PublishTurnFollowUps(prompt);
+            Save();
+            return true;
+        }
+
+        if ((chartChoice.HasOverlays || chartChoice.HasResearchScans) &&
+            !AuthoredChartChoiceCatalogV1.LooksLikeTradingRequest(effectiveRequest))
+        {
+            if (Messages.Count == 0) DeriveIdentityFrom(prompt);
+            if (chartChoice.HasOverlays)
+                _ = CompleteHostOverlayVisualizerAsync(prompt, effectiveRequest, chartChoice);
+            else
+                _ = CompleteHostResearchScanAsync(prompt, chartChoice);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Diagnostics / owned E2E: attach an already-compiled strategy as if Build + Register succeeded,
+    /// so Validate → Paper can be exercised without a live model turn.
+    /// </summary>
+    public bool TryAttachCompiledStrategyForDiagnostics(
+        AuthoredUnitSpecificationV1 specification,
+        CompiledAuthoredUnitV1 unit,
+        StrategyScript script,
+        out string reason)
+    {
+        ArgumentNullException.ThrowIfNull(specification);
+        ArgumentNullException.ThrowIfNull(unit);
+        ArgumentNullException.ThrowIfNull(script);
+
+        if (unit.Kind != AuthoredUnitKindV1.Strategy)
+        {
+            reason = "Diagnostics attach requires a Strategy compiled unit.";
+            return false;
+        }
+
+        if (!string.Equals(
+                AuthoredUnitSpecificationCanonicalJsonV1.Hash(specification),
+                unit.SpecificationHashSha256,
+                StringComparison.Ordinal))
+        {
+            reason = "Compiled unit hash does not match the provided specification.";
+            return false;
+        }
+
+        StrategyId = specification.UnitId;
+        AuthoredUnitSpecification = specification;
+        SetFiles(script.Files);
+        _filesEditedByUser = false;
+        HasDetachedImplementationSource = false;
+        ConfirmAuthoredUnitRegistration(script, unit);
+        SynchronizeStrategyWorkspace();
+        if (!CanRunHistoricalValidation)
+        {
+            reason = "Strategy registered but historical validation is still locked.";
+            return false;
+        }
+
+        reason = string.Empty;
+        return true;
+    }
+
     private async Task ClassifyAndRouteInitialRequestAsync(AiProviderChoice choice, string prompt)
     {
         var provider = ResolveClient(choice) ?? choice.Client;
@@ -2495,7 +2594,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             !AuthoredChartChoiceCatalogV1.LooksLikeTradingRequest(effectiveRequest))
         {
             if (chartChoice.HasOverlays)
-                await CompleteHostOverlayVisualizerAsync(choice, prompt, effectiveRequest, chartChoice);
+                await CompleteHostOverlayVisualizerAsync(prompt, effectiveRequest, chartChoice);
             else
                 await CompleteHostResearchScanAsync(prompt, chartChoice);
             return;
@@ -2641,7 +2740,6 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     }
 
     private Task CompleteHostOverlayVisualizerAsync(
-        AiProviderChoice choice,
         string prompt,
         string effectiveRequest,
         AuthoredChartChoiceResolutionV1 chartChoice)
