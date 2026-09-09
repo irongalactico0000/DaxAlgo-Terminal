@@ -179,7 +179,8 @@ public sealed record AuthoredUnitSpecificationV1(
     IReadOnlyList<AuthoredChartReferenceResolutionV1> ReferenceResolutions,
     AuthoredUnitExecutionIntentV1 ExecutionIntent,
     StrategyClassificationBindingV1? StrategyClassification = null,
-    ConfirmedStrategyIntentV1? ConfirmedStrategyIntent = null)
+    ConfirmedStrategyIntentV1? ConfirmedStrategyIntent = null,
+    StrategyInteractionBindingsV1? InteractionBindings = null)
 {
     public const string CurrentSchemaVersion = "authored-unit-spec/v1";
 }
@@ -390,6 +391,11 @@ public static class AuthoredUnitSpecificationValidatorV1
         ValidateParameters(specification.Parameters, issues);
         ValidateDrawing(specification, issues);
         ValidateReferences(specification, forLaunch, issues);
+        if (specification.InteractionBindings is not null)
+        {
+            foreach (var interactionIssue in StrategyInteractionBindingsValidatorV1.Validate(specification))
+                issues.Add(Issue(interactionIssue.Code, interactionIssue.Path, interactionIssue.Message));
+        }
 
         return issues;
     }

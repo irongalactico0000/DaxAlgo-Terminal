@@ -52,6 +52,7 @@ using TradingTerminal.UI.Logging;
 using TradingTerminal.UI.Strategies;
 using TradingTerminal.StrategyComposer;
 using TradingTerminal.App.Avalonia.Execution;
+using TradingTerminal.App.Plugins;
 using TradingTerminal.UI.Execution;
 
 namespace TradingTerminal.App.Avalonia.Composition;
@@ -155,8 +156,8 @@ public static class ServiceConfiguration
         services.AddBacktestStrategyCatalog();
         services.AddSingleton<TradingTerminal.UI.Strategies.IVisualizerRegistry,
             TradingTerminal.UI.Strategies.VisualizerRegistry>();
-        services.AddSingleton<TradingTerminal.UI.Strategies.IStrategyKernelRegistry,
-            TradingTerminal.UI.Strategies.StrategyKernelRegistry>();
+        // StrategyKernelRegistry is constructed after PluginLoader so authored plugin
+        // registrations and durable open-packages can both populate the catalog.
         services.AddFastBacktestRunner();
 
         var useLocalDaxqLicensing = false;
@@ -222,6 +223,24 @@ public static class ServiceConfiguration
         }
         services.AddPluginFeed(pluginOptions);
         services.AddSingleton<AuthoredStrategyInstaller>();
+        services.AddSingleton<TradingTerminal.UI.Strategies.IStrategyKernelRegistry>(sp =>
+        {
+            var registry = new TradingTerminal.UI.Strategies.StrategyKernelRegistry(
+                sp.GetServices<DaxAlgo.Sdk.AuthoredStrategyKernelPluginRegistration>());
+            try
+            {
+                OpenPackageHostRegistrar.RegisterInstalled(
+                    pluginsRoot,
+                    registry,
+                    sp.GetRequiredService<TradingTerminal.Core.Strategies.Generation.IAuthoredUnitCompilerV1>(),
+                    sp.GetRequiredService<TradingTerminal.UI.Strategies.IVisualizerRegistry>());
+            }
+            catch
+            {
+                // Durable open-package catalog is best-effort at startup; install path registers live.
+            }
+            return registry;
+        });
         services.AddTransient<TradingTerminal.App.Plugins.PluginManagerViewModel>();
         services.AddTransient<TradingTerminal.App.Plugins.PluginManagerView>();
 

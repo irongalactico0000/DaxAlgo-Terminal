@@ -108,7 +108,7 @@ public sealed class CanonicalAuthoredUnitPersistenceTests : IDisposable
             ],
             new string('d', 64));
 
-        return new AuthoredUnitSpecificationV1(
+        return StrategyInteractionBindingsFactoryV1.UpgradeTrustedSpecification(new AuthoredUnitSpecificationV1(
             AuthoredUnitSpecificationV1.CurrentSchemaVersion,
             "restartable-strategy",
             "Restartable Strategy",
@@ -136,7 +136,7 @@ public sealed class CanonicalAuthoredUnitPersistenceTests : IDisposable
             [],
             AuthoredUnitExecutionIntentV1.PaperTargets,
             classification,
-            intent);
+            intent));
     }
 
     private static string Source(AuthoredUnitSpecificationV1 specification)

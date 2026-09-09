@@ -185,7 +185,8 @@ public partial class MainWindow : Window
     private async Task OpenPaperStrategyRunnerAsync(
         TradingTerminal.UI.Strategies.StrategyKernelRegistration? initialStrategy,
         IReadOnlyDictionary<string, object?>? initialParameters = null,
-        string? requiredBookId = null)
+        string? requiredBookId = null,
+        bool autoStart = false)
     {
         if (_paperStrategyRunnerWindow is { } existing)
         {
@@ -197,21 +198,26 @@ public partial class MainWindow : Window
             }
             else
             {
+                TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerViewModel? existingViewModel = null;
                 if (initialStrategy is not null && existing.DataContext is
-                    TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerViewModel existingViewModel)
+                    TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerViewModel prepared)
                 {
+                    existingViewModel = prepared;
                     if (initialParameters is not null &&
-                        !existingViewModel.TryPrepareTestedStrategy(initialStrategy, initialParameters, out var reason))
+                        !prepared.TryPrepareTestedStrategy(initialStrategy, initialParameters, out var reason))
                     {
                         Vm?.ActivityLog.Append("Backtest", "WARN", reason);
+                        autoStart = false;
                     }
                     else if (initialParameters is null)
                     {
-                        existingViewModel.SelectedStrategy = existingViewModel.Strategies.FirstOrDefault(choice =>
+                        prepared.SelectedStrategy = prepared.Strategies.FirstOrDefault(choice =>
                             string.Equals(choice.Id, initialStrategy.Id, StringComparison.Ordinal));
                     }
                 }
                 existing.Activate();
+                if (autoStart && existingViewModel is not null)
+                    await TryAutoStartPaperStrategyAsync(existingViewModel);
                 return;
             }
         }
@@ -236,7 +242,7 @@ public partial class MainWindow : Window
                 initialStrategy,
                 initialParameters);
             var window = services.GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerWindow>();
-            window.Title = $"Paper Strategy Runner — {bookLease.Book.Name}";
+            window.Title = $"Harness · Paper · {bookLease.Book.Name}";
             window.DataContext = viewModel;
             _paperStrategyRunnerWindow = window;
             var ownedLease = bookLease;
@@ -249,6 +255,8 @@ public partial class MainWindow : Window
             ShowDisposing(window, viewModel);
             Vm?.ActivityLog.Append("Execution", "INFO",
                 $"Opened Paper Strategy Runner for {ownedLease.Book.Name}/{ownedLease.Book.AccountId}.");
+            if (autoStart)
+                await TryAutoStartPaperStrategyAsync(viewModel);
         }
         catch (Exception exception)
         {
@@ -257,6 +265,29 @@ public partial class MainWindow : Window
                 $"Paper strategy execution remained unavailable: {exception.Message}");
             await new TradingTerminal.App.Avalonia.Execution.PaperExecutionUnavailableWindow(exception.Message)
                 .ShowDialog(this);
+        }
+    }
+
+    private async Task TryAutoStartPaperStrategyAsync(
+        TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerViewModel viewModel)
+    {
+        if (!viewModel.StartCommand.CanExecute(null))
+        {
+            Vm?.ActivityLog.Append("Execution", "WARN",
+                "Paper Strategy Runner opened with tested parameters, but Start was not ready (feed/book/strategy gate).");
+            return;
+        }
+
+        try
+        {
+            await viewModel.StartCommand.ExecuteAsync(null);
+            Vm?.ActivityLog.Append("Execution", "INFO",
+                "Auto-started Paper Strategy Runner after Validate → Paper handoff.");
+        }
+        catch (Exception exception)
+        {
+            Vm?.ActivityLog.Append("Execution", "ERROR",
+                $"Paper Strategy Runner auto-start failed: {exception.Message}");
         }
     }
 
@@ -649,7 +680,9 @@ public partial class MainWindow : Window
                 authoring.Status = reason;
                 return;
             }
-            await OpenPaperStrategyRunnerAsync(registration, testedParameters, book.Id);
+            await OpenPaperStrategyRunnerAsync(registration, testedParameters, book.Id, autoStart: true);
+            authoring.Status =
+                $"Bound Paper book {book.Name}. Strategy Runner auto-started; watch BOOK POSITION for OMS qty after fills.";
         }
         catch (Exception exception)
         {
@@ -935,8 +968,14 @@ public partial class MainWindow : Window
             OpenUrl(uri.AbsoluteUri);
     }
 
-    private void OnMarketplace(object? sender, RoutedEventArgs e) =>
+    private void OnMarketplace(object? sender, RoutedEventArgs e)
+    {
         OpenUrl("https://daxalgo.com/marketplace");
+        Vm?.ActivityLog.Append(
+            "Marketplace",
+            "INFO",
+            "Opened marketplace site. To install a package URL into the Terminal catalog: Strategy Manager → Install from URL (or --install-open-package=https://…). Live broker order execution is not part of this path.");
+    }
 
     private async void OnCopySelectedLogs(object? sender, RoutedEventArgs e)
     {
@@ -985,24 +1024,29 @@ public partial class MainWindow : Window
             shell.BeginBusy("Opening visualizer", $"Starting {item.Name} and warming its data feed...");
             try
             {
-                await TradingTerminal.UI.Avalonia.Controls.Render.AuthoredVisualizerSession.OpenAsync(
-                    item.Name,
-                    registration.Create,
-                    services.GetRequiredService<IMarketDataHub>(),
-                    services.GetRequiredService<TradingTerminal.Core.Time.IClock>(),
-                    shell.ActivityLog,
-                    specification: registration.AuthoredSpecification,
-                    ingest: registration.AuthoredSpecification is null
-                        ? null
-                        : services.GetRequiredService<IMarketDataIngest>(),
-                    instrumentRegistry: registration.AuthoredSpecification is null
-                        ? null
-                        : services.GetRequiredService<IInstrumentRegistry>(),
-                    brokerSelector: registration.AuthoredSpecification is null
-                        ? null
-                        : services.GetRequiredService<IBrokerSelector>(),
-                    owner: this);
-                shell.ActivityLog.Append("Visualizers", "INFO", $"Opened '{item.Name}'.");
+                if (registration.AuthoredSpecification is not null)
+                {
+                    await TradingTerminal.App.Avalonia.Harness.UnitHarnessShell.OpenVisualizerAsync(
+                        registration,
+                        services.GetRequiredService<IMarketDataHub>(),
+                        services.GetRequiredService<TradingTerminal.Core.Time.IClock>(),
+                        shell.ActivityLog,
+                        services.GetRequiredService<IMarketDataIngest>(),
+                        services.GetRequiredService<IInstrumentRegistry>(),
+                        services.GetRequiredService<IBrokerSelector>(),
+                        owner: this);
+                }
+                else
+                {
+                    await TradingTerminal.UI.Avalonia.Controls.Render.AuthoredVisualizerSession.OpenAsync(
+                        item.Name,
+                        registration.Create,
+                        services.GetRequiredService<IMarketDataHub>(),
+                        services.GetRequiredService<TradingTerminal.Core.Time.IClock>(),
+                        shell.ActivityLog,
+                        owner: this);
+                }
+                shell.ActivityLog.Append("Visualizers", "INFO", $"Opened '{item.Name}' in harness shell.");
             }
             catch (Exception ex)
             {

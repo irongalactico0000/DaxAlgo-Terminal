@@ -275,6 +275,67 @@ public sealed class PaperExecutionBooksTests
         }
     }
 
+    [AvaloniaFact]
+    public async Task Native_admit_handoff_catalog_schema_opens_selected_book_fill_and_position()
+    {
+        // Native Admit→Prepare writes this Mac-compatible books.json shape (CreateBook handoff).
+        var directory = NewDirectory();
+        var storePath = Path.Combine(directory, "books.json");
+        var ledgerRoot = Path.Combine(directory, "ledgers");
+        var clock = new MutableClock(new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc));
+        try
+        {
+            var handoffCatalog = """
+                {
+                  "schemaVersion": 1,
+                  "selectedBookId": "paper-handoff01",
+                  "books": [
+                    {
+                      "id": "paper-handoff01",
+                      "name": "admit-owner-test",
+                      "accountId": "owner-test-account",
+                      "primarySymbol": "TESTA",
+                      "strategies": [ "owner-test-strategy" ],
+                      "isPaused": false,
+                      "openingBalance": 100000
+                    }
+                  ]
+                }
+                """;
+            await File.WriteAllTextAsync(storePath, handoffCatalog);
+
+            using var manager = new PaperExecutionBookManager(
+                new JsonPaperExecutionBookStore(storePath),
+                clock,
+                new MemoryRegistry(),
+                new FixedSecretStore(),
+                ledgerRoot);
+            Assert.Equal("paper-handoff01", manager.SelectedBook.Id);
+            Assert.Equal("owner-test-account", manager.SelectedBook.AccountId);
+            Assert.Equal("TESTA", manager.SelectedBook.PrimarySymbol);
+            Assert.Contains("owner-test-strategy", manager.SelectedBook.Strategies);
+
+            using var lease = manager.AcquireSelectedSession();
+            Assert.True((await lease.Session.Client.RefreshAsync()).IsSuccess);
+            var instrument = lease.Session.Instruments.Single(choice => choice.Symbol == "TESTA");
+            var draft = new PaperOrderTicketDraft(
+                instrument, OrderSide.Buy, OrderType.Market, TimeInForce.Day,
+                "2", "100", null, null, false);
+            Assert.True(lease.Session.TryCreateSubmit(
+                draft, lease.Session.Client.GetSnapshot(), out var request, out var reason), reason);
+            Assert.True((await lease.Session.Client.SubmitAsync(request!)).IsSuccess);
+
+            var snapshot = lease.Session.Client.GetSnapshot();
+            Assert.Contains(snapshot.Orders, order => order.State == OrderLifecycleState.Filled);
+            Assert.Equal(2m, ExecutionNumericBoundary.ToDecimal(
+                Assert.Single(snapshot.Economics.Positions).Quantity));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static string NewDirectory()
     {
         var directory = Path.Combine(Path.GetTempPath(), "daxalgo-paper-book-tests", Guid.NewGuid().ToString("N"));

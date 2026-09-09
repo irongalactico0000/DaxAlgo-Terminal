@@ -196,7 +196,8 @@ public sealed class CanonicalAuthoredStrategyGenerationTests
             Request = request;
             var intent = request.ConfirmedStrategyIntent!;
             var instrument = request.AvailableInstruments.Single(item => item.CanonicalSymbol == "SPY");
-            var specification = new AuthoredUnitSpecificationV1(
+            var specification = StrategyInteractionBindingsFactoryV1.UpgradeTrustedSpecification(
+                new AuthoredUnitSpecificationV1(
                 AuthoredUnitSpecificationV1.CurrentSchemaVersion,
                 request.UnitId,
                 "SPY breakout Paper",
@@ -217,7 +218,7 @@ public sealed class CanonicalAuthoredStrategyGenerationTests
                 [],
                 AuthoredUnitExecutionIntentV1.PaperTargets,
                 intent.Classification,
-                intent);
+                intent));
             return Task.FromResult(new AuthoredUnitSpecificationGenerationResultV1(
                 specification,
                 [],

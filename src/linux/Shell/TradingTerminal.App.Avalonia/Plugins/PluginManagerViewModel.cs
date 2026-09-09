@@ -10,9 +10,11 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DaxAlgo.Daxq.Host;
 using DaxAlgo.Package;
+using TradingTerminal.Core.Strategies.Generation;
 using TradingTerminal.Infrastructure.Plugins;
 using TradingTerminal.Infrastructure.Plugins.Feed;
 using TradingTerminal.UI;
+using TradingTerminal.UI.Strategies;
 
 namespace TradingTerminal.App.Plugins;
 
@@ -50,19 +52,28 @@ public sealed partial class PluginManagerViewModel : ViewModelBase
     private readonly PluginFeedClient _feed;
     private readonly IHttpClientFactory _httpFactory;
     private readonly DaxqStrategyInstaller _daxqInstaller;
+    private readonly IStrategyKernelRegistry _kernelRegistry;
+    private readonly IVisualizerRegistry _visualizerRegistry;
+    private readonly IAuthoredUnitCompilerV1 _authoredUnitCompiler;
     private IReadOnlyList<PluginCatalogItem> _allCatalog = [];
 
     public PluginManagerViewModel(
         PluginHostContext context,
         PluginFeedClient feed,
         IHttpClientFactory httpFactory,
-        DaxqStrategyInstaller daxqInstaller)
+        DaxqStrategyInstaller daxqInstaller,
+        IStrategyKernelRegistry kernelRegistry,
+        IVisualizerRegistry visualizerRegistry,
+        IAuthoredUnitCompilerV1 authoredUnitCompiler)
     {
         _context = context;
         _state = context.State;
         _feed = feed;
         _httpFactory = httpFactory;
         _daxqInstaller = daxqInstaller;
+        _kernelRegistry = kernelRegistry ?? throw new ArgumentNullException(nameof(kernelRegistry));
+        _visualizerRegistry = visualizerRegistry ?? throw new ArgumentNullException(nameof(visualizerRegistry));
+        _authoredUnitCompiler = authoredUnitCompiler ?? throw new ArgumentNullException(nameof(authoredUnitCompiler));
         PluginsRoot = context.PluginsRoot;
         TrustPolicySummary = context.TrustPolicy.RequireSignature
             ? "Curated mode — only plugins signed by a trusted publisher will load."
@@ -77,8 +88,6 @@ public sealed partial class PluginManagerViewModel : ViewModelBase
                 ? $"{context.LoadedPlugins.Count} plugin(s) loaded."
                 : $"{context.LoadedPlugins.Count} plugin(s) loaded — {problems} problem(s) need attention below.";
 
-        // Show whatever the background refresh already cached; then check for a newer index (no-op /
-        // instant when the feed is off or unreachable). Fire-and-forget on the UI context.
         RebuildCatalog();
         if (_feed.IsConfigured)
         {
@@ -92,6 +101,8 @@ public sealed partial class PluginManagerViewModel : ViewModelBase
     public ObservableCollection<PluginRow> Rows { get; } = new();
 
     [ObservableProperty] private string _status = string.Empty;
+
+    [ObservableProperty] private string _packageUrl = string.Empty;
 
     /// <summary>True once any lifecycle change (enable/disable/uninstall/install) is pending a
     /// restart — drives the banner. Loaded plugins are file-locked, so nothing applies live.</summary>
@@ -115,13 +126,8 @@ public sealed partial class PluginManagerViewModel : ViewModelBase
     partial void OnCatalogSearchChanged(string value) => ApplySearch();
 
     /// <summary>
-    /// Pick a DaxAlgo open artifact and verify it. Accepted Extensions formats match public Windows:
-    /// <see cref="DaxPackage.AcceptedExtensions"/> (<c>.daxalgostrategy</c> /
-    /// <c>.daxalgovisualizer</c>). Installation of open packages stays gated.
-    ///
-    /// <para>Mac-only sealed <c>.daxq</c> packages remain installable here as a separate lane; raw
-    /// <c>.dll</c> and legacy <c>.daxplugin</c> are refused by name via
-    /// <see cref="ExtensionsPackageInspection"/>.</para>
+    /// Pick a DaxAlgo open artifact, verify it, durable-install it, and register for open/run when
+    /// the package carries an authored specification plus C# sources.
     /// </summary>
     [RelayCommand]
     private async Task InstallPluginAsync()
@@ -131,7 +137,6 @@ public sealed partial class PluginManagerViewModel : ViewModelBase
             ["daxalgostrategy", "daxalgovisualizer", "daxq"]);
         if (string.IsNullOrWhiteSpace(fileName)) return;
 
-        // Sealed Mac runtime packages are outside the open submission contract.
         if (fileName.EndsWith(".daxq", StringComparison.OrdinalIgnoreCase))
         {
             var daxq = _daxqInstaller.Install(fileName);
@@ -142,8 +147,61 @@ public sealed partial class PluginManagerViewModel : ViewModelBase
             return;
         }
 
-        _ = ExtensionsPackageInspection.TryVerify(fileName, out var status);
-        Status = status;
+        Status = InstallLocalOpenPackage(fileName);
+    }
+
+    /// <summary>
+    /// Download an open package from <see cref="PackageUrl"/> (HTTPS, or localhost HTTP), then
+    /// durable-install and register for catalog open/run.
+    /// </summary>
+    [RelayCommand]
+    private async Task InstallFromUrlAsync()
+    {
+        Status = await InstallOpenPackageFromUrlAsync(PackageUrl).ConfigureAwait(true);
+    }
+
+    /// <summary>CLI / deep-link entry: download URL → durable install → host registry.</summary>
+    public async Task<string> InstallOpenPackageFromUrlAsync(
+        string packageUrl,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(packageUrl))
+            return "Paste an https URL to a .daxalgostrategy or .daxalgovisualizer package.";
+
+        var http = _httpFactory.CreateClient(
+            TradingTerminal.Infrastructure.Plugins.Feed.PluginFeedServiceCollectionExtensions.FeedHttpClientName);
+        var downloaded = await OpenPackageRemoteInstaller.DownloadAsync(http, packageUrl, cancellationToken)
+            .ConfigureAwait(false);
+        if (!downloaded.Success || string.IsNullOrWhiteSpace(downloaded.LocalPath))
+            return downloaded.Message;
+
+        try
+        {
+            return InstallLocalOpenPackage(downloaded.LocalPath);
+        }
+        finally
+        {
+            try { File.Delete(downloaded.LocalPath); } catch { /* temp */ }
+        }
+    }
+
+    private string InstallLocalOpenPackage(string fileName)
+    {
+        var openRoot = Path.Combine(PluginsRoot, "open-packages");
+        var installed = OpenPackageDurableInstaller.Install(fileName, openRoot);
+        if (!installed.Success)
+            return installed.Message;
+
+        var registered = OpenPackageHostRegistrar.RegisterInstall(
+            installed,
+            _kernelRegistry,
+            _authoredUnitCompiler,
+            _visualizerRegistry);
+        if (!registered.Registered)
+            RestartRequired = true;
+        return registered.Registered
+            ? $"{installed.Message} {registered.Message}"
+            : $"{installed.Message} Open/run not registered: {registered.Message}";
     }
 
     /// <summary>Re-enable a disabled or quarantined plugin — it loads again on the next start.</summary>

@@ -175,7 +175,8 @@ public sealed class CanonicalQuickBacktestTests
         var schema = new StrategyParameterSchema(
             StrategyParameter.Int("fastPeriod", "Fast EMA", 9, min: 2, max: 100));
         var classification = new StrategyClassificationBindingV1("bar-signal", new string('a', 64));
-        var specification = new AuthoredUnitSpecificationV1(
+        var specification = StrategyInteractionBindingsFactoryV1.UpgradeTrustedSpecification(
+            new AuthoredUnitSpecificationV1(
             AuthoredUnitSpecificationV1.CurrentSchemaVersion,
             "spy-bars-paper",
             "SPY Bars Paper",
@@ -193,7 +194,7 @@ public sealed class CanonicalQuickBacktestTests
             [],
             AuthoredUnitExecutionIntentV1.PaperTargets,
             classification,
-            AuthoredStrategyIntentFixture.Create(classification));
+            AuthoredStrategyIntentFixture.Create(classification)));
         return new StrategyKernelRegistration(
             specification.UnitId,
             specification.Name,
@@ -206,7 +207,8 @@ public sealed class CanonicalQuickBacktestTests
     private static StrategyKernelRegistration PairRegistration(IStrategyKernel kernel)
     {
         var classification = new StrategyClassificationBindingV1("pair", new string('b', 64));
-        var specification = new AuthoredUnitSpecificationV1(
+        var specification = StrategyInteractionBindingsFactoryV1.UpgradeTrustedSpecification(
+            new AuthoredUnitSpecificationV1(
             AuthoredUnitSpecificationV1.CurrentSchemaVersion,
             "spy-qqq-pair",
             "SPY QQQ Pair",
@@ -225,7 +227,7 @@ public sealed class CanonicalQuickBacktestTests
             [],
             AuthoredUnitExecutionIntentV1.PaperTargets,
             classification,
-            AuthoredStrategyIntentFixture.Create(classification, StrategyIntentKindV1.MultiLegTarget));
+            AuthoredStrategyIntentFixture.Create(classification, StrategyIntentKindV1.MultiLegTarget)));
         return new StrategyKernelRegistration(
             specification.UnitId,
             specification.Name,

@@ -74,6 +74,9 @@ public sealed partial class PaperStrategyLegRow : ObservableObject
     private string _position = "0";
 
     [ObservableProperty]
+    private string _bookPosition = "0";
+
+    [ObservableProperty]
     private string _averageEntry = "—";
 }
 
@@ -100,6 +103,7 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
     private PaperMarketDataExecutionBridge? _marketBridge;
     private AuthoredUnitFeedLease? _feedLease;
     private int _disposed;
+    private int _bookRefreshGeneration;
 
     public string BookId => _bookId;
 
@@ -273,6 +277,9 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
 
     [ObservableProperty]
     private string _modelPosition = "0";
+
+    [ObservableProperty]
+    private string _bookPosition = "0";
 
     [ObservableProperty]
     private string _averageEntry = "—";
@@ -555,6 +562,7 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
         LastMessage = outcome.Result.Message;
         FrameRequested?.Invoke(this, EventArgs.Empty);
         RetryTargetCommand.NotifyCanExecuteChanged();
+        QueueClientRefresh();
     });
 
     private void ApplySnapshot(IModelPortfolio? snapshot)
@@ -698,9 +706,58 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
 
     private void QueueClientRefresh() => _ = Task.Run(async () =>
     {
-        try { await _paper.Client.RefreshAsync().ConfigureAwait(false); }
+        var generation = Interlocked.Increment(ref _bookRefreshGeneration);
+        try
+        {
+            await _paper.Client.RefreshAsync().ConfigureAwait(false);
+            if (generation != Volatile.Read(ref _bookRefreshGeneration))
+                return;
+            var snapshot = _paper.Client.GetSnapshot();
+            Post(() =>
+            {
+                if (generation != Volatile.Read(ref _bookRefreshGeneration))
+                    return;
+                ApplyBookSnapshot(snapshot);
+            });
+        }
         catch { }
     });
+
+    /// <summary>
+    /// Surfaces durable Paper OMS / adapter qty beside the model portfolio so Validate → Paper
+    /// handoff can prove fills without opening the Execution Console.
+    /// </summary>
+    private void ApplyBookSnapshot(PaperExecutionClientSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        foreach (var leg in StrategyLegs)
+        {
+            var quantity = snapshot.Economics.Positions
+                .FirstOrDefault(position => position.InstrumentId == leg.Instrument)?.Quantity
+                ?? default;
+            leg.BookPosition = FormatBookQuantity(quantity);
+        }
+
+        if (StrategyLegs.Count == 0)
+        {
+            BookPosition = "0";
+            return;
+        }
+
+        if (StrategyLegs.Count == 1)
+        {
+            BookPosition = StrategyLegs[0].BookPosition;
+            return;
+        }
+
+        var nonFlat = StrategyLegs.Count(static leg =>
+            !string.Equals(leg.BookPosition, "0", StringComparison.Ordinal));
+        BookPosition = nonFlat == 0 ? "0" : $"{nonFlat}/{StrategyLegs.Count} legs";
+    }
+
+    private static string FormatBookQuantity(ScaledQuantity quantity) =>
+        ExecutionNumericBoundary.ToDecimal(quantity)
+            .ToString("0.########", CultureInfo.InvariantCulture);
 
     private async Task CleanupAsync(bool stopRuntime)
     {

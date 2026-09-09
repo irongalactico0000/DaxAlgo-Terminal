@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using FluentAssertions;
 using TradingTerminal.App.Avalonia.Execution;
 using Xunit;
@@ -80,7 +81,8 @@ public sealed class PaperExecutionConsoleSurfaceTests
                  {
                      "PAPER STRATEGY RUNNER", "PAPER ONLY · AUTHENTICATED IPC",
                      "CANONICAL ASSET SET", "every reviewed leg and feed",
-                     "not represented as an atomic exchange order", "STRATEGY LEGS · MODEL TARGETS",
+                     "not represented as an atomic exchange order", "STRATEGY LEGS · MODEL + PAPER BOOK",
+                     "BOOK POSITION",
                      "STRATEGY-ASSET VISUALIZATION", "ASSET BINDING READY",
                      "never inferred from a strategy name or typed prose",
                      "Retry target", "No live broker order adapter is loaded"
@@ -169,6 +171,64 @@ public sealed class PaperExecutionConsoleSurfaceTests
         {
             window.Close();
         }
+    }
+
+    [AvaloniaFact]
+    public void Paper_strategy_runner_binds_visible_book_position_qty()
+    {
+        var window = new PaperStrategyRunnerWindow
+        {
+            DataContext = new BookPositionProbe("2"),
+        };
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+
+            window.CaptureRenderedFrame().Should().NotBeNull();
+            var metrics = window.GetVisualDescendants().OfType<TextBlock>()
+                .Select(block => block.Text)
+                .Where(text => !string.IsNullOrWhiteSpace(text))
+                .ToArray();
+            metrics.Should().Contain("BOOK POSITION");
+            metrics.Should().Contain("2");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private sealed class BookPositionProbe(string bookPosition)
+    {
+        public string BookPosition { get; } = bookPosition;
+        public string ModelTarget { get; } = "0";
+        public string ModelPosition { get; } = "0";
+        public string AverageEntry { get; } = "—";
+        public string ModelEquity { get; } = "—";
+        public string DroppedEvents { get; } = "0";
+        public string StatusText { get; } = "Smoke";
+        public string LastMessage { get; } = string.Empty;
+        public string AssetSummary { get; } = "probe";
+        public string RuntimeState { get; } = "Stopped";
+        public string LastAlert { get; } = "No strategy alerts";
+        public bool IsBusy { get; } = false;
+        public bool HasEligibleStrategies { get; } = false;
+        public bool SelectionLocked { get; } = false;
+        public bool IsRunning { get; } = false;
+        public bool IsPaused { get; } = false;
+        public bool IsStopped { get; } = true;
+        public bool CanSelectInstrument { get; } = true;
+        public bool IsMultiAssetStrategy { get; } = false;
+        public string MultiAssetGateSummary { get; } = string.Empty;
+        public System.Collections.ObjectModel.ObservableCollection<object> Strategies { get; } = new();
+        public System.Collections.ObjectModel.ObservableCollection<object> Parameters { get; } = new();
+        public System.Collections.ObjectModel.ObservableCollection<object> StrategyLegs { get; } = new();
+        public System.Collections.IEnumerable Instruments { get; } = Array.Empty<object>();
+        public object? SelectedStrategy { get; set; }
+        public object? SelectedInstrument { get; set; }
+        public Action<DaxAlgo.Sdk.IRenderSurface> Draw { get; } = _ => { };
     }
 
     [AvaloniaFact]

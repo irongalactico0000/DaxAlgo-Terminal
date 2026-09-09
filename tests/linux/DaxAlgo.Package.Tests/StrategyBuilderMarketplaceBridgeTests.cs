@@ -52,7 +52,7 @@ public sealed class StrategyBuilderMarketplaceBridgeTests : IDisposable
 
         ExtensionsPackageInspection.TryVerify(path, out var status).Should().BeTrue();
         status.Should().Contain("SB Mean Reversion 0.1.0 (strategy) verified");
-        status.Should().Contain("Installing artifacts is not wired up yet");
+        status.Should().Contain("Durable install is available");
     }
 
     [Fact]
@@ -145,4 +145,47 @@ public sealed class StrategyBuilderMarketplaceBridgeTests : IDisposable
         a.PackageSha256.Should().NotBe(b.PackageSha256);
         a.StrategyBuilderConfirmedInputSha256.Should().NotBe(b.StrategyBuilderConfirmedInputSha256);
     }
+
+    [Fact]
+    public void Open_package_durable_install_extracts_and_indexes_by_package_sha()
+    {
+        var path = Path_("install" + DaxPackage.StrategyExtension);
+        var request = StrategyBuilderPackageBridge.CreateStrategySubmission(
+            packageId: "sb.installable",
+            version: "1.2.3",
+            displayName: "Installable",
+            entryTypeName: "Sb.InstallableStrategy",
+            confirmedRunId: "run-install",
+            confirmedInputSha256: HexSha256("install-input"),
+            reviewSha256: HexSha256("install-review"),
+            confirmedBy: "builder",
+            confirmedAt: "2026-09-08T00:00:00Z",
+            strategyPayloads:
+            [
+                DaxPayloadSource.FromBytes(
+                    "src/Installable.cs", DaxPayloadRole.Source, Encoding.UTF8.GetBytes("class Installable {}")),
+            ],
+            publisher: "StrategyBuilder");
+        DaxPackage.Write(path, request);
+
+        var root = Path_("open-packages");
+        var first = OpenPackageDurableInstaller.Install(path, root);
+        first.Success.Should().BeTrue(first.Message);
+        first.Handoff.Should().NotBeNull();
+        first.InstallDirectory.Should().NotBeNullOrWhiteSpace();
+        Directory.Exists(Path.Combine(first.InstallDirectory!, OpenPackageDurableInstaller.ContentDirectoryName))
+            .Should().BeTrue();
+        File.Exists(Path.Combine(first.InstallDirectory!, OpenPackageDurableInstaller.HandoffFileName))
+            .Should().BeTrue();
+
+        var second = OpenPackageDurableInstaller.Install(path, root);
+        second.Success.Should().BeTrue(second.Message);
+        second.Handoff!.PackageSha256.Should().Be(first.Handoff!.PackageSha256);
+
+        var index = OpenPackageDurableInstaller.ReadIndex(root);
+        index.Packages.Should().ContainSingle(item =>
+            item.PackageId == "sb.installable" &&
+            item.PackageSha256 == first.Handoff.PackageSha256);
+    }
 }
+

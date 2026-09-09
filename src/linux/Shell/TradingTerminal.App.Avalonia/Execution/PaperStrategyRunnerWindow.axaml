@@ -137,33 +137,36 @@
       </ScrollViewer>
 
       <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*,Auto" Margin="14,0,0,0">
-        <UniformGrid Grid.Row="0" Columns="5">
+        <UniformGrid Grid.Row="0" Columns="6">
           <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="RUNTIME" Classes="eyebrow" /><TextBlock Text="{Binding RuntimeState}" Classes="metric" /></StackPanel></Border>
           <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="MODEL TARGET" Classes="eyebrow" /><TextBlock Text="{Binding ModelTarget}" Classes="metric" /></StackPanel></Border>
           <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="MODEL POSITION" Classes="eyebrow" /><TextBlock Text="{Binding ModelPosition}" Classes="metric" /></StackPanel></Border>
+          <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="BOOK POSITION" Classes="eyebrow" /><TextBlock Text="{Binding BookPosition}" Classes="metric" /></StackPanel></Border>
           <Border Classes="card" Margin="0,0,8,0"><StackPanel><TextBlock Text="AVERAGE ENTRY" Classes="eyebrow" /><TextBlock Text="{Binding AverageEntry}" Classes="metric" /></StackPanel></Border>
           <Border Classes="card"><StackPanel><TextBlock Text="MODEL EQUITY" Classes="eyebrow" /><TextBlock Text="{Binding ModelEquity}" Classes="metric" /></StackPanel></Border>
         </UniformGrid>
 
         <Border Grid.Row="1" Classes="card" Margin="0,12,0,0">
           <StackPanel Spacing="7">
-            <TextBlock Text="STRATEGY LEGS · MODEL TARGETS" Classes="eyebrow" />
+            <TextBlock Text="STRATEGY LEGS · MODEL + PAPER BOOK" Classes="eyebrow" />
             <ItemsControl ItemsSource="{Binding StrategyLegs}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <Grid ColumnDefinitions="2*,*,*,*" Margin="0,2">
+                  <Grid ColumnDefinitions="2*,*,*,*,*" Margin="0,2">
                     <TextBlock Text="{Binding Symbol}" FontFamily="{DynamicResource Font.Data}" />
                     <TextBlock Grid.Column="1" Text="{Binding Target, StringFormat='target {0}'}"
                                Foreground="{DynamicResource Text.Secondary}" />
                     <TextBlock Grid.Column="2" Text="{Binding Position, StringFormat='model {0}'}"
                                Foreground="{DynamicResource Text.Secondary}" />
-                    <TextBlock Grid.Column="3" Text="{Binding AverageEntry, StringFormat='avg {0}'}"
+                    <TextBlock Grid.Column="3" Text="{Binding BookPosition, StringFormat='book {0}'}"
+                               Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBlock Grid.Column="4" Text="{Binding AverageEntry, StringFormat='avg {0}'}"
                                Foreground="{DynamicResource Text.Secondary}" />
                   </Grid>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <TextBlock Text="Shared cash, equity and P&amp;L are authoritative in the durable Paper Execution Console."
+            <TextBlock Text="Book qty is Paper OMS / adapter position after fills. Cash and marked P&amp;L stay in the Paper Execution Console."
                        Foreground="{DynamicResource Text.Muted}" FontSize="9.5" />
           </StackPanel>
         </Border>

@@ -348,7 +348,8 @@ public static class AuthoredChartChoiceCatalogV1
             ? $"{instrument.CanonicalSymbol} candles"
             : $"{instrument.CanonicalSymbol} · {string.Join(" + ", namedOverlays)}";
 
-        var specification = new AuthoredUnitSpecificationV1(
+        var specification = StrategyInteractionBindingsFactoryV1.UpgradeTrustedSpecification(
+            new AuthoredUnitSpecificationV1(
             AuthoredUnitSpecificationV1.CurrentSchemaVersion,
             unitId.Trim(),
             name,
@@ -369,7 +370,7 @@ public static class AuthoredChartChoiceCatalogV1
             ComposeDrawing(overlays),
             [],
             [],
-            AuthoredUnitExecutionIntentV1.None);
+            AuthoredUnitExecutionIntentV1.None));
 
         return AuthoredUnitSpecificationValidatorV1.ValidateForLaunch(specification).Count == 0
             ? specification

@@ -376,7 +376,7 @@ public sealed class AuthoredUnitSpecificationGeneratorV1Tests
         string request,
         AuthoredUnitInstrumentCandidateV1 instrument,
         IReadOnlyList<AuthoredChartLayerV1> layers) =>
-        new(
+        StrategyInteractionBindingsFactoryV1.UpgradeTrustedSpecification(new(
             AuthoredUnitSpecificationV1.CurrentSchemaVersion,
             id,
             id,
@@ -393,14 +393,14 @@ public sealed class AuthoredUnitSpecificationGeneratorV1Tests
                 layers),
             [],
             [],
-            AuthoredUnitExecutionIntentV1.None);
+            AuthoredUnitExecutionIntentV1.None));
 
     private static AuthoredUnitSpecificationV1 Strategy(
         string id,
         string request,
         AuthoredUnitInstrumentCandidateV1 instrument,
         ConfirmedStrategyIntentV1 intent) =>
-        new(
+        StrategyInteractionBindingsFactoryV1.UpgradeTrustedSpecification(new(
             AuthoredUnitSpecificationV1.CurrentSchemaVersion,
             id,
             id,
@@ -423,7 +423,7 @@ public sealed class AuthoredUnitSpecificationGeneratorV1Tests
             [],
             AuthoredUnitExecutionIntentV1.PaperTargets,
             intent.Classification,
-            intent);
+            intent));
 
     private static ConfirmedStrategyIntentV1 ConfirmedIntent(
         StrategyClassificationBindingV1 classification) => new(

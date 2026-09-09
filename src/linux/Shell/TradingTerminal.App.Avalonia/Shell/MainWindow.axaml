@@ -586,17 +586,14 @@
               </Button>
             </Border>
             <Button Click="OnMarketplace" Margin="14,0,0,0" Padding="16,10"
-                    ToolTip.Tip="Browse the DaxAlgo strategy marketplace (coming soon).">
+                    ToolTip.Tip="Open the DaxAlgo marketplace site. Install a package URL in Strategy Manager.">
               <StackPanel Orientation="Horizontal">
                 <TextBlock Text="▦" FontSize="16" Margin="0,0,8,0" />
                 <TextBlock Text="Browse Marketplace" FontWeight="SemiBold" FontSize="13" />
-                <Border Background="{DynamicResource Ai.Soft}" Margin="8,0,0,0" Padding="4,1">
-                  <TextBlock Text="SOON" FontSize="8" FontWeight="Bold" Foreground="{DynamicResource Text.Secondary}" />
-                </Border>
               </StackPanel>
             </Button>
           </StackPanel>
-          <Button Content="Already have a .daxplugin? Install it in Strategy Manager &#x2192;"
+          <Button Content="Already have a .daxalgostrategy / URL? Install in Strategy Manager &#x2192;"
                   Click="OnPluginManager" HorizontalAlignment="Center" Margin="0,14,0,0"
                   Background="Transparent" BorderThickness="0"
                   Foreground="{DynamicResource Text.Secondary}" />

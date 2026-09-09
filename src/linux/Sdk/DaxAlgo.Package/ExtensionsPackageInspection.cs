@@ -5,10 +5,9 @@ namespace DaxAlgo.Package;
 /// <summary>
 /// Extensions (Strategy Manager) open-package gate shared by every edition.
 ///
-/// <para>Public Windows verifies <c>.daxalgostrategy</c> / <c>.daxalgovisualizer</c> and does not
-/// install them yet. Mac Avalonia reuses this exact gate so StrategyBuilder publications and
-/// Marketplace submissions agree on acceptance before any installer or sealed <c>.daxq</c> path
-/// runs.</para>
+/// <para>Public Windows verifies <c>.daxalgostrategy</c> / <c>.daxalgovisualizer</c>. Mac Avalonia
+/// reuses this exact gate so StrategyBuilder publications and Marketplace submissions agree on
+/// acceptance before <see cref="OpenPackageDurableInstaller"/> or sealed <c>.daxq</c> paths run.</para>
 /// </summary>
 public static class ExtensionsPackageInspection
 {
@@ -29,7 +28,8 @@ public static class ExtensionsPackageInspection
             var manifest = DaxPackage.Read(path).Manifest;
             status =
                 $"{manifest.DisplayName} {manifest.Version} ({WireKind(manifest.Kind)}) verified — "
-                + $"{manifest.Payloads.Count} payload(s). Installing artifacts is not wired up yet.";
+                + $"{manifest.Payloads.Count} payload(s). Durable install is available via "
+                + $"{nameof(OpenPackageDurableInstaller)}.";
             return true;
         }
         catch (DaxPackageException ex)

@@ -146,10 +146,12 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
         if (overlays.Length == 0)
             return specification;
 
-        return specification with
+        var hostOwned = specification with
         {
             Drawing = AuthoredChartChoiceCatalogV1.ComposeDrawing(overlays),
+            InteractionBindings = null,
         };
+        return StrategyInteractionBindingsFactoryV1.UpgradeTrustedSpecification(hostOwned);
     }
 
     internal static IReadOnlyList<AuthoredUnitSpecificationGenerationIssueV1> ValidateRequest(
@@ -280,6 +282,10 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
         var issues = AuthoredUnitSpecificationValidatorV1.ValidateForLaunch(specification)
             .Select(static item => Issue(item.Code, item.Path, item.Message))
             .ToList();
+
+        if (specification.InteractionBindings is null)
+            issues.Add(Issue("UNIT_INTERACTION_BINDINGS_REQUIRED", "interactionBindings",
+                "New generated units must explicitly bind parameters, features, drawing layers, and strategy rules."));
 
         if (!string.Equals(specification.UnitId, request.UnitId, StringComparison.Ordinal))
             issues.Add(Issue("UNIT_ID_CHANGED", "unitId", "The provider changed the host-owned unit id."));
@@ -441,7 +447,7 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
         Required JSON fields:
         schemaVersion, unitId, name, rawRequest, sourceKind, kind, instruments, timeframe,
         dataRequirement, parameters, drawing, references, referenceResolutions, executionIntent,
-        strategyClassification, confirmedStrategyIntent. Use schemaVersion "authored-unit-spec/v1". Enum values are camelCase.
+        strategyClassification, confirmedStrategyIntent, interactionBindings. Use schemaVersion "authored-unit-spec/v1". Enum values are camelCase.
         InstrumentId is {"value": number}. TimeSpan barSize uses "hh:mm:ss" (for example
         "00:01:00") or null. dataRequirement is a comma-separated enum string such as "bars" or
         "bars, l1". Arrays must always be present.
@@ -457,7 +463,16 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
         target output. For a visualizer, confirmedStrategyIntent is JSON null, never the string
         "null". For a strategy, copy the
         supplied confirmedStrategyIntent exactly and implement every applicable reviewed requirement;
-        do not reduce it to the classification label or rawRequest summary. Return the JSON object only,
+        do not reduce it to the classification label or rawRequest summary.
+
+        interactionBindings must use schemaVersion "strategy-interaction-bindings/v1" and contain
+        parameters, features, layers, and rules arrays. Parameter bindings map stable parameterId to
+        one exact parameterKey. Features declare stable featureId/typeId/data and parameterIds. Layer
+        bindings identify an existing layerId, its featureIds, and a parameterBindings object mapping
+        drawing-property names to parameterIds. Strategy rules identify stable ruleId plus exact
+        featureIds, parameterIds, instrumentRequestIds, and confirmed-intent requirementIds. A
+        visualizer has an empty rules array. Hiding a layer is appearance-only and must never delete
+        its feature or rule binding. Return the JSON object only,
         with no markdown or prose.
         """;
 

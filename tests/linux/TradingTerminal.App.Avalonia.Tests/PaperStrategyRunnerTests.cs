@@ -183,6 +183,18 @@ public sealed class PaperStrategyRunnerTests
                     ExecutionNumericBoundary.QuantityFromDecimal(2m),
                     Assert.Single(liveSnapshot.Economics.Positions).Quantity);
 
+                var bookVisible = await WaitUntilAsync(
+                    () =>
+                    {
+                        global::Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+                        return string.Equals(viewModel.BookPosition, "2", StringComparison.Ordinal) &&
+                               viewModel.StrategyLegs.Count == 1 &&
+                               string.Equals(viewModel.StrategyLegs[0].BookPosition, "2", StringComparison.Ordinal);
+                    },
+                    TimeSpan.FromSeconds(5));
+                Assert.True(bookVisible,
+                    $"Runner did not surface OMS book qty. BookPosition={viewModel.BookPosition}; LastMessage={viewModel.LastMessage}");
+
                 await viewModel.StopCommand.ExecuteAsync(null);
                 Assert.Equal(2, ingest.Disposed);
             }

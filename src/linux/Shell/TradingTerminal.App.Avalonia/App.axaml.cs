@@ -52,7 +52,9 @@ public partial class App : Application
                 Height = 170,
                 CanResize = false,
                 WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                Background = Resources["Background.Primary"] as global::Avalonia.Media.IBrush,
+                // Hardcoded colors: theme resources are not applied yet, so Resource brushes can
+                // render as an empty black splash that looks hung.
+                Background = global::Avalonia.Media.Brushes.WhiteSmoke,
                 Title = "Starting DaxAlgo Terminal",
                 Content = new TextBlock
                 {
@@ -60,7 +62,7 @@ public partial class App : Application
                     TextWrapping = global::Avalonia.Media.TextWrapping.Wrap,
                     Margin = new Thickness(24),
                     VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Center,
-                    Foreground = Resources["Text.Primary"] as global::Avalonia.Media.IBrush,
+                    Foreground = global::Avalonia.Media.Brushes.Black,
                 },
             };
             startupDesktop.MainWindow = startupWindow;
@@ -151,6 +153,52 @@ public partial class App : Application
                     $"Strategy smoke finished with exit code {exitCode}; report: {reportPath}");
                 startupWindow?.Close();
                 desktop.Shutdown(exitCode);
+                return;
+            }
+
+            var paperHandoffSmoke = args.FirstOrDefault(argument =>
+                argument.StartsWith("--smoke-paper-handoff", StringComparison.OrdinalIgnoreCase));
+            if (paperHandoffSmoke is not null)
+            {
+                var diagnosticsDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "DaxAlgoTerminal",
+                    "diagnostics");
+                var reportPath = paperHandoffSmoke.Contains('=', StringComparison.Ordinal)
+                    ? paperHandoffSmoke.Split('=', 2)[1]
+                    : Path.Combine(diagnosticsDirectory, "smoke-paper-handoff.txt");
+                var exitCode = await PaperHandoffSmoke.RunAsync(Services, reportPath);
+                activityLog.Append(
+                    "Diagnostics",
+                    exitCode == 0 ? "Information" : "Error",
+                    $"Paper handoff smoke finished with exit code {exitCode}; report: {reportPath}");
+                startupWindow?.Close();
+                Services = null;
+                desktop.Shutdown(exitCode);
+                return;
+            }
+
+            var installOpenPackage = args.FirstOrDefault(argument =>
+                argument.StartsWith("--install-open-package=", StringComparison.OrdinalIgnoreCase));
+            if (installOpenPackage is not null)
+            {
+                var packageUrl = installOpenPackage.Split('=', 2)[1];
+                var manager = Services.GetRequiredService<TradingTerminal.App.Plugins.PluginManagerViewModel>();
+                var message = await manager.InstallOpenPackageFromUrlAsync(packageUrl);
+                activityLog.Append(
+                    "Marketplace",
+                    message.Contains("registered", StringComparison.OrdinalIgnoreCase) ? "Information" : "Warning",
+                    message);
+                var diagnosticsDirectoryForInstall = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "DaxAlgoTerminal",
+                    "diagnostics");
+                Directory.CreateDirectory(diagnosticsDirectoryForInstall);
+                var installReportPath = Path.Combine(diagnosticsDirectoryForInstall, "install-open-package.txt");
+                await File.WriteAllTextAsync(installReportPath, message);
+                startupWindow?.Close();
+                Services = null;
+                desktop.Shutdown(message.Contains("registered", StringComparison.OrdinalIgnoreCase) ? 0 : 1);
                 return;
             }
 
@@ -254,12 +302,14 @@ public partial class App : Application
                         File.AppendAllText("/tmp/daxalgo-preview-overlays.log", $"opened handler failure: {ex}\n");
                     }
 
-                    // Skip Support modal during chart smoke previews so Charts stays frontmost.
+                    // Skip Support modal during chart smoke previews and login-bypass runs so the
+                    // catalog / Paper path stays visible for visual verification.
                     var isOverlayPreview = args.Any(argument =>
                         argument.StartsWith("--preview-overlays=", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(argument, "--preview-research-capture", StringComparison.OrdinalIgnoreCase) ||
                         argument.StartsWith("--preview-research-auto", StringComparison.OrdinalIgnoreCase));
-                    if (!isOverlayPreview)
+                    var skipSupportPrompt = isOverlayPreview || bypassLoginRequested || bypassAccountLoginRequested;
+                    if (!skipSupportPrompt)
                     {
                         try
                         {
