@@ -113,3 +113,13 @@ public sealed class LogLevelToBrushConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 }
+
+/// <summary>Armed-LIVE flag → status-strip brush (armed=red, PAPER default=amber).</summary>
+public sealed class ExecutionModeToBrushConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is true ? ShellPalette.Danger : ShellPalette.Warning;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}

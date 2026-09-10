@@ -25,6 +25,9 @@
   <Project Path="src/linux/Charts/TradingTerminal.OrderBook/TradingTerminal.OrderBook.csproj" />
   <Project Path="src/linux/Charts/TradingTerminal.VolumeFootprint/TradingTerminal.VolumeFootprint.csproj" />
   <Project Path="src/linux/Core/TradingTerminal.Core/TradingTerminal.Core.csproj" />
+  <Project Path="src/linux/Execution/TradingTerminal.Execution/TradingTerminal.Execution.csproj" />
+  <Project Path="src/linux/Execution/TradingTerminal.Execution.Mac/TradingTerminal.Execution.Mac.csproj" />
+  <Project Path="src/linux/Execution/TradingTerminal.ExecutionUi.Core/TradingTerminal.ExecutionUi.Core.csproj" />
   <Project Path="src/linux/Sdk/DaxAlgo.Strategy.Bundle/DaxAlgo.Strategy.Bundle.csproj" />
   <Project Path="src/linux/Sdk/DaxAlgo.Package/DaxAlgo.Package.csproj" />
   <Project Path="src/linux/Sdk/DaxAlgo.Sdk/DaxAlgo.Sdk.csproj" />

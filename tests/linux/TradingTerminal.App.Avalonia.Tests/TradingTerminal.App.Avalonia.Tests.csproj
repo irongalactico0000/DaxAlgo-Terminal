@@ -42,6 +42,9 @@
     <None Include="..\..\..\src\linux\Shell\TradingTerminal.App.Avalonia\Execution\PaperExecutionConsoleWindow.axaml"
           Link="Fixtures\PaperExecutionConsoleWindow.axaml"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\src\linux\Shell\TradingTerminal.App.Avalonia\Execution\ExecutionConsoleWindow.axaml"
+          Link="Fixtures\ExecutionConsoleWindow.axaml"
+          CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\src\linux\Shell\TradingTerminal.App.Avalonia\Execution\PaperExecutionBooksWindow.axaml"
           Link="Fixtures\PaperExecutionBooksWindow.axaml"
           CopyToOutputDirectory="PreserveNewest" />

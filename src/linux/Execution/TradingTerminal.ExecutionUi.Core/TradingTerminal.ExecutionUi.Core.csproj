@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <!-- Namespace stays TradingTerminal.ExecutionUi so the ported console view-models need no
+         using changes against their Windows counterparts. -->
+    <RootNamespace>TradingTerminal.ExecutionUi</RootNamespace>
+    <Description>Toolkit-free execution console view-model layer: in-process client, read models, analytics, and the mode-status projection. The confirmation prompt is an interface the UI head implements.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TradingTerminal.Execution\TradingTerminal.Execution.csproj" />
+    <ProjectReference Include="..\..\Shell\TradingTerminal.Login\TradingTerminal.Login.csproj" />
+    <ProjectReference Include="..\..\UI\TradingTerminal.UI.Core\TradingTerminal.UI.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>

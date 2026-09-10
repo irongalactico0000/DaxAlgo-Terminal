@@ -16,6 +16,7 @@ public partial class MainWindow : Window
     private TradingTerminal.App.Avalonia.Theming.IThemeManager? _themeManager;
     private Window? _executionBooksWindow;
     private Window? _executionConsoleWindow;
+    private Window? _liveExecutionConsoleWindow;
     private Window? _paperStrategyRunnerWindow;
     private TradingTerminal.Charts.ChartsWindow? _researchChartWindow;
     private TradingTerminal.Charts.ChartsViewModel? _researchChartViewModel;
@@ -179,6 +180,36 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnLiveExecutionConsole(object? sender, RoutedEventArgs e)
+    {
+        if (_liveExecutionConsoleWindow is { } existing)
+        {
+            existing.Activate();
+            return;
+        }
+        if ((Application.Current as App)?.Services is not { } services) return;
+        try
+        {
+            var viewModel = services.GetRequiredService<TradingTerminal.ExecutionUi.ExecutionConsoleViewModel>();
+            var window = services.GetRequiredService<
+                TradingTerminal.App.Avalonia.Execution.ExecutionConsoleWindow>();
+            window.DataContext = viewModel;
+            _liveExecutionConsoleWindow = window;
+            window.Closed += (_, _) => _liveExecutionConsoleWindow = null;
+            ShowDisposing(window, viewModel);
+            Vm?.ActivityLog.Append("Execution", "INFO",
+                "Opened the Execution Console. Every venue starts PAPER; LIVE is armed per venue.");
+        }
+        catch (Exception exception)
+        {
+            // The books and engine are app-lifetime, so a window that fails to open must leave them
+            // running and say why rather than taking the shell down.
+            _liveExecutionConsoleWindow = null;
+            Vm?.ActivityLog.Append("Execution", "ERROR",
+                $"The Execution Console did not open and no order route was created: {exception.Message}");
+        }
+    }
+
     private async void OnPaperStrategyRunner(object? sender, RoutedEventArgs e) =>
         await OpenPaperStrategyRunnerAsync(initialStrategy: null);
 
@@ -240,9 +271,10 @@ public partial class MainWindow : Window
                 services.GetRequiredService<TradingTerminal.Core.MarketData.IMarketDataIngest>(),
                 services.GetRequiredService<TradingTerminal.Core.Brokers.IBrokerSelector>(),
                 initialStrategy,
-                initialParameters);
+                initialParameters,
+                services.GetService<TradingTerminal.ExecutionUi.IExecutionClient>());
             var window = services.GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerWindow>();
-            window.Title = $"Harness · Paper · {bookLease.Book.Name}";
+            window.Title = $"Harness · Strategy · {bookLease.Book.Name}";
             window.DataContext = viewModel;
             _paperStrategyRunnerWindow = window;
             var ownedLease = bookLease;
@@ -443,6 +475,9 @@ public partial class MainWindow : Window
             return;
         }
 
+        var authoringViewModel = targetViewModel;
+        var authoringWindow = targetWindow;
+
         PreviewLog(
             hostOverlayIds is { Count: > 0 }
                 ? $"resolving Charts services for overlays [{string.Join(',', hostOverlayIds)}]"
@@ -499,25 +534,71 @@ public partial class MainWindow : Window
         EventHandler<TradingTerminal.Charts.ResearchChartSelectionRequestedEventArgs>? selectionHandler = null;
         selectionHandler = (_, args) =>
         {
-            var authoringViewModel = targetViewModel;
-            var authoringWindow = targetWindow;
-            if (authoringViewModel is null || authoringWindow is null || !authoringWindow.IsVisible)
-            {
-                authoringViewModel = services.GetRequiredService<TradingTerminal.App.Authoring.StrategyAuthoringViewModel>();
-                authoringWindow = CreateAuthoringWindow(authoringViewModel);
-                WireResearchChartRequest(authoringViewModel, authoringWindow);
-                ShowDisposing(authoringWindow, authoringViewModel);
-            }
-
+            (authoringViewModel, authoringWindow) = EnsureAuthoringForResearchChart(services, authoringViewModel, authoringWindow);
             authoringViewModel.SetResearchChartSelection(args.Selection);
             authoringWindow.Activate();
             // Keep the single Charts window open for further gallery box focus.
         };
         chartViewModel.ResearchSelectionRequested += selectionHandler;
+
+        EventHandler<TradingTerminal.Charts.StrategyDraftRequestedEventArgs>? draftHandler = null;
+        draftHandler = (_, args) =>
+        {
+            (authoringViewModel, authoringWindow) = EnsureAuthoringForResearchChart(services, authoringViewModel, authoringWindow);
+            authoringViewModel.SetStrategyDraft(args.Draft);
+            authoringWindow.Activate();
+        };
+        chartViewModel.StrategyDraftRequested += draftHandler;
+
+        EventHandler? lockHandler = null;
+        lockHandler = (_, _) =>
+        {
+            (authoringViewModel, authoringWindow) = EnsureAuthoringForResearchChart(services, authoringViewModel, authoringWindow);
+            if (!authoringViewModel.TryLockPendingStrategyDraftToActiveTradeIr(out var message))
+                chartViewModel.Status = message;
+            else
+            {
+                chartViewModel.Status = message;
+                authoringWindow.Activate();
+            }
+        };
+        chartViewModel.StrategyDraftLockRequested += lockHandler;
+
+        EventHandler? historicalHandler = null;
+        historicalHandler = (_, _) =>
+        {
+            (authoringViewModel, authoringWindow) = EnsureAuthoringForResearchChart(services, authoringViewModel, authoringWindow);
+            if (!authoringViewModel.TryCreateHistoricalValidationContext(out _, out var blocker) ||
+                !authoringViewModel.CanRunHistoricalValidation)
+            {
+                // Consent-preserving assist: open Build, auto-Compile when ready, stop before Register.
+                authoringViewModel.PrepareHistoricalValidationAssist();
+                var message = string.IsNullOrWhiteSpace(authoringViewModel.Status)
+                    ? (string.IsNullOrWhiteSpace(blocker)
+                        ? authoringViewModel.DescribeHistoricalValidationBlocker()
+                        : blocker)
+                    : authoringViewModel.Status;
+                authoringViewModel.Status = message;
+                chartViewModel.Status = message;
+                authoringWindow.Activate();
+                return;
+            }
+
+            OpenAuthoringHistoricalValidation(authoringViewModel);
+            chartViewModel.Status =
+                string.IsNullOrWhiteSpace(authoringViewModel.Status)
+                    ? "Historical validation opened from Charts research shell."
+                    : authoringViewModel.Status;
+        };
+        chartViewModel.HistoricalBacktestRequested += historicalHandler;
+
         chartWindow.Closed += (_, _) =>
         {
             PreviewLog("Charts window closed");
             chartViewModel.ResearchSelectionRequested -= selectionHandler;
+            chartViewModel.StrategyDraftRequested -= draftHandler;
+            chartViewModel.StrategyDraftLockRequested -= lockHandler;
+            chartViewModel.HistoricalBacktestRequested -= historicalHandler;
             if (ReferenceEquals(_researchChartWindow, chartWindow))
             {
                 _researchChartWindow = null;
@@ -532,6 +613,25 @@ public partial class MainWindow : Window
             ArmHostResearchCapture(chartViewModel, PreviewLog);
         PreviewLog(
             $"Show(owner)+Activate Charts IsVisible={chartWindow.IsVisible} Width={chartWindow.Width} Height={chartWindow.Height} researchCapture={startResearchCapture}");
+    }
+
+    private (
+        TradingTerminal.App.Authoring.StrategyAuthoringViewModel ViewModel,
+        Settings.StrategyAuthoringWindow Window)
+        EnsureAuthoringForResearchChart(
+            IServiceProvider services,
+            TradingTerminal.App.Authoring.StrategyAuthoringViewModel? targetViewModel,
+            Settings.StrategyAuthoringWindow? targetWindow)
+    {
+        if (targetViewModel is null || targetWindow is null || !targetWindow.IsVisible)
+        {
+            targetViewModel = services.GetRequiredService<TradingTerminal.App.Authoring.StrategyAuthoringViewModel>();
+            targetWindow = CreateAuthoringWindow(targetViewModel);
+            WireResearchChartRequest(targetViewModel, targetWindow);
+            ShowDisposing(targetWindow, targetViewModel);
+        }
+
+        return (targetViewModel, targetWindow);
     }
 
     private static void ArmHostResearchCapture(

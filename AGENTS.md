@@ -20,7 +20,7 @@ mirror, or coordinate with a Windows repository unless the user explicitly place
 - `InstrumentId` is canonical and market-data provenance is preserved.
 - Ingest is tick-primary and non-blocking; view models consume hub/ingest/store seams.
 - MVVM remains strict; streaming UI is bounded and deterministically disposable.
-- Sidecars bind to `127.0.0.1`; introduce no live order-execution path.
+- Sidecars bind to `127.0.0.1`. Live order execution is allowed only for **Alpaca / Interactive Brokers / cTrader** when composed with Keychain-backed `ILiveExecutionConfirmationStore`, per-broker `AllowLiveExecution`, and typed **LIVE** confirmation. **Binance stays market-data only** (no order adapter). Strategy → OMS only via `SandboxExecutionReplicator` (never kernel `PlaceOrder`).
 
 ## Verification
 

@@ -127,8 +127,15 @@ public partial class App : Application
             {
                 _pluginFaultWatchdog?.Dispose();
                 _pluginFaultWatchdog = null;
-                _host?.StopAsync().GetAwaiter().GetResult();
-                _host?.Dispose();
+                try
+                {
+                    _host?.StopAsync().GetAwaiter().GetResult();
+                    _host?.Dispose();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Smoke / last-window Close can tear the host down more than once.
+                }
                 _host = null;
             };
 
@@ -172,8 +179,31 @@ public partial class App : Application
                     "Diagnostics",
                     exitCode == 0 ? "Information" : "Error",
                     $"Paper handoff smoke finished with exit code {exitCode}; report: {reportPath}");
-                startupWindow?.Close();
                 Services = null;
+                startupWindow?.Close();
+                desktop.Shutdown(exitCode);
+                return;
+            }
+
+            var liveOmsSmoke = args.FirstOrDefault(argument =>
+                argument.StartsWith("--smoke-live-oms", StringComparison.OrdinalIgnoreCase) ||
+                argument.StartsWith("--smoke-live-paper-alpaca", StringComparison.OrdinalIgnoreCase));
+            if (liveOmsSmoke is not null)
+            {
+                var diagnosticsDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "DaxAlgoTerminal",
+                    "diagnostics");
+                var reportPath = liveOmsSmoke.Contains('=', StringComparison.Ordinal)
+                    ? liveOmsSmoke.Split('=', 2)[1]
+                    : Path.Combine(diagnosticsDirectory, "smoke-live-oms.txt");
+                var exitCode = await LiveOmsSmoke.RunAsync(reportPath);
+                activityLog.Append(
+                    "Diagnostics",
+                    exitCode == 0 ? "Information" : "Error",
+                    $"Live OMS smoke finished with exit code {exitCode}; report: {reportPath}");
+                Services = null;
+                startupWindow?.Close();
                 desktop.Shutdown(exitCode);
                 return;
             }

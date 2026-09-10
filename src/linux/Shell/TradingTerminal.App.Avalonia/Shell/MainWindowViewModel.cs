@@ -36,6 +36,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private readonly SessionContext _session;
     private readonly ICliWorkspaceLauncher? _cliLauncher;
     private readonly DispatcherTimer _clockTimer;
+    private readonly TradingTerminal.ExecutionUi.ExecutionModeStatusProjection? _executionMode;
     private bool _simulatedWarningLogged;
 
     public MainWindowViewModel(
@@ -49,8 +50,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         IStrategyKernelRegistry strategyKernelRegistry,
         ICliWorkspaceLauncher? cliLauncher = null,
         TickRecordingService? recorder = null,
-        PaperExecutionBooksViewModel? executionBooks = null)
+        PaperExecutionBooksViewModel? executionBooks = null,
+        TradingTerminal.ExecutionUi.ExecutionModeStatusProjection? executionMode = null)
     {
+        _executionMode = executionMode;
+        if (_executionMode is not null)
+            _executionMode.PropertyChanged += OnExecutionModeChanged;
         _brokerSelector = brokerSelector;
         _strategyFactory = factory;
         _visualizerRegistry = visualizerRegistry;
@@ -127,6 +132,23 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     /// <summary>App-lifetime Paper books chip; null only in the design-time constructor.</summary>
     public PaperExecutionBooksViewModel? ExecutionBooks { get; }
+
+    /// <summary>
+    /// Whether any registered execution adapter or open console is currently armed for real-money
+    /// routing. A projection fault reports LIVE rather than a falsely reassuring PAPER.
+    /// </summary>
+    public bool IsLiveExecutionArmed => _executionMode?.HasLiveExecution ?? false;
+
+    /// <summary>Status-strip execution mode. Paper is the default, not a permanent claim.</summary>
+    public string ExecutionModeBannerLabel =>
+        IsLiveExecutionArmed ? "LIVE EXECUTION ARMED" : "PAPER EXECUTION (DEFAULT)";
+
+    private void OnExecutionModeChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            OnPropertyChanged(nameof(IsLiveExecutionArmed));
+            OnPropertyChanged(nameof(ExecutionModeBannerLabel));
+        });
 
     public void LaunchCli(CliLaunchChoice? choice)
     {
@@ -378,6 +400,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         if (_visualizerRegistry is not null) _visualizerRegistry.Changed -= OnVisualizerCatalogChanged;
         if (_strategyKernelRegistry is not null) _strategyKernelRegistry.Changed -= OnStrategyKernelCatalogChanged;
         ActivityLog.Entries.CollectionChanged -= OnLogEntriesChanged;
+        if (_executionMode is not null) _executionMode.PropertyChanged -= OnExecutionModeChanged;
         ApiMeter?.Dispose();
     }
 }

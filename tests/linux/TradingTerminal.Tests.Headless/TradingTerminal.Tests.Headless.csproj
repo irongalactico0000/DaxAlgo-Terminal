@@ -27,6 +27,9 @@
     <ProjectReference Include="..\..\..\src\linux\UI\TradingTerminal.UI.Core\TradingTerminal.UI.Core.csproj" />
     <ProjectReference Include="..\..\..\src\linux\Shell\TradingTerminal.Accounts\TradingTerminal.Accounts.csproj" />
     <ProjectReference Include="..\..\..\src\linux\Tools\TradingTerminal.Recording\TradingTerminal.Recording.csproj" />
+    <ProjectReference Include="..\..\..\src\linux\Execution\TradingTerminal.Execution\TradingTerminal.Execution.csproj" />
+    <ProjectReference Include="..\..\..\src\linux\Execution\TradingTerminal.Execution.Mac\TradingTerminal.Execution.Mac.csproj" />
+    <ProjectReference Include="..\..\..\src\linux\Execution\TradingTerminal.ExecutionUi.Core\TradingTerminal.ExecutionUi.Core.csproj" />
     <!-- Ported per-strategy projects (net9.0 leg) â€” verify their portable VMs resolve headless. -->
   </ItemGroup>
 

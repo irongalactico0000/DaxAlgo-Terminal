@@ -13,7 +13,7 @@ namespace TradingTerminal.App.Avalonia.Tests;
 public sealed class PaperExecutionConsoleSurfaceTests
 {
     [Fact]
-    public void Shell_exposes_a_truthful_Paper_only_execution_entry()
+    public void Shell_offers_the_Paper_surfaces_and_the_live_capable_console()
     {
         XNamespace av = "https://github.com/avaloniaui";
         var shell = XDocument.Load(Fixture("MainWindow.axaml"));
@@ -21,11 +21,42 @@ public sealed class PaperExecutionConsoleSurfaceTests
         shell.Descendants(av + "MenuItem").Should().Contain(element =>
             (string?)element.Attribute("Header") == "_Paper Execution Console…" &&
             (string?)element.Attribute("Click") == "OnExecutionConsole");
-        shell.Descendants(av + "TextBlock").Should().Contain(element =>
-            (string?)element.Attribute("Text") == "PAPER EXECUTION ONLY");
         shell.Descendants(av + "MenuItem").Should().Contain(element =>
             (string?)element.Attribute("Header") == "Paper Execution _Books…" &&
             (string?)element.Attribute("Click") == "OnExecutionBooks");
+        shell.Descendants(av + "MenuItem").Should().Contain(element =>
+            (string?)element.Attribute("Header") == "_Execution Console (live-capable)…" &&
+            (string?)element.Attribute("Click") == "OnLiveExecutionConsole");
+    }
+
+    [Fact]
+    public void Shell_banner_reports_the_armed_mode_rather_than_a_permanent_Paper_claim()
+    {
+        XNamespace av = "https://github.com/avaloniaui";
+        var shell = XDocument.Load(Fixture("MainWindow.axaml"));
+
+        shell.Descendants(av + "TextBlock").Should().NotContain(element =>
+            (string?)element.Attribute("Text") == "PAPER EXECUTION ONLY");
+        shell.Descendants(av + "TextBlock").Should().Contain(element =>
+            (string?)element.Attribute("Text") == "{Binding ExecutionModeBannerLabel}");
+    }
+
+    [Fact]
+    public void Live_capable_console_declares_brokers_a_real_book_and_a_limit_first_ticket()
+    {
+        var text = File.ReadAllText(Fixture("ExecutionConsoleWindow.axaml"));
+
+        foreach (var required in new[]
+                 {
+                     "ExecutionModeBannerLabel", "ManagedAdapters", "ConnectAdapterCommand",
+                     "DisconnectAdapterCommand", "SetExecutionModeCommand", "CreateBookCommand",
+                     "SubmitManualOrderCommand", "ManualOrderTypes", "ManualLimitPrice",
+                     "Books", "Positions", "Orders",
+                     "AveragePrice", "LastPrice", "UnrealizedProfitAndLoss", "RealizedProfitAndLoss",
+                     "TargetQuantity", "Delta", "DailyPnlSeries",
+                     "AVG", "LAST", "UNREAL.", "REAL.", "TARGET", "DRIFT", "DAILY REALIZED P&amp;L",
+                 })
+            text.Should().Contain(required);
     }
 
     [Fact]

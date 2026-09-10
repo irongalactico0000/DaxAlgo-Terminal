@@ -21,6 +21,7 @@
     <vm:ApiStatusToBrushConverter x:Key="ApiBrush" />
     <vm:SessionFlagToBrushConverter x:Key="SessionBrush" />
     <vm:LogLevelToBrushConverter x:Key="LevelBrush" />
+    <vm:ExecutionModeToBrushConverter x:Key="ExecutionModeBrush" />
   </Window.Resources>
 
   <Window.Styles>
@@ -275,6 +276,9 @@
                   ToolTip.Tip="Durable local Paper OMS. No live broker order route is loaded." />
         <MenuItem Header="Paper _Strategy Runner&#x2026;" Click="OnPaperStrategyRunner"
                   ToolTip.Tip="Run one canonical strategy/asset through the authenticated local Paper OMS." />
+        <Separator />
+        <MenuItem Header="_Execution Console (live-capable)&#x2026;" Click="OnLiveExecutionConsole"
+                  ToolTip.Tip="Brokers, Paper or Real books, and the manual ticket. Paper is the default; LIVE is armed per venue with a typed confirmation." />
       </MenuItem>
       <MenuItem Header="_Settings">
         <MenuItem Header="_Notifications…" Click="OnNotifications" />
@@ -321,8 +325,8 @@
           <Button Margin="10,0,0,0" Padding="7,1" Click="OnExecutionBooks"
                   ToolTip.Tip="Open persistent Paper execution books">
             <StackPanel Orientation="Horizontal" Spacing="5">
-              <TextBlock Text="PAPER EXECUTION ONLY" Foreground="{DynamicResource Warning.Brush}"
-                         FontSize="9" FontWeight="Bold" />
+              <TextBlock Text="{Binding ExecutionModeBannerLabel}" FontSize="9" FontWeight="Bold"
+                         Foreground="{Binding IsLiveExecutionArmed, Converter={StaticResource ExecutionModeBrush}}" />
               <TextBlock Text="·" Foreground="{DynamicResource Text.Secondary}" FontSize="9" />
               <TextBlock Text="{Binding ExecutionBooks.Summary}" Foreground="{DynamicResource Text.Secondary}"
                          FontSize="9" FontWeight="SemiBold" />

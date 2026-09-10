@@ -1,0 +1,367 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:forms="clr-namespace:TradingTerminal.App.Login.Forms;assembly=TradingTerminal.Login"
+        x:Class="TradingTerminal.App.Avalonia.Execution.ExecutionConsoleWindow"
+        Title="DaxAlgo Execution Console"
+        Width="1440" Height="900" MinWidth="1120" MinHeight="700"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Background.Primary}"
+        Foreground="{DynamicResource Text.Primary}"
+        FontFamily="{DynamicResource Font.Base}"
+        FontSize="12">
+  <Window.DataTemplates>
+    <!-- The same credential forms the shared Login window uses; the console reads them back through
+         the view-model's TryReadBrokerCredentials, so there is one place to type a secret. -->
+    <DataTemplate DataType="{x:Type forms:AlpacaLoginFormViewModel}"><forms:AlpacaLoginForm /></DataTemplate>
+    <DataTemplate DataType="{x:Type forms:CTraderLoginFormViewModel}"><forms:CTraderLoginForm /></DataTemplate>
+    <DataTemplate DataType="{x:Type forms:IbLoginFormViewModel}"><forms:IbLoginForm /></DataTemplate>
+  </Window.DataTemplates>
+
+  <Window.Styles>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource Background.Surface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border.Brush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="TextBlock.eyebrow">
+      <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.fieldLabel">
+      <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+      <Setter Property="FontSize" Value="10" />
+    </Style>
+    <Style Selector="Border.formNote">
+      <Setter Property="Background" Value="{DynamicResource Background.Primary}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border.Brush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="8" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Foreground" Value="{DynamicResource Bearish.Brush}" />
+      <Setter Property="Background" Value="{DynamicResource Bearish.Soft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Bearish.Brush}" />
+    </Style>
+    <Style Selector="ListBox.table">
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.table ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="TextBlock.colHeader">
+      <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+      <Setter Property="FontSize" Value="9" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.numeric">
+      <Setter Property="FontFamily" Value="{DynamicResource Font.Data}" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+    <!-- ───────── Header + execution-mode banner ───────── -->
+    <Border Grid.Row="0" Background="{DynamicResource Gradient.Chrome}"
+            BorderBrush="{DynamicResource Border.Brush}" BorderThickness="0,0,0,1" Padding="18,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Grid.Column="0" Spacing="4">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="EXECUTION CONSOLE" FontSize="18" FontWeight="Bold"
+                       Foreground="{DynamicResource Text.Header}" />
+            <Border BorderThickness="1" CornerRadius="10" Padding="9,2"
+                    Background="{DynamicResource Warning.Soft}" BorderBrush="{DynamicResource Warning.Brush}"
+                    IsVisible="{Binding !HasLiveExecution}">
+              <TextBlock Text="{Binding ExecutionModeBannerLabel}" FontSize="10" FontWeight="Bold"
+                         Foreground="{DynamicResource Warning.Brush}" />
+            </Border>
+            <Border BorderThickness="1" CornerRadius="10" Padding="9,2"
+                    Background="{DynamicResource Bearish.Soft}" BorderBrush="{DynamicResource Bearish.Brush}"
+                    IsVisible="{Binding HasLiveExecution}">
+              <TextBlock Text="{Binding ExecutionModeBannerLabel}" FontSize="10" FontWeight="Bold"
+                         Foreground="{DynamicResource Bearish.Brush}" />
+            </Border>
+          </StackPanel>
+          <TextBlock Text="{Binding DashboardContextLabel}" Classes="eyebrow" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Content="{Binding BrokersToggleLabel}" Command="{Binding ToggleBrokersCommand}" />
+          <Button Content="New book" Command="{Binding NewBookCommand}" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- ───────── Brokers ───────── -->
+    <Border Grid.Row="1" Classes="card" Margin="14,14,14,0" IsVisible="{Binding AreBrokersExpanded}">
+      <StackPanel Spacing="10">
+        <TextBlock Text="BROKERS" Classes="eyebrow" />
+        <TextBlock Classes="fieldLabel" TextWrapping="Wrap"
+                   Text="Paper is the shipped mode for every venue. Switching one to LIVE needs its own owner flag, real credentials, the exact account ID, and a typed LIVE confirmation stored in the login Keychain. Binance is market data only and never appears here." />
+        <ItemsControl ItemsSource="{Binding ManagedAdapters}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Classes="card" Margin="0,0,0,10">
+                <StackPanel Spacing="8">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                      <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"
+                                 Foreground="{DynamicResource Text.Header}" />
+                      <TextBlock Text="{Binding StatusDetail}" Classes="fieldLabel" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                      <TextBlock Text="{Binding StatusLabel}" VerticalAlignment="Center"
+                                 Foreground="{DynamicResource Text.Secondary}" />
+                      <Border BorderThickness="1" CornerRadius="9" Padding="8,2"
+                              BorderBrush="{DynamicResource Border.Brush}">
+                        <TextBlock Text="{Binding ModeLabel}" FontSize="10" FontWeight="Bold" />
+                      </Border>
+                    </StackPanel>
+                  </Grid>
+                  <ContentControl Content="{Binding LoginForm}" IsVisible="{Binding HasLoginForm}" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Connect" IsEnabled="{Binding CanConnect}"
+                            Command="{Binding $parent[Window].DataContext.ConnectAdapterCommand}"
+                            CommandParameter="{Binding Id}" />
+                    <Button Content="Disconnect" IsEnabled="{Binding CanDisconnect}"
+                            Command="{Binding $parent[Window].DataContext.DisconnectAdapterCommand}"
+                            CommandParameter="{Binding Id}" />
+                    <Button Content="{Binding ModeSwitchLabel}" Classes="danger"
+                            IsEnabled="{Binding CanChangeExecutionMode}"
+                            Command="{Binding $parent[Window].DataContext.SetExecutionModeCommand}"
+                            CommandParameter="{Binding}" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Grid ColumnDefinitions="*,*,*">
+          <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+            <TextBlock Text="Alpaca LIVE account ID" Classes="fieldLabel" />
+            <TextBox Text="{Binding AlpacaLiveAccountId}" Watermark="Required before arming LIVE" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,8,0">
+            <TextBlock Text="cTrader ctidTraderAccountId" Classes="fieldLabel" />
+            <TextBox Text="{Binding CTraderExecutionAccountId}" Watermark="Exact numeric account" />
+          </StackPanel>
+          <StackPanel Grid.Column="2" Spacing="4">
+            <TextBlock Text="Interactive Brokers account ID" Classes="fieldLabel" />
+            <TextBox Text="{Binding InteractiveBrokersAccountId}" Watermark="e.g. DU123456" />
+          </StackPanel>
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <!-- ───────── Books, new book, manual ticket ───────── -->
+    <Grid Grid.Row="2" ColumnDefinitions="320,*" Margin="14">
+      <StackPanel Grid.Column="0" Spacing="10" Margin="0,0,12,0">
+        <Border Classes="card" IsVisible="{Binding IsNewBookOpen}">
+          <StackPanel Spacing="6">
+            <TextBlock Text="NEW BOOK" Classes="eyebrow" />
+            <TextBlock Text="Name" Classes="fieldLabel" />
+            <TextBox Text="{Binding NewBookName}" Watermark="2–48 characters" />
+            <TextBlock Text="Mode" Classes="fieldLabel" />
+            <ComboBox ItemsSource="{Binding AvailableBookModes}" SelectedItem="{Binding SelectedNewBookMode}"
+                      HorizontalAlignment="Stretch" />
+            <TextBlock Text="Strategy (optional)" Classes="fieldLabel" />
+            <ComboBox ItemsSource="{Binding AvailableStrategies}" SelectedItem="{Binding SelectedNewBookStrategy}"
+                      HorizontalAlignment="Stretch" />
+            <StackPanel Spacing="4" IsVisible="{Binding NewBookNeedsBroker}">
+              <TextBlock Text="Broker account (Real)" Classes="fieldLabel" />
+              <ComboBox ItemsSource="{Binding AvailableAdapters}" SelectedItem="{Binding SelectedNewBookAdapter}"
+                        HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding DisplayName}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <Border Classes="formNote">
+                <TextBlock TextWrapping="Wrap" Classes="fieldLabel"
+                           Text="A Real book binds to the connected broker adapter. It still routes PAPER until that venue is independently armed for LIVE." />
+              </Border>
+            </StackPanel>
+            <TextBlock Text="{Binding NewBookError}" TextWrapping="Wrap"
+                       Foreground="{DynamicResource Bearish.Brush}"
+                       IsVisible="{Binding NewBookError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Create" Command="{Binding CreateBookCommand}" />
+              <Button Content="Cancel" Command="{Binding CancelNewBookCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="8">
+            <TextBlock Text="BOOKS" Classes="eyebrow" />
+            <TextBlock Classes="fieldLabel" TextWrapping="Wrap" IsVisible="{Binding !HasBooks}"
+                       Text="No execution books yet. Create one to begin." />
+            <ListBox Classes="table" MaxHeight="280" ItemsSource="{Binding BookEntries}"
+                     SelectedItem="{Binding SelectedBookEntry}">
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Spacing="2" Margin="0,4">
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Summary}" Classes="fieldLabel" />
+                  </StackPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="{Binding IntakeToggleLabel}" Command="{Binding ToggleIntakeCommand}"
+                      IsEnabled="{Binding CanIssueCommands}" />
+              <Button Content="Reconcile" Command="{Binding ReconcileCommand}"
+                      IsEnabled="{Binding CanIssueCommands}" />
+              <Button Content="Kill" Classes="danger" Command="{Binding KillCommand}"
+                      IsEnabled="{Binding CanKill}" />
+            </StackPanel>
+            <TextBlock Text="{Binding LeaseSummary}" Classes="fieldLabel" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+
+      <Grid Grid.Column="1" RowDefinitions="Auto,*">
+        <Border Grid.Row="0" Classes="card" IsVisible="{Binding ShowManualTicket}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="MANUAL TICKET" Classes="eyebrow" />
+            <Grid ColumnDefinitions="2*,*,*,*,*" >
+              <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                <TextBlock Text="Instrument" Classes="fieldLabel" />
+                <ComboBox ItemsSource="{Binding ManualInstruments}"
+                          SelectedItem="{Binding SelectedManualInstrument}"
+                          HorizontalAlignment="Stretch">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding DisplayName}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+              <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,8,0">
+                <TextBlock Text="Side" Classes="fieldLabel" />
+                <ComboBox ItemsSource="{Binding AvailableManualSides}"
+                          SelectedItem="{Binding SelectedManualSide}" HorizontalAlignment="Stretch" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,8,0">
+                <TextBlock Text="Type" Classes="fieldLabel" />
+                <ComboBox ItemsSource="{Binding AvailableManualOrderTypes}"
+                          SelectedItem="{Binding SelectedManualOrderType}" HorizontalAlignment="Stretch" />
+              </StackPanel>
+              <StackPanel Grid.Column="3" Spacing="4" Margin="0,0,8,0">
+                <TextBlock Text="Quantity" Classes="fieldLabel" />
+                <TextBox Text="{Binding ManualQuantityText}" />
+              </StackPanel>
+              <StackPanel Grid.Column="4" Spacing="4">
+                <TextBlock Text="Limit" Classes="fieldLabel" IsVisible="{Binding ManualTicketNeedsLimitPrice}" />
+                <TextBox Text="{Binding ManualLimitPriceText}" IsVisible="{Binding ManualTicketNeedsLimitPrice}" />
+                <TextBlock Text="Stop" Classes="fieldLabel" IsVisible="{Binding ManualTicketNeedsStopPrice}" />
+                <TextBox Text="{Binding ManualStopPriceText}" IsVisible="{Binding ManualTicketNeedsStopPrice}" />
+              </StackPanel>
+            </Grid>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Button Content="Submit order" Command="{Binding SubmitManualOrderCommand}"
+                      IsEnabled="{Binding CanSubmitManualTicket}" />
+              <TextBlock Text="{Binding ManualTicketError}" VerticalAlignment="Center" TextWrapping="Wrap"
+                         Foreground="{DynamicResource Bearish.Brush}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="1" RowDefinitions="*,Auto" Margin="0,10,0,0">
+          <Grid Grid.Row="0" ColumnDefinitions="*,*">
+            <Border Grid.Column="0" Classes="card" Margin="0,0,6,0">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="POSITIONS" Classes="eyebrow" Margin="0,0,0,8" />
+                <Grid DockPanel.Dock="Top"
+                      ColumnDefinitions="1.2*,0.55*,0.7*,0.7*,0.75*,0.7*,0.6*,0.55*"
+                      Margin="0,0,0,4">
+                  <TextBlock Grid.Column="0" Text="INSTRUMENT" Classes="colHeader" />
+                  <TextBlock Grid.Column="1" Text="QTY" Classes="colHeader numeric" />
+                  <TextBlock Grid.Column="2" Text="AVG" Classes="colHeader numeric" />
+                  <TextBlock Grid.Column="3" Text="LAST" Classes="colHeader numeric" />
+                  <TextBlock Grid.Column="4" Text="UNREAL." Classes="colHeader numeric" />
+                  <TextBlock Grid.Column="5" Text="REAL." Classes="colHeader numeric" />
+                  <TextBlock Grid.Column="6" Text="TARGET" Classes="colHeader numeric" />
+                  <TextBlock Grid.Column="7" Text="DRIFT" Classes="colHeader numeric" />
+                </Grid>
+                <ListBox Classes="table" ItemsSource="{Binding Positions}"
+                         AutomationProperties.Name="Execution console positions">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <Grid ColumnDefinitions="1.2*,0.55*,0.7*,0.7*,0.75*,0.7*,0.6*,0.55*" Margin="0,3">
+                        <TextBlock Grid.Column="0" Text="{Binding Instrument}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Text="{Binding RealQuantity}" Classes="numeric" />
+                        <TextBlock Grid.Column="2" Text="{Binding AveragePrice}" Classes="numeric" />
+                        <TextBlock Grid.Column="3" Text="{Binding LastPrice}" Classes="numeric" />
+                        <TextBlock Grid.Column="4" Text="{Binding UnrealizedProfitAndLoss}" Classes="numeric" />
+                        <TextBlock Grid.Column="5" Text="{Binding RealizedProfitAndLoss}" Classes="numeric" />
+                        <TextBlock Grid.Column="6" Text="{Binding TargetQuantity}" Classes="numeric" />
+                        <TextBlock Grid.Column="7" Text="{Binding Delta}" Classes="numeric" />
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </DockPanel>
+            </Border>
+            <Border Grid.Column="1" Classes="card" Margin="6,0,0,0">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="OPEN ORDERS" Classes="eyebrow" Margin="0,0,0,8" />
+                <ListBox Classes="table" ItemsSource="{Binding OpenOrders}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,3">
+                        <TextBlock Grid.Column="0" Text="{Binding Instrument}" />
+                        <TextBlock Grid.Column="1" Text="{Binding Side}" Margin="8,0" />
+                        <TextBlock Grid.Column="2" Text="{Binding Quantity}" Margin="8,0" />
+                        <TextBlock Grid.Column="3" Text="{Binding State}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </DockPanel>
+            </Border>
+          </Grid>
+
+          <Border Grid.Row="1" Classes="card" Margin="0,10,0,0" MaxHeight="160">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,8">
+                <TextBlock Text="DAILY REALIZED P&amp;L" Classes="eyebrow" />
+                <TextBlock Classes="fieldLabel" TextWrapping="Wrap"
+                           Text="Realized-only series from the selected book analytics. Not a full portfolio mark-to-market chart." />
+              </StackPanel>
+              <ListBox Classes="table" ItemsSource="{Binding DailyPnlSeries}"
+                       AutomationProperties.Name="Execution console daily realized PnL">
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,3">
+                      <TextBlock Grid.Column="0"
+                                 Text="{Binding DateUtc, StringFormat={}{0:yyyy-MM-dd}}" />
+                      <TextBlock Grid.Column="1" Classes="numeric"
+                                 Text="{Binding RealizedProfitAndLoss, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </DockPanel>
+          </Border>
+        </Grid>
+      </Grid>
+    </Grid>
+
+    <!-- ───────── Status ───────── -->
+    <Border Grid.Row="3" Background="{DynamicResource Gradient.Chrome}"
+            BorderBrush="{DynamicResource Border.Brush}" BorderThickness="0,1,0,0" Padding="14,6">
+      <Grid ColumnDefinitions="Auto,*">
+        <TextBlock Grid.Column="0" Text="{Binding ConnectionSummary}" Margin="0,0,16,0"
+                   Foreground="{DynamicResource Text.Secondary}" />
+        <TextBlock Grid.Column="1" Text="{Binding OperationMessage}" TextTrimming="CharacterEllipsis" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

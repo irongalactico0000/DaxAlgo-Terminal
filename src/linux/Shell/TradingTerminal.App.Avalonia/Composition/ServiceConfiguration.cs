@@ -53,6 +53,11 @@ using TradingTerminal.UI.Strategies;
 using TradingTerminal.StrategyComposer;
 using TradingTerminal.App.Avalonia.Execution;
 using TradingTerminal.App.Plugins;
+using TradingTerminal.Execution.Alpaca;
+using TradingTerminal.Execution.CTrader;
+using TradingTerminal.Execution.InteractiveBrokers;
+using TradingTerminal.Execution.Mac;
+using TradingTerminal.ExecutionUi;
 using TradingTerminal.UI.Execution;
 
 namespace TradingTerminal.App.Avalonia.Composition;
@@ -108,6 +113,19 @@ public static class ServiceConfiguration
             configuration.GetSection(CTraderOptions.SectionName));
         services.Configure<AlpacaOptions>(
             configuration.GetSection(AlpacaOptions.SectionName));
+        services.PostConfigure<AlpacaOptions>(options =>
+        {
+            var keyId = options.ApiKey ?? string.Empty;
+            var secretKey = options.ApiSecret ?? string.Empty;
+            if (!AlpacaCliLocalCredentialBootstrap.TryMergeMissing(ref keyId, ref secretKey, out var profile))
+                return;
+            options.ApiKey = keyId;
+            options.ApiSecret = secretKey;
+            activityLog.Append(
+                "MarketData",
+                "Information",
+                $"Alpaca market-data ApiKey/ApiSecret seeded from CLI profile '{profile}'.");
+        });
         services.Configure<BinanceOptions>(
             configuration.GetSection(BinanceOptions.SectionName));
         services.Configure<IronBeamOptions>(
@@ -266,13 +284,25 @@ public static class ServiceConfiguration
         services.AddSingleton<IThemeManager, ThemeManager>();
 
         // Persistent Paper books own lazy, account-isolated sessions. The shell acquires the
-        // explicitly selected book for each Console/Runner window; no live adapter is registered.
+        // explicitly selected book for each Console/Runner window.
         services.AddSingleton<IPaperExecutionBookStore, JsonPaperExecutionBookStore>();
         services.AddSingleton<PaperExecutionBookManager>();
         services.AddSingleton<PaperExecutionBooksViewModel>();
         services.AddTransient<PaperExecutionBooksWindow>();
         services.AddTransient<PaperExecutionConsoleWindow>();
         services.AddTransient<PaperStrategyRunnerWindow>();
+
+        // Live-capable Execution Console (Windows parity). Every venue is an independent opt-in
+        // section, Paper is the shipped mode, and LIVE additionally needs that venue's own owner
+        // flag, real credentials, and a typed confirmation persisted in the login Keychain.
+        // The dialog is registered before AddExecutionConsole because that call TryAdds the
+        // fail-closed "refuse every prompt" default for hosts with no UI head.
+        var liveConfirmations = new MacKeychainLiveExecutionConfirmationStore();
+        services.AddSingleton<TradingTerminal.Execution.Oms.ILiveExecutionConfirmationStore>(liveConfirmations);
+        services.AddSingleton<IExecutionConfirmationService, AvaloniaExecutionConfirmationService>();
+        AddGatedVenueExecution(services, configuration, liveConfirmations, activityLog);
+        services.AddExecutionConsole();
+        services.AddTransient<ExecutionConsoleWindow>();
 
         // AI tool VMs (portable — ILogger-only ctors; file I/O via the UiFile seam).
         services.AddTransient<TradingTerminal.Ai.MarketAnalyst.AiAnalystViewModel>();
@@ -319,6 +349,72 @@ public static class ServiceConfiguration
                     hostServices.Add(descriptor);
             })
             .Build();
+    }
+
+    /// <summary>
+    /// Registers each execution venue from its own configuration section. A section that is absent,
+    /// disabled, or refused by its endpoint gate leaves that venue unregistered — the console then
+    /// shows it as unavailable instead of the shell failing to start. Binance is deliberately not
+    /// here: it stays market-data only.
+    /// </summary>
+    private static void AddGatedVenueExecution(
+        IServiceCollection services,
+        IConfiguration configuration,
+        TradingTerminal.Execution.Oms.ILiveExecutionConfirmationStore confirmations,
+        InMemoryLogSink activityLog)
+    {
+        void Register(string venue, Action register)
+        {
+            try
+            {
+                register();
+            }
+            catch (Exception exception)
+            {
+                activityLog.Append(
+                    "Execution",
+                    "Warning",
+                    $"{venue} execution stayed unregistered and can route no orders: {exception.Message}");
+            }
+        }
+
+        Register("Alpaca", () => services.AddAlpacaExecution(
+            options =>
+            {
+                configuration.GetSection(AlpacaExecutionOptions.SectionName).Bind(options);
+                if (AlpacaCliLocalCredentialBootstrap.TryApplyMissing(options, out var profile))
+                {
+                    activityLog.Append(
+                        "Execution",
+                        "Information",
+                        $"Alpaca execution KeyId/SecretKey seeded from CLI profile '{profile}' " +
+                        "(~/.config/alpaca). Brokers-form credentials still override at Connect.");
+                }
+            },
+            confirmationStore: confirmations));
+        Register("cTrader", () => services.AddCTraderExecution(
+            options => configuration.GetSection(CTraderExecutionOptions.SectionName).Bind(options),
+            confirmationStore: confirmations));
+
+        // The IB adapter constructs its native TWS transport eagerly the first time it is resolved,
+        // so registering it without CSharpAPI.dll would take the whole console down at open time
+        // rather than showing one unavailable broker card.
+        var interactiveBrokers = configuration.GetSection(InteractiveBrokersExecutionOptions.SectionName);
+        if (interactiveBrokers.GetValue<bool>(nameof(InteractiveBrokersExecutionOptions.Enabled)) &&
+            Type.GetType("IBApi.EClientSocket, CSharpAPI") is null)
+        {
+            activityLog.Append(
+                "Execution",
+                "Warning",
+                "Interactive Brokers execution is enabled but the TWS API (CSharpAPI.dll) was not " +
+                "resolved at build time. Install the TWS API or set TwsApiClientDll, then rebuild.");
+        }
+        else
+        {
+            Register("Interactive Brokers", () => services.AddInteractiveBrokersExecution(
+                options => interactiveBrokers.Bind(options),
+                confirmationStore: confirmations));
+        }
     }
 
     private static string ResolveLogFilePath(string configuredPath)

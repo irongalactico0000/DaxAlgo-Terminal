@@ -16,6 +16,7 @@ using TradingTerminal.Core.Time;
 using TradingTerminal.Infrastructure.Backtest;
 using TradingTerminal.Sandbox;
 using TradingTerminal.Sandbox.Runtime;
+using TradingTerminal.ExecutionUi;
 using TradingTerminal.UI.Avalonia.Controls.Render;
 using TradingTerminal.UI.Execution;
 using TradingTerminal.UI.Logging;
@@ -82,7 +83,7 @@ public sealed partial class PaperStrategyLegRow : ObservableObject
 
 /// <summary>
 /// Native desktop owner for one canonical SDK kernel, its bounded per-instrument model portfolio, and the
-/// authenticated strategy-target route into the local Paper OMS.
+/// authenticated strategy-target route into the local Paper OMS or a console Real book (broker Paper only).
 /// </summary>
 public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDisposable
 {
@@ -92,20 +93,21 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
     private readonly IClock _clock;
     private readonly InMemoryLogSink _activityLog;
     private readonly PaperExecutionDesktopSession _paper;
-    private readonly string _bookId;
-    private readonly string _bookName;
+    private readonly IExecutionClient? _executionClient;
+    private readonly PaperExecutionBookDefinition? _localPaperBook;
+    private readonly string _defaultBookName;
     private readonly IInstrumentRegistry _instrumentRegistry;
     private readonly IMarketDataIngest? _marketDataIngest;
     private readonly IBrokerSelector? _brokerSelector;
     private SandboxStrategyRuntime? _runtime;
     private SandboxExecutionReplicator? _replicator;
-    private AuthenticatedPaperExecutionBookTargetIntake? _intake;
+    private IExecutionBookTargetIntake? _intake;
     private PaperMarketDataExecutionBridge? _marketBridge;
     private AuthoredUnitFeedLease? _feedLease;
     private int _disposed;
     private int _bookRefreshGeneration;
 
-    public string BookId => _bookId;
+    public string BookId => SelectedBook?.BookId ?? _localPaperBook?.Id ?? _paper.BookId;
 
     public PaperStrategyRunnerViewModel(
         IBacktestStrategyRegistry strategyRegistry,
@@ -119,7 +121,8 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
         IMarketDataIngest? marketDataIngest = null,
         IBrokerSelector? brokerSelector = null,
         StrategyKernelRegistration? initialStrategy = null,
-        IReadOnlyDictionary<string, object?>? initialParameters = null)
+        IReadOnlyDictionary<string, object?>? initialParameters = null,
+        IExecutionClient? executionClient = null)
     {
         ArgumentNullException.ThrowIfNull(strategyRegistry);
         _hub = hub ?? throw new ArgumentNullException(nameof(hub));
@@ -129,8 +132,9 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
         _instrumentRegistry = instrumentRegistry ?? throw new ArgumentNullException(nameof(instrumentRegistry));
         _marketDataIngest = marketDataIngest;
         _brokerSelector = brokerSelector;
-        _bookId = bookDefinition?.Id ?? paper.BookId;
-        _bookName = bookDefinition?.Name ?? paper.BookName;
+        _executionClient = executionClient;
+        _localPaperBook = bookDefinition;
+        _defaultBookName = bookDefinition?.Name ?? paper.BookName;
 
         var boundStrategies = bookDefinition?.Strategies ?? [];
         var registeredLegacyStrategies = strategyRegistry.All
@@ -179,11 +183,14 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
                 ?? Instruments.FirstOrDefault()
             : Instruments.FirstOrDefault();
         SelectCanonicalInstrument();
+        RebuildAvailableBooks();
+        SelectedBook = AvailableBooks.FirstOrDefault(static book => book.CanStart)
+            ?? AvailableBooks.FirstOrDefault();
         StatusText = Strategies.Count == 0
             ? UnsupportedMultiAssetStrategyCount == 0
                 ? "No eligible strategy kernel is registered."
                 : $"No eligible strategy is available; {UnsupportedMultiAssetStrategyCount} legacy multi-asset definition(s) were blocked."
-            : $"Book {_bookName} selected. Review the strategy's canonical asset set, then start the Paper-only runtime.";
+            : $"Book {_defaultBookName} selected. Choose a Paper OMS or broker-Paper Real book, then start.";
         LastMessage = "No strategy order has been sent.";
         UpdateAssetSummary();
         RebuildStrategyLegs();
@@ -191,14 +198,15 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
         ApplyParameterValues(initialParameters);
         if (initialParameters is not null)
         {
-            StatusText = "Backtest-tested parameters loaded. Paper account risk will be evaluated again before every order.";
-            LastMessage = "Review the selected Paper book and press Start when ready.";
+            StatusText = "Backtest-tested parameters loaded. Account risk will be evaluated again before every order.";
+            LastMessage = "Review the selected book and press Start when ready.";
         }
         RefreshCommandState();
     }
 
     public IReadOnlyList<PaperStrategyChoice> Strategies { get; }
     public IReadOnlyList<PaperExecutionInstrumentChoice> Instruments { get; }
+    public ObservableCollection<StrategyRunnerBookChoice> AvailableBooks { get; } = [];
     public int UnsupportedMultiAssetStrategyCount { get; }
     public string StrategyEligibilitySummary => UnsupportedMultiAssetStrategyCount == 0
         ? "Canonical single-asset and pair/basket strategies are eligible when every reviewed feed is available."
@@ -214,6 +222,11 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
     public bool IsStopped => _runtime is null;
     public bool CanSelectInstrument => IsStopped && SelectedStrategy?.CanonicalRegistration is null;
     public bool IsMultiAssetStrategy => StrategyLegs.Count > 1;
+    public string ModeBadgeText => SelectedBook?.BadgeText ?? "PAPER OMS · AUTHENTICATED IPC";
+    public string BookBlockReason => SelectedBook is { CanStart: false, BlockReason: { Length: > 0 } reason }
+        ? reason
+        : string.Empty;
+    public bool HasBookBlockReason => BookBlockReason.Length > 0;
 
     public event EventHandler? FrameRequested;
 
@@ -256,6 +269,9 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
 
     [ObservableProperty]
     private PaperExecutionInstrumentChoice? _selectedInstrument;
+
+    [ObservableProperty]
+    private StrategyRunnerBookChoice? _selectedBook;
 
     [ObservableProperty]
     private bool _isBusy;
@@ -313,17 +329,57 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
         RefreshCommandState();
     }
 
+    partial void OnSelectedBookChanged(StrategyRunnerBookChoice? value)
+    {
+        OnPropertyChanged(nameof(ModeBadgeText));
+        OnPropertyChanged(nameof(BookBlockReason));
+        OnPropertyChanged(nameof(HasBookBlockReason));
+        OnPropertyChanged(nameof(BookId));
+        if (IsStopped)
+        {
+            StatusText = value is null
+                ? "Select a Paper OMS or broker-Paper Real book."
+                : value.CanStart
+                    ? $"Book {value.DisplayName} selected. Review assets, then Start."
+                    : $"Book {value.DisplayName} is blocked: {value.BlockReason}";
+        }
+        RefreshCommandState();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRefreshBooks))]
+    private void RefreshBooks()
+    {
+        var previousId = SelectedBook?.BookId;
+        RebuildAvailableBooks();
+        SelectedBook = AvailableBooks.FirstOrDefault(book =>
+                           string.Equals(book.BookId, previousId, StringComparison.Ordinal))
+                       ?? AvailableBooks.FirstOrDefault(static book => book.CanStart)
+                       ?? AvailableBooks.FirstOrDefault();
+        RefreshCommandState();
+    }
+
+    private bool CanRefreshBooks() => IsStopped && !IsBusy;
+
     [RelayCommand(CanExecute = nameof(CanStart))]
     private async Task StartAsync()
     {
         if (SelectedStrategy is null ||
+            SelectedBook is null ||
             (SelectedStrategy.CanonicalRegistration is null && SelectedInstrument is null)) return;
+        if (!SelectedBook.CanStart)
+        {
+            LastMessage = SelectedBook.BlockReason;
+            return;
+        }
+
         IsBusy = true;
         RefreshCommandState();
         try
         {
             var choice = SelectedStrategy;
+            var boundBook = SelectedBook;
             var strategyId = new StrategyId(choice.Id);
+            EnsureStrategyBoundToBook(boundBook, choice.Id);
             var values = Parameters.ToDictionary(
                 parameter => parameter.Key,
                 parameter => (object?)parameter.Value,
@@ -339,7 +395,7 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
                         !Instruments.Any(choice => choice.InstrumentId == instrument.InstrumentId)))
                 {
                     throw new InvalidOperationException(
-                        "Every reviewed authored-strategy asset must exist in the selected Paper book.");
+                        "Every reviewed authored-strategy asset must exist in the host instrument registry.");
                 }
                 if (_marketDataIngest is null || _brokerSelector is null)
                     throw new InvalidOperationException(
@@ -358,7 +414,7 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
             else if (choice.LegacyOption is { } option)
             {
                 if (SelectedInstrument is null)
-                    throw new InvalidOperationException("A canonical Paper asset must be selected.");
+                    throw new InvalidOperationException("A canonical asset must be selected.");
                 var instrumentParameter = choice.RuntimeSchema.Parameters.Single(parameter =>
                     parameter.Kind == ParameterKind.Instrument);
                 values[instrumentParameter.Key] = SelectedInstrument.InstrumentId;
@@ -375,25 +431,35 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
                 throw new InvalidOperationException("The selected strategy has no runnable kernel factory.");
             }
 
-            _marketBridge = new PaperMarketDataExecutionBridge(
-                _hub,
-                executionInstruments,
-                _paper.Runtime.Venue,
-                _paper.Runtime.Oms,
-                resultObserver: _ => QueueClientRefresh(),
-                faultObserver: fault => Post(() =>
-                {
-                    LastMessage = $"Paper market bridge failed closed: {fault.Reason}";
-                    StatusText = "Strategy execution paused by a Paper market-data fault.";
-                }));
-            _intake = new AuthenticatedPaperExecutionBookTargetIntake(
-                _bookId,
-                strategyId,
-                RunnerStrategyVersion,
-                _paper.Client,
-                _paper,
-                _clock,
-                _marketBridge.TryGetLatestReferencePrice);
+            if (boundBook.Kind == StrategyRunnerBookKind.LocalPaper)
+            {
+                _marketBridge = new PaperMarketDataExecutionBridge(
+                    _hub,
+                    executionInstruments,
+                    _paper.Runtime.Venue,
+                    _paper.Runtime.Oms,
+                    resultObserver: _ => QueueClientRefresh(),
+                    faultObserver: fault => Post(() =>
+                    {
+                        LastMessage = $"Paper market bridge failed closed: {fault.Reason}";
+                        StatusText = "Strategy execution paused by a Paper market-data fault.";
+                    }));
+                _intake = new AuthenticatedPaperExecutionBookTargetIntake(
+                    boundBook.BookId,
+                    strategyId,
+                    RunnerStrategyVersion,
+                    _paper.Client,
+                    _paper,
+                    _clock,
+                    _marketBridge.TryGetLatestReferencePrice);
+            }
+            else
+            {
+                if (_executionClient is null)
+                    throw new InvalidOperationException("The live-capable execution client is unavailable.");
+                _intake = new ExecutionClientTargetIntakeAdapter(_executionClient, boundBook.BookId);
+            }
+
             _runtime = new SandboxStrategyRuntime(
                 kernelFactory,
                 choice.RuntimeSchema,
@@ -414,21 +480,24 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
             _replicator = new SandboxExecutionReplicator(
                 _runtime,
                 _intake,
-                new SandboxExecutionReplicationOptions(_bookId, choice.Id));
+                new SandboxExecutionReplicationOptions(boundBook.BookId, choice.Id));
             _replicator.SubmissionCompleted += OnSubmissionCompleted;
 
             await _runtime.RunAsync().ConfigureAwait(false);
+            var routeLabel = boundBook.Kind == StrategyRunnerBookKind.LocalPaper
+                ? "authenticated IPC to the Paper OMS"
+                : $"OMS Real book '{boundBook.DisplayName}' (broker Paper only)";
             Post(() =>
             {
                 foreach (var snapshot in _runtime.CurrentSnapshots)
                     ApplySnapshot(snapshot);
-                StatusText = "Running · committed model targets replicate through authenticated IPC to the Paper OMS.";
+                StatusText = $"Running · committed model targets replicate through {routeLabel}.";
                 LastMessage = "Strategy started. Waiting for authorized market data and a committed target.";
                 RuntimeState = _runtime.State.ToString();
                 NotifyRuntimeState();
             });
             _activityLog.Append("Paper Strategy", "INFO",
-                $"Started {choice.Name} on {string.Join(", ", StrategyLegs.Select(static leg => leg.Symbol))} in Paper-only mode.");
+                $"Started {choice.Name} on {string.Join(", ", StrategyLegs.Select(static leg => leg.Symbol))} → {boundBook.DisplayName}.");
         }
         catch (Exception exception)
         {
@@ -538,6 +607,7 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
         !IsBusy &&
         _runtime is null &&
         SelectedStrategy is not null &&
+        SelectedBook is { CanStart: true } &&
         (SelectedStrategy.CanonicalRegistration is not null
             ? StrategyLegs.Count > 0
             : SelectedInstrument is not null);
@@ -709,6 +779,23 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
         var generation = Interlocked.Increment(ref _bookRefreshGeneration);
         try
         {
+            if (SelectedBook?.Kind == StrategyRunnerBookKind.ConsoleReal && _executionClient is not null)
+            {
+                if (generation != Volatile.Read(ref _bookRefreshGeneration))
+                    return;
+                var book = _executionClient.GetSnapshot().Books
+                    .FirstOrDefault(item => string.Equals(item.Id, SelectedBook.BookId, StringComparison.Ordinal));
+                if (book is null)
+                    return;
+                Post(() =>
+                {
+                    if (generation != Volatile.Read(ref _bookRefreshGeneration))
+                        return;
+                    ApplyConsoleBookSnapshot(book);
+                });
+                return;
+            }
+
             await _paper.Client.RefreshAsync().ConfigureAwait(false);
             if (generation != Volatile.Read(ref _bookRefreshGeneration))
                 return;
@@ -738,6 +825,28 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
             leg.BookPosition = FormatBookQuantity(quantity);
         }
 
+        ApplyLegBookPositionSummary();
+    }
+
+    private void ApplyConsoleBookSnapshot(ExecutionBookReadModel book)
+    {
+        ArgumentNullException.ThrowIfNull(book);
+        foreach (var leg in StrategyLegs)
+        {
+            var symbol = leg.Symbol;
+            var position = book.Positions.FirstOrDefault(item =>
+                string.Equals(item.Instrument, symbol, StringComparison.OrdinalIgnoreCase) ||
+                item.Instrument.Contains(symbol, StringComparison.OrdinalIgnoreCase));
+            leg.BookPosition = position is null
+                ? "0"
+                : string.IsNullOrWhiteSpace(position.RealQuantity) ? "0" : position.RealQuantity.Trim();
+        }
+
+        ApplyLegBookPositionSummary();
+    }
+
+    private void ApplyLegBookPositionSummary()
+    {
         if (StrategyLegs.Count == 0)
         {
             BookPosition = "0";
@@ -759,6 +868,50 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
         ExecutionNumericBoundary.ToDecimal(quantity)
             .ToString("0.########", CultureInfo.InvariantCulture);
 
+    private void RebuildAvailableBooks()
+    {
+        AvailableBooks.Clear();
+        if (_localPaperBook is not null)
+            AvailableBooks.Add(StrategyRunnerBookChoice.FromLocalPaper(_localPaperBook));
+        else
+        {
+            AvailableBooks.Add(new StrategyRunnerBookChoice(
+                StrategyRunnerBookKind.LocalPaper,
+                _paper.BookId,
+                $"Paper · {_defaultBookName}",
+                "PAPER",
+                IsLive: false,
+                CanStart: true,
+                BlockReason: string.Empty,
+                BoundStrategies: []));
+        }
+
+        if (_executionClient is null)
+            return;
+
+        foreach (var book in _executionClient.GetSnapshot().Books
+                     .OrderBy(static item => item.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            AvailableBooks.Add(StrategyRunnerBookChoice.FromConsoleBook(book));
+        }
+    }
+
+    private static void EnsureStrategyBoundToBook(StrategyRunnerBookChoice book, string strategyId)
+    {
+        if (book.Kind != StrategyRunnerBookKind.ConsoleReal)
+            return;
+        if (book.BoundStrategies.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Real book '{book.DisplayName}' has no bound strategies. Create/bind the strategy id in the Execution Console before Start.");
+        }
+        if (!book.BoundStrategies.Contains(strategyId, StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Strategy '{strategyId}' is not bound to Real book '{book.DisplayName}'. Bind it in the Execution Console, then refresh books.");
+        }
+    }
+
     private async Task CleanupAsync(bool stopRuntime)
     {
         var runtime = Interlocked.Exchange(ref _runtime, null);
@@ -775,7 +928,8 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
             catch { }
         }
         if (replicator is not null) await replicator.DisposeAsync().ConfigureAwait(false);
-        intake?.Dispose();
+        if (intake is IDisposable disposableIntake)
+            disposableIntake.Dispose();
         bridge?.Dispose();
         feedLease?.Dispose();
         if (runtime is not null) await runtime.DisposeAsync().ConfigureAwait(false);
@@ -798,6 +952,7 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
         ResumeCommand.NotifyCanExecuteChanged();
         StopCommand.NotifyCanExecuteChanged();
         RetryTargetCommand.NotifyCanExecuteChanged();
+        RefreshBooksCommand.NotifyCanExecuteChanged();
     }
 
     private static void Post(Action action)
