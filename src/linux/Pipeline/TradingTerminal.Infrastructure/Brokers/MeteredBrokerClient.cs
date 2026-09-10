@@ -54,6 +54,13 @@ public sealed class MeteredBrokerClient : IBrokerClient
         return _inner.RequestHistoricalBarsAsync(contract, barSize, duration, ct);
     }
 
+    public Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
+        Contract contract, BarSize barSize, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default)
+    {
+        _meter.RecordCall(_inner.Kind, nameof(RequestHistoricalBarsAsync));
+        return _inner.RequestHistoricalBarsAsync(contract, barSize, fromUtc, toUtc, ct);
+    }
+
     public IAsyncEnumerable<Bar> SubscribeBarsAsync(
         Contract contract, BarSize barSize, CancellationToken ct = default)
     {

@@ -213,14 +213,25 @@ internal sealed class RealUpstoxClient : IBrokerClient
     public async Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
         Contract contract, BarSize barSize, TimeSpan duration, CancellationToken ct = default)
     {
+        var to = DateTime.UtcNow;
+        var from = to - (duration <= TimeSpan.Zero ? TimeSpan.FromDays(5) : duration);
+        return await RequestHistoricalBarsAsync(contract, barSize, from, to, ct).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
+        Contract contract, BarSize barSize, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default)
+    {
+        if (toUtc <= fromUtc)
+            throw new ArgumentOutOfRangeException(nameof(toUtc), "toUtc must be after fromUtc.");
+
         var key = ToInstrumentKey(contract);
         var interval = ToHistoricalInterval(barSize);
         // Upstox dates are in IST; use the exchange day boundaries.
         var ist = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
-        var nowIst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, ist);
-        var toDate = nowIst.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-        var fromDate = nowIst.Subtract(duration <= TimeSpan.Zero ? TimeSpan.FromDays(5) : duration)
-            .ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var fromIst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc), ist);
+        var toIst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(toUtc, DateTimeKind.Utc), ist);
+        var toDate = toIst.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var fromDate = fromIst.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         var url = $"{BaseUrl}/v2/historical-candle/{Uri.EscapeDataString(key)}/{interval}/{toDate}/{fromDate}";
         try
@@ -231,7 +242,16 @@ internal sealed class RealUpstoxClient : IBrokerClient
             using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
             resp.EnsureSuccessStatusCode();
             var bytes = await resp.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
-            return ParseCandles(bytes);
+            var bars = ParseCandles(bytes);
+            var from = DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc);
+            var to = DateTime.SpecifyKind(toUtc, DateTimeKind.Utc);
+            return bars
+                .Where(bar =>
+                {
+                    var ts = DateTime.SpecifyKind(bar.TimestampUtc, DateTimeKind.Utc);
+                    return ts >= from && ts < to;
+                })
+                .ToArray();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)

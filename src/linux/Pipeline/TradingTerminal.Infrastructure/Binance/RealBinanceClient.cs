@@ -102,17 +102,59 @@ internal sealed class RealBinanceClient : IBrokerClient
     public async Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
         Contract contract, BarSize barSize, TimeSpan duration, CancellationToken ct = default)
     {
+        var to = DateTime.UtcNow;
+        var from = to - duration;
+        return await RequestHistoricalBarsAsync(contract, barSize, from, to, ct).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
+        Contract contract, BarSize barSize, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default)
+    {
+        if (toUtc <= fromUtc)
+            throw new ArgumentOutOfRangeException(nameof(toUtc), "toUtc must be after fromUtc.");
+
         var symbol = contract.Symbol.Trim().ToUpperInvariant();
         var interval = MapInterval(barSize);
         var step = barSize.ToTimeSpan();
-        var limit = Math.Clamp((int)Math.Ceiling(duration / step), 1, 1000);
+        var from = DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc);
+        var to = DateTime.SpecifyKind(toUtc, DateTimeKind.Utc);
+        var startMs = new DateTimeOffset(from).ToUnixTimeMilliseconds();
+        var endMs = new DateTimeOffset(to).ToUnixTimeMilliseconds();
+        var bars = new List<Bar>();
+        var cursor = startMs;
 
-        var url = $"{_options.RestBaseUrl}/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}";
-        using var resp = await _http.GetAsync(url, ct).ConfigureAwait(false);
-        resp.EnsureSuccessStatusCode();
-        var bytes = await resp.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
-        using var doc = JsonDocument.Parse(bytes);
-        return ParseHistoricalKlines(doc.RootElement, _options.SizeScale);
+        // Binance klines: startTime/endTime + limit≤1000; page forward by open time.
+        while (cursor < endMs && !ct.IsCancellationRequested)
+        {
+            var url =
+                $"{_options.RestBaseUrl}/api/v3/klines?symbol={symbol}&interval={interval}" +
+                $"&startTime={cursor}&endTime={endMs}&limit=1000";
+            using var resp = await _http.GetAsync(url, ct).ConfigureAwait(false);
+            resp.EnsureSuccessStatusCode();
+            var bytes = await resp.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(bytes);
+            var page = ParseHistoricalKlines(doc.RootElement, _options.SizeScale);
+            if (page.Count == 0)
+                break;
+
+            foreach (var bar in page)
+            {
+                var ts = DateTime.SpecifyKind(bar.TimestampUtc, DateTimeKind.Utc);
+                if (ts >= from && ts < to)
+                    bars.Add(bar);
+            }
+
+            var lastOpen = page[^1].TimestampUtc;
+            var next = new DateTimeOffset(DateTime.SpecifyKind(lastOpen, DateTimeKind.Utc))
+                .ToUnixTimeMilliseconds() + (long)step.TotalMilliseconds;
+            if (next <= cursor)
+                break;
+            cursor = next;
+            if (page.Count < 1000)
+                break;
+        }
+
+        return bars;
     }
 
     public IAsyncEnumerable<Bar> SubscribeBarsAsync(

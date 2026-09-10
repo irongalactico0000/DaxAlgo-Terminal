@@ -258,12 +258,23 @@ public sealed class RealCTraderClient : IBrokerClient
     public async Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
         Contract contract, BarSize barSize, TimeSpan duration, CancellationToken ct = default)
     {
+        var to = DateTime.UtcNow;
+        var from = to - duration;
+        return await RequestHistoricalBarsAsync(contract, barSize, from, to, ct).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
+        Contract contract, BarSize barSize, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default)
+    {
         if (_client is null) throw new InvalidOperationException("Not connected.");
+        if (toUtc <= fromUtc)
+            throw new ArgumentOutOfRangeException(nameof(toUtc), "toUtc must be after fromUtc.");
+
         var symbol = await ResolveSymbolAsync(contract.Symbol, ct).ConfigureAwait(false);
 
         var period = MapPeriod(barSize);
-        var toMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        var fromMs = toMs - (long)duration.TotalMilliseconds;
+        var toMs = new DateTimeOffset(DateTime.SpecifyKind(toUtc, DateTimeKind.Utc)).ToUnixTimeMilliseconds();
+        var fromMs = new DateTimeOffset(DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc)).ToUnixTimeMilliseconds();
 
         var res = await SendAndAwaitAsync<ProtoOAGetTrendbarsRes>(
             new ProtoOAGetTrendbarsReq

@@ -129,6 +129,57 @@ public sealed class MarketDataRepository : IMarketDataRepository
         return fresh;
     }
 
+    public async Task<IReadOnlyList<Bar>> GetHistoricalBarsAsync(
+        Contract contract,
+        BrokerKind broker,
+        BarSize barSize,
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken ct = default)
+    {
+        if (toUtc <= fromUtc)
+            throw new ArgumentOutOfRangeException(nameof(toUtc), "toUtc must be after fromUtc.");
+
+        var client = RequireCapability(
+            broker,
+            static capabilities => capabilities.SupportsHistoricalBars,
+            "historical bars");
+
+        var from = DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc);
+        var to = DateTime.SpecifyKind(toUtc, DateTimeKind.Utc);
+        var instrumentId = _ingest.Resolve(contract, broker);
+
+        var cached = new List<Bar>();
+        await foreach (var bar in _store.ReadBarsAsync(instrumentId, barSize, from, to, broker, ct)
+                           .ConfigureAwait(false))
+        {
+            cached.Add(bar.ToBar());
+        }
+
+        // Require at least one bar and coverage that reaches near both ends of the window
+        // (half a bar-width slack) before treating the store as authoritative.
+        var barSpan = barSize.ToTimeSpan();
+        var slack = TimeSpan.FromTicks(Math.Max(1, barSpan.Ticks / 2));
+        if (cached.Count > 0 &&
+            cached[0].TimestampUtc <= from + slack &&
+            cached[^1].TimestampUtc >= to - barSpan - slack)
+        {
+            _logger.LogDebug(
+                "Historical {Symbol} {Size} range {From:u}→{To:u} cache-hit ({Count} bars, source {Broker})",
+                contract.Symbol, barSize.ToDisplayString(), from, to, cached.Count, broker);
+            return cached;
+        }
+
+        _logger.LogDebug(
+            "Historical {Symbol} {Size} range {From:u}→{To:u} cache-miss → broker {Broker} (cached={Cached})",
+            contract.Symbol, barSize.ToDisplayString(), from, to, broker, cached.Count);
+        var fresh = await client.RequestHistoricalBarsAsync(contract, barSize, from, to, ct)
+            .ConfigureAwait(false);
+        foreach (var bar in fresh)
+            _store.EnqueueBar(OhlcvBar.FromBar(bar, instrumentId, barSize, broker, isFinal: true));
+        return fresh;
+    }
+
     public async IAsyncEnumerable<Bar> SubscribeBarsAsync(
         Contract contract, BrokerKind broker, BarSize barSize,
         [EnumeratorCancellation] CancellationToken ct = default)

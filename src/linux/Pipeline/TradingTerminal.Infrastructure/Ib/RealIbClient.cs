@@ -128,15 +128,35 @@ public sealed class RealIbClient : IBApi.DefaultEWrapper, IBrokerClient
     public Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
         Contract contract, BarSize barSize, TimeSpan duration, CancellationToken ct = default)
     {
+        var to = DateTime.UtcNow;
+        var from = to - duration;
+        return RequestHistoricalBarsAsync(contract, barSize, from, to, ct);
+    }
+
+    public Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
+        Contract contract, BarSize barSize, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default)
+    {
         if (_client?.IsConnected() != true) throw new InvalidOperationException("Not connected.");
+        if (toUtc <= fromUtc)
+            throw new ArgumentOutOfRangeException(nameof(toUtc), "toUtc must be after fromUtc.");
+
+        var from = DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc);
+        var to = DateTime.SpecifyKind(toUtc, DateTimeKind.Utc);
+        var duration = to - from;
+        if (duration < TimeSpan.FromMinutes(1))
+            duration = TimeSpan.FromMinutes(1);
+
         var reqId = Interlocked.Increment(ref _nextRequestId);
         var tcs = new TaskCompletionSource<IReadOnlyList<Bar>>(TaskCreationOptions.RunContinuationsAsynchronously);
         var req = new HistoricalRequest(tcs);
         lock (_gate) _historical[reqId] = req;
 
         var ibContract = ToIbContract(contract);
+        // IB: endDateTime + durationStr. Empty endDateTime means "now"; for past windows
+        // pass an explicit UTC end so the range is not silently shifted to the present.
+        var endDateTime = to.ToString("yyyyMMdd-HH:mm:ss", CultureInfo.InvariantCulture) + " UTC";
         _client.reqHistoricalData(reqId, ibContract,
-            endDateTime: string.Empty,
+            endDateTime: endDateTime,
             durationStr: ToIbDuration(duration),
             barSizeSetting: barSize.ToIbString(),
             whatToShow: "TRADES",
@@ -152,7 +172,20 @@ public sealed class RealIbClient : IBApi.DefaultEWrapper, IBrokerClient
             lock (_gate) _historical.Remove(reqId);
         });
 
-        return tcs.Task;
+        return FilterBarsAsync(tcs.Task, from, to);
+    }
+
+    private static async Task<IReadOnlyList<Bar>> FilterBarsAsync(
+        Task<IReadOnlyList<Bar>> task, DateTime fromUtc, DateTime toUtc)
+    {
+        var bars = await task.ConfigureAwait(false);
+        return bars
+            .Where(bar =>
+            {
+                var ts = DateTime.SpecifyKind(bar.TimestampUtc, DateTimeKind.Utc);
+                return ts >= fromUtc && ts < toUtc;
+            })
+            .ToArray();
     }
 
     public async IAsyncEnumerable<Bar> SubscribeBarsAsync(

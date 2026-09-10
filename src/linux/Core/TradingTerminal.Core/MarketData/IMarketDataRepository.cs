@@ -36,6 +36,18 @@ public interface IMarketDataRepository
         CancellationToken ct = default);
 
     /// <summary>
+    /// Cache-first historical bars for an explicit UTC window
+    /// [<paramref name="fromUtc"/>, <paramref name="toUtc"/>). Prefer this for Charts From/To.
+    /// </summary>
+    Task<IReadOnlyList<Bar>> GetHistoricalBarsAsync(
+        Contract contract,
+        BrokerKind broker,
+        BarSize barSize,
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Streaming bars from <paramref name="broker"/>. The sequence completes when
     /// <paramref name="ct"/> is cancelled or the connection is permanently lost. If the broker is
     /// not currently connected, the call throws <see cref="InvalidOperationException"/>. If this

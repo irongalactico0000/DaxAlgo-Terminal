@@ -174,6 +174,53 @@ public sealed class MarketDataRepositoryTests
     }
 
     [Fact]
+    public async Task GetHistoricalBars_range_fetches_via_from_to_overload()
+    {
+        var contract = Contract.UsStock("AAPL");
+        var instrumentId = new InstrumentId(7);
+        var size = BarSize.OneMinute;
+        var from = DateTime.UtcNow.AddDays(-10);
+        var to = from.AddDays(2);
+
+        var ingest = Substitute.For<IMarketDataIngest>();
+        ingest.Resolve(contract, TestBroker).Returns(instrumentId);
+        var hub = new MarketDataHub();
+        var store = Substitute.For<IMarketDataStore>();
+        store.ReadBarsAsync(instrumentId, size, from, to, TestBroker, Arg.Any<CancellationToken>())
+             .Returns(EmptyAsync<OhlcvBar>());
+
+        var client = Substitute.For<IBrokerClient>();
+        client.Kind.Returns(TestBroker);
+        client.ConnectionState.Returns(new BehaviorSubject<ConnectionState>(ConnectionState.Connected));
+        var freshBars = new[]
+        {
+            new Bar(from.AddHours(1), 100, 101, 99.5, 100.5, 10),
+            new Bar(from.AddHours(2), 100.5, 102, 100.2, 101.7, 12),
+        };
+        client.RequestHistoricalBarsAsync(contract, size, from, to, Arg.Any<CancellationToken>())
+              .Returns(freshBars);
+
+        var selector = new StubBrokerSelector(client);
+        var repo = new MarketDataRepository(
+            selector, new ImmediateDispatcher(),
+            ingest, hub, store,
+            NullLogger<MarketDataRepository>.Instance);
+
+        var bars = await repo.GetHistoricalBarsAsync(contract, TestBroker, size, from, to);
+
+        bars.Should().BeEquivalentTo(freshBars);
+        await client.Received(1).RequestHistoricalBarsAsync(contract, size, from, to, Arg.Any<CancellationToken>());
+        store.Received(2).EnqueueBar(Arg.Is<OhlcvBar>(b =>
+            b.InstrumentId == instrumentId && b.Size == size && b.IsFinal));
+    }
+
+    private static async IAsyncEnumerable<T> EmptyAsync<T>()
+    {
+        await Task.CompletedTask;
+        yield break;
+    }
+
+    [Fact]
     public async Task GetHistoricalBars_refetches_when_cache_is_stale()
     {
         var contract = Contract.UsStock("AAPL");

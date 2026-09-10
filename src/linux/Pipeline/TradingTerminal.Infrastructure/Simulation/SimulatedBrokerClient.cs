@@ -31,6 +31,7 @@ internal sealed class SimulatedBrokerClient : IBrokerClient
     private readonly SimulatedBrokerOptions _options;
     private readonly ILogger<SimulatedBrokerClient> _logger;
     private readonly BehaviorSubject<ConnectionState> _state = new(Core.Domain.ConnectionState.Disconnected);
+    private int _disposed;
 
     public SimulatedBrokerClient(
         IMarketDataStore store,
@@ -85,34 +86,51 @@ internal sealed class SimulatedBrokerClient : IBrokerClient
     public async Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
         Contract contract, BarSize barSize, TimeSpan duration, CancellationToken ct = default)
     {
+        var to = DateTime.UtcNow;
+        var from = to - duration;
+        return await RequestHistoricalBarsAsync(contract, barSize, from, to, ct).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
+        Contract contract, BarSize barSize, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default)
+    {
+        if (toUtc <= fromUtc)
+            throw new ArgumentOutOfRangeException(nameof(toUtc), "toUtc must be after fromUtc.");
+
+        var from = DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc);
+        var to = DateTime.SpecifyKind(toUtc, DateTimeKind.Utc);
         var step = barSize.ToTimeSpan();
-        var count = Math.Clamp((int)(duration.Ticks / Math.Max(1, step.Ticks)), 1, 1000);
+        const int maxSyntheticBars = 5000;
+        var needed = (int)((to - from).Ticks / Math.Max(1, step.Ticks));
+        if (needed > maxSyntheticBars)
+        {
+            throw new InvalidOperationException(
+                $"Simulated history needs {needed} {barSize} bars for the requested window " +
+                $"(max {maxSyntheticBars}). Narrow From/To or use a coarser bar size.");
+        }
+
+        var count = Math.Max(1, needed);
 
         if (_options.Mode == SimulatedFeedMode.Replay && ResolveStored(contract) is { } id)
         {
-            var stored = await _store.GetRecentBarsAsync(id, barSize, count, source: null, ct).ConfigureAwait(false);
-            if (stored.Count > 0)
-            {
-                var asBars = stored.Select(b => b.ToBar()).ToList();
-                // Calm stored DevSim series never trips research gallery thresholds — fall through
-                // to synthetic history with planted demo jumps when no ±5% close move exists.
-                if (HasCloseToCloseMove(asBars, threshold: 0.05))
-                    return asBars;
-            }
+            var stored = new List<Bar>();
+            await foreach (var bar in _store.ReadBarsAsync(id, barSize, from, to, source: null, ct)
+                               .ConfigureAwait(false))
+                stored.Add(bar.ToBar());
+
+            if (stored.Count > 0 && HasCloseToCloseMove(stored, threshold: 0.05))
+                return stored;
 
             _logger.LogInformation(
                 "Simulated replay: stored {Size} bars for {Symbol} lack research-sized moves; serving synthetic history with demo jumps.",
                 barSize, contract.Symbol);
         }
 
-        // Synthetic history: walk backwards from now so the series ends at the current bar.
-        // Inject a few deterministic ±6% closes so research gallery (+5% / pre-crash) can find
-        // events on DevSim — calm SyntheticVolatility alone never crosses those thresholds.
+        // Synthetic history anchored to the requested window (not "ending now").
         var walk = NewWalk(contract.Symbol, "histbars");
         var bars = new List<Bar>(count);
-        var end = DateTime.UtcNow;
-        for (var i = count - 1; i >= 0; i--)
-            bars.Add(walk.NextBar(end - step * i, _options.SyntheticVolatility));
+        for (var i = 0; i < count; i++)
+            bars.Add(walk.NextBar(from + step * i, _options.SyntheticVolatility));
         InjectResearchDemoOutcomeJumps(bars, unchecked(_options.Seed ^ contract.Symbol.GetHashCode()));
         return bars;
     }
@@ -466,8 +484,23 @@ internal sealed class SimulatedBrokerClient : IBrokerClient
 
     public ValueTask DisposeAsync()
     {
-        _state.OnCompleted();
-        _state.Dispose();
+        // Host Exit + last-window Close can dispose DI scope more than once during smoke shutdown.
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return ValueTask.CompletedTask;
+
+        try
+        {
+            if (!_state.IsDisposed)
+            {
+                _state.OnCompleted();
+                _state.Dispose();
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            // Concurrent teardown already completed the subject.
+        }
+
         return ValueTask.CompletedTask;
     }
 

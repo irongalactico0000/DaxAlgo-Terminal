@@ -44,6 +44,43 @@ public interface IBrokerClient : IAsyncDisposable
         TimeSpan duration,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Historical bars for <paramref name="contract"/> over
+    /// [<paramref name="fromUtc"/>, <paramref name="toUtc"/>), oldest first.
+    /// Preferred for Charts explicit From/To research windows.
+    /// Default covers back to <paramref name="fromUtc"/> via the duration-ending-now API
+    /// then filters — venues with native range APIs should override.
+    /// </summary>
+    async Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
+        Contract contract,
+        BarSize barSize,
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken ct = default)
+    {
+        if (toUtc <= fromUtc)
+            throw new ArgumentOutOfRangeException(nameof(toUtc), "toUtc must be after fromUtc.");
+
+        var from = DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc);
+        var to = DateTime.SpecifyKind(toUtc, DateTimeKind.Utc);
+        var window = to - from;
+        var coverFromNow = DateTime.UtcNow - from;
+        if (coverFromNow < TimeSpan.FromMinutes(1))
+            coverFromNow = window;
+        var cover = coverFromNow > window ? coverFromNow : window;
+        if (cover < TimeSpan.FromMinutes(1))
+            cover = TimeSpan.FromMinutes(1);
+
+        var bars = await RequestHistoricalBarsAsync(contract, barSize, cover, ct).ConfigureAwait(false);
+        return bars
+            .Where(bar =>
+            {
+                var ts = DateTime.SpecifyKind(bar.TimestampUtc, DateTimeKind.Utc);
+                return ts >= from && ts < to;
+            })
+            .ToArray();
+    }
+
     IAsyncEnumerable<Bar> SubscribeBarsAsync(
         Contract contract,
         BarSize barSize,

@@ -238,6 +238,18 @@ public sealed class RealAlpacaClient : IBrokerClient
         EnsureConnected();
         var to = DateTime.UtcNow;
         var from = to - duration;
+        return await RequestHistoricalBarsAsync(contract, barSize, from, to, ct).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<Bar>> RequestHistoricalBarsAsync(
+        Contract contract, BarSize barSize, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default)
+    {
+        EnsureConnected();
+        if (toUtc <= fromUtc)
+            throw new ArgumentOutOfRangeException(nameof(toUtc), "toUtc must be after fromUtc.");
+
+        var from = DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc);
+        var to = DateTime.SpecifyKind(toUtc, DateTimeKind.Utc);
         var timeFrame = MapBarSize(barSize);
         var assetClass = ClassifyAsset(contract);
 
