@@ -2,11 +2,13 @@ using TradingTerminal.Core.Strategies.Generation;
 
 namespace TradingTerminal.Charts;
 
-/// <summary>The two mutually exclusive left-drag behaviors supported by the native chart.</summary>
+/// <summary>The mutually exclusive left-drag / click behaviors supported by the native chart.</summary>
 public enum ChartInteractionMode
 {
     Pan,
     SelectResearchRange,
+    PlaceStop,
+    PlaceTarget,
 }
 
 /// <summary>A half-open UTC range selected over completed chart bars.</summary>
@@ -32,6 +34,18 @@ public sealed class ChartRangeSelectedEventArgs(ChartTimeRange range) : EventArg
 public sealed class ResearchChartSelectionRequestedEventArgs(ResearchChartSelectionV1 selection) : EventArgs
 {
     public ResearchChartSelectionV1 Selection { get; } = selection ?? throw new ArgumentNullException(nameof(selection));
+}
+
+/// <summary>Host handoff for a chart-authored strategy draft (stop/target levels). Not an order path.</summary>
+public sealed class StrategyDraftRequestedEventArgs(StrategyDraftV1 draft) : EventArgs
+{
+    public StrategyDraftV1 Draft { get; } = draft ?? throw new ArgumentNullException(nameof(draft));
+}
+
+/// <summary>Price click while Place STOP/TARGET mode is armed.</summary>
+public sealed class ChartPriceClickedEventArgs(decimal price) : EventArgs
+{
+    public decimal Price { get; } = price;
 }
 
 /// <summary>Maps a horizontal drag over the visible candle window to a half-open range.</summary>

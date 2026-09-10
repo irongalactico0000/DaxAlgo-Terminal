@@ -1165,6 +1165,25 @@
                       <Border Background="{StaticResource Background.Elevated}"
                               BorderBrush="{StaticResource Border.Brush}" BorderThickness="1"
                               CornerRadius="5" Padding="9,8"
+                              IsVisible="{Binding HasStrategyDraft}"
+                              AutomationProperties.Name="Chart strategy draft summary">
+                        <StackPanel Spacing="6">
+                          <TextBlock Text="CHART STRATEGY DRAFT" Classes="eyebrow" />
+                          <TextBlock Text="{Binding StrategyDraftSummaryText}"
+                                     Classes="caption" TextWrapping="Wrap"
+                                     AutomationProperties.Name="Strategy draft summary" />
+                          <TextBlock Text="Stop/target from Charts. Unlocked draft only — Confirm / generate still owns TradeIR. Never places orders."
+                                     Classes="caption" TextWrapping="Wrap" />
+                          <Button Classes="ghost" Content="Clear draft"
+                                  HorizontalAlignment="Left"
+                                  Command="{Binding ClearStrategyDraftCommand}"
+                                  AutomationProperties.Name="Clear chart strategy draft" />
+                        </StackPanel>
+                      </Border>
+
+                      <Border Background="{StaticResource Background.Elevated}"
+                              BorderBrush="{StaticResource Border.Brush}" BorderThickness="1"
+                              CornerRadius="5" Padding="9,8"
                               IsVisible="{Binding HasResearchOutcomeGalleryResult}"
                               AutomationProperties.Name="Research outcome gallery">
                         <StackPanel Spacing="6">

@@ -143,6 +143,20 @@ public sealed class AuthoredChartChoiceCatalogV1Tests
     }
 
     [Fact]
+    public void Default_research_capture_overlay_ids_are_ema_rsi_atr()
+    {
+        Assert.Equal(
+            ["ema-20", "rsi-14", "atr-14"],
+            NativeChartOverlaySelectionV1.DefaultResearchCaptureOverlayIds);
+        var state = NativeChartOverlaySelectionV1.FromHostOverlayIds(
+            NativeChartOverlaySelectionV1.DefaultResearchCaptureOverlayIds);
+        Assert.True(state.ShowEma);
+        Assert.Equal(20, state.EmaPeriod);
+        Assert.True(state.ShowRsi);
+        Assert.True(state.ShowAtr);
+    }
+
+    [Fact]
     public void User_indicator_json_merges_into_catalog()
     {
         var user = UserChartIndicatorCatalogV1.Parse(

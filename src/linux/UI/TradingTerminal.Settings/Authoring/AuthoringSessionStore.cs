@@ -71,7 +71,9 @@ public sealed record AuthoringSessionSnapshot(
     IReadOnlyList<ChartPatternSelectionV1>? ChartPatternSelections = null,
     string? StrategyWorkspaceJson = null,
     string? ResearchDatasetJson = null,
-    string? ResearchExperimentJson = null)
+    string? ResearchExperimentJson = null,
+    /// <summary>Optional chart-authored strategy draft (stop/target). Unlocked drafts are not TradeIR.</summary>
+    string? StrategyDraftJson = null)
 {
     public const int CurrentAuthoringUxVersion = 3;
 

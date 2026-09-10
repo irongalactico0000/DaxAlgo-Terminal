@@ -2923,7 +2923,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             HostChartOverlayPreviewRequested?.Invoke(
                 this,
                 new HostChartOverlayPreviewRequestedEventArgs(
-                    new[] { "ema-20", "rsi-14", "atr-14" },
+                    NativeChartOverlaySelectionV1.DefaultResearchCaptureOverlayIds,
                     startResearchCapture: false,
                     preferredSymbol: match.CanonicalSymbol,
                     galleryMatch: match));
@@ -3425,6 +3425,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             ChartPatternSelections.Clear();
             ResearchDatasetDefinition = null;
             PendingResearchChartSelection = null;
+            PendingStrategyDraft = null;
             AuthoredUnitSpecification = null;
             OnPropertyChanged(nameof(HasChartReferences));
             OnPropertyChanged(nameof(HasChartReferenceInspections));
@@ -3617,6 +3618,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
             AuthoredUnitSpecification = RestoreAuthoredUnitSpecification(session, ChartReferences, ref restoreWarning);
             RestoreResearchDataset(session, ref restoreWarning);
             RestoreResearchExperiment(session, ref restoreWarning);
+            RestoreStrategyDraft(session, ref restoreWarning);
             ClearCandidate();
             _fourLaneStrategyBrief = !string.IsNullOrWhiteSpace(session.FourLaneStrategyBrief) ||
                                      !string.IsNullOrWhiteSpace(session.ParallelCandidateBatchJson)
@@ -3924,7 +3926,8 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
     {
         if (_restoring || !_ready || string.IsNullOrWhiteSpace(StrategyId)) return;
         if (Messages.Count == 0 && !_filesEditedByUser && StrategyIntentDraft is null &&
-            ChartReferences.Count == 0 && AuthoredUnitSpecification is null && ResearchDatasetDefinition is null)
+            ChartReferences.Count == 0 && AuthoredUnitSpecification is null && ResearchDatasetDefinition is null &&
+            PendingStrategyDraft is null)
             return;   // nothing worth a file yet
 
         SynchronizeStrategyWorkspace();
@@ -3983,7 +3986,10 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
                 : ResearchDatasetCanonicalJsonV1.Serialize(ResearchDatasetDefinition),
             ResearchExperimentJson: ResearchExperimentEvidence is null
                 ? null
-                : ResearchExperimentCanonicalJsonV1.Serialize(ResearchExperimentEvidence));
+                : ResearchExperimentCanonicalJsonV1.Serialize(ResearchExperimentEvidence),
+            StrategyDraftJson: PendingStrategyDraft is null
+                ? null
+                : StrategyDraftCanonicalJsonV1.Serialize(PendingStrategyDraft));
 
         if (!_sessionRepository.Save(snapshot))
         {

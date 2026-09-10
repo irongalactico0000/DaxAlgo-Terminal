@@ -47,6 +47,7 @@ public partial class ChartsPanel : UserControl
         Loaded += OnLoaded;
         DataContextChanged += OnDataContextChanged;
         _surface.ResearchRangeSelected += OnResearchRangeSelected;
+        _surface.PriceClicked += OnPriceClicked;
     }
 
     private void OnLoaded(object? sender, RoutedEventArgs e)
@@ -138,11 +139,19 @@ public partial class ChartsPanel : UserControl
     private void OnResearchRangeSelected(object? sender, ChartRangeSelectedEventArgs e) =>
         _viewModel?.SelectResearchRange(e.Range);
 
+    private void OnPriceClicked(object? sender, ChartPriceClickedEventArgs e) =>
+        _viewModel?.ApplyClickedDraftPrice(e.Price);
+
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(ChartsViewModel.IsResearchRangeSelectionEnabled) or
             nameof(ChartsViewModel.ResearchObservationRange) or
-            nameof(ChartsViewModel.ResearchOutcomeRange))
+            nameof(ChartsViewModel.ResearchOutcomeRange) or
+            nameof(ChartsViewModel.DraftPlacementMode) or
+            nameof(ChartsViewModel.DraftStopPrice) or
+            nameof(ChartsViewModel.DraftTargetPrice) or
+            nameof(ChartsViewModel.DraftStopPriceText) or
+            nameof(ChartsViewModel.DraftTargetPriceText))
         {
             if (Dispatcher.UIThread.CheckAccess()) ApplySurfaceInteractionState();
             else Dispatcher.UIThread.Post(ApplySurfaceInteractionState);
@@ -151,11 +160,18 @@ public partial class ChartsPanel : UserControl
 
     private void ApplySurfaceInteractionState()
     {
-        _surface.InteractionMode = _viewModel?.IsResearchRangeSelectionEnabled == true
-            ? ChartInteractionMode.SelectResearchRange
-            : ChartInteractionMode.Pan;
+        if (_viewModel?.IsResearchRangeSelectionEnabled == true)
+            _surface.InteractionMode = ChartInteractionMode.SelectResearchRange;
+        else if (_viewModel is not null &&
+                 _viewModel.DraftPlacementMode is ChartInteractionMode.PlaceStop or ChartInteractionMode.PlaceTarget)
+            _surface.InteractionMode = _viewModel.DraftPlacementMode;
+        else
+            _surface.InteractionMode = ChartInteractionMode.Pan;
+
         _surface.ObservationRange = _viewModel?.ResearchObservationRange;
         _surface.OutcomeRange = _viewModel?.ResearchOutcomeRange;
+        _surface.DraftStopPrice = _viewModel?.DraftStopPrice;
+        _surface.DraftTargetPrice = _viewModel?.DraftTargetPrice;
     }
 
     private async void ExportPng_Click(object? sender, RoutedEventArgs e)
@@ -206,6 +222,7 @@ public partial class ChartsPanel : UserControl
         _host = null;
         Unbind();
         _surface.ResearchRangeSelected -= OnResearchRangeSelected;
+        _surface.PriceClicked -= OnPriceClicked;
         Loaded -= OnLoaded;
         DataContextChanged -= OnDataContextChanged;
     }

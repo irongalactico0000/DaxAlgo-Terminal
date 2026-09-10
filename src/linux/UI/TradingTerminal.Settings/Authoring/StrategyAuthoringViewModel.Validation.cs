@@ -25,6 +25,34 @@ public sealed partial class StrategyAuthoringViewModel
         : $"Validated {HistoricalValidationEvidence!.FromUtc:u} → {HistoricalValidationEvidence.ToUtc:u} · " +
           $"{HistoricalValidationEvidence.TradeCount} trades · {HistoricalValidationEvidence.DataMode}.";
 
+    /// <summary>
+    /// Actionable blocker for Charts shell ⑤ / Validate. Lock draft ≠ historical-ready.
+    /// </summary>
+    public string DescribeHistoricalValidationBlocker()
+    {
+        if (IsGenerating)
+            return "Wait for generation to finish before historical validation.";
+        if (IsRegistered &&
+            AuthoredUnitSpecification is not null &&
+            StrategyWorkspace.Bindings.BuildArtifactHashSha256 is not null &&
+            StrategyWorkspace.Bindings.AuthoredUnitSpecificationHashSha256 is not null)
+        {
+            var registration = _strategyKernelRegistry?.Find(AuthoredUnitSpecification.UnitId);
+            if (registration is null)
+                return "The compiled unit is not in the strategy registry. Confirm Register again, then retry Historical BT.";
+            return string.Empty;
+        }
+
+        if (!CanCompileCurrentSource && AuthoredUnitSpecification is null)
+            return "Historical BT needs a compiled authored unit. In Builder: generate/lower to C# → Compile → Register, then retry Historical BT. (TradeIR smoke ≠ historical.)";
+        if (CanCompileCurrentSource && !IsRegistered)
+            return "Compile and Confirm Register in Builder (Build/Review), then retry Historical BT from Charts.";
+        if (IsRegistered && StrategyWorkspace.Bindings.BuildArtifactHashSha256 is null)
+            return "Registration is incomplete (missing build artifact hash). Re-compile and Register, then retry.";
+
+        return "Compile, review, and register this exact authored strategy before historical validation.";
+    }
+
     public bool TryCreateHistoricalValidationContext(
         out HistoricalValidationContextV1? context,
         out string reason)
@@ -35,7 +63,9 @@ public sealed partial class StrategyAuthoringViewModel
         if (!IsRegistered || AuthoredUnitSpecification is null || specificationHash is null || buildHash is null)
         {
             context = null;
-            reason = "Compile, review, and register this exact authored strategy before historical validation.";
+            reason = DescribeHistoricalValidationBlocker();
+            if (string.IsNullOrWhiteSpace(reason))
+                reason = "Compile, review, and register this exact authored strategy before historical validation.";
             return false;
         }
 
@@ -57,6 +87,71 @@ public sealed partial class StrategyAuthoringViewModel
             StrategyWorkspace.Bindings.FeatureSetHashSha256);
         reason = string.Empty;
         return true;
+    }
+
+    /// <summary>
+    /// Opens the Builder screen that unblocks historical validation (Build or Validate).
+    /// </summary>
+    public void FocusHistoricalValidationPrep()
+    {
+        if (OpenValidateScreenCommand.CanExecute(null))
+            OpenValidateScreenCommand.Execute(null);
+        else if (OpenBuildScreenCommand.CanExecute(null))
+            OpenBuildScreenCommand.Execute(null);
+        else if (OpenBriefScreenCommand.CanExecute(null))
+            OpenBriefScreenCommand.Execute(null);
+    }
+
+    /// <summary>
+    /// Charts shell ⑤ assist: open Build, auto-Compile when source is ready, leave Register
+    /// for the user. Never calls <see cref="ConfirmRegisterCommand"/>.
+    /// </summary>
+    /// <returns>
+    /// <c>true</c> when review overlay is open and waiting for Register;
+    /// <c>false</c> when compile could not run or registration is still incomplete.
+    /// </returns>
+    public bool PrepareHistoricalValidationAssist()
+    {
+        if (CanRunHistoricalValidation &&
+            TryCreateHistoricalValidationContext(out _, out _))
+            return false;
+
+        // Prefer Build when Compile/Register is still required; Validate is only useful after register.
+        if (!IsRegistered || StrategyWorkspace.Bindings.BuildArtifactHashSha256 is null)
+        {
+            if (OpenBuildScreenCommand.CanExecute(null))
+                OpenBuildScreenCommand.Execute(null);
+            else
+                FocusHistoricalValidationPrep();
+        }
+        else
+        {
+            FocusHistoricalValidationPrep();
+        }
+
+        if (CanCompileCurrentSource &&
+            CompileCommand.CanExecute(null) &&
+            !ReviewOpen)
+        {
+            CompileCommand.Execute(null);
+            if (ReviewOpen)
+            {
+                Status =
+                    "Compiled for Historical BT — review the code, then press Register. Retry Charts ⑤ after Register.";
+                return true;
+            }
+        }
+
+        if (ReviewOpen)
+        {
+            Status =
+                "Review the compiled code, then press Register. Retry Charts ⑤ after Register.";
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(Status))
+            Status = DescribeHistoricalValidationBlocker();
+        return false;
     }
 
     public bool AcceptHistoricalValidationEvidence(

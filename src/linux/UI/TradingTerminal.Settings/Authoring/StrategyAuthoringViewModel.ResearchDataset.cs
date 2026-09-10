@@ -201,6 +201,10 @@ public sealed partial class StrategyAuthoringViewModel
             ? $"Added {label} sample ({updated.Samples.Count}/4 for research experiment). Future outcome excluded from features."
             : $"Added {label} sample. Dataset has {updated.Samples.Count} events — run the research experiment when ready.";
         Save();
+        HostChartOverlayPreviewRequested?.Invoke(
+            this,
+            new HostChartOverlayPreviewRequestedEventArgs(
+                NativeChartOverlaySelectionV1.DefaultResearchCaptureOverlayIds));
         if (!_suppressGalleryAdvance)
             TryAdvanceToNextUnusedGalleryMatch();
         PublishTurnFollowUps(lastUserText: null);
@@ -272,7 +276,7 @@ public sealed partial class StrategyAuthoringViewModel
         HostChartOverlayPreviewRequested?.Invoke(
             this,
             new HostChartOverlayPreviewRequestedEventArgs(
-                Array.Empty<string>(),
+                NativeChartOverlaySelectionV1.DefaultResearchCaptureOverlayIds,
                 startResearchCapture: true));
 
         IsScanningResearchGallery = true;

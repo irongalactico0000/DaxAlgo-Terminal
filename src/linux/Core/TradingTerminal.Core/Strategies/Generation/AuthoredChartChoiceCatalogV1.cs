@@ -105,6 +105,8 @@ public readonly record struct NativeChartOverlaySelectionV1(
         var showEma20 = ids.Contains("ema-20");
         var showEma50 = ids.Contains("ema-50");
         var showEma = showEma20 || showEma50 || ids.Contains("ema");
+        // Prefer 20 when explicitly requested; otherwise 50. Callers that merge onto an existing
+        // chart should pass current EmaPeriod through ApplyHostOverlayIds (additive).
         var emaPeriod = showEma20 && !showEma50 ? 20 : 50;
 
         return new(
@@ -119,6 +121,12 @@ public readonly record struct NativeChartOverlaySelectionV1(
             ShowVwap: ids.Contains("vwap") || ids.Contains("vwap-session"),
             ShowAdx: ids.Contains("adx-14") || ids.Contains("adx"));
     }
+
+    /// <summary>
+    /// Default overlays applied after research capture labeling (B/C/N) and gallery focus.
+    /// </summary>
+    public static IReadOnlyList<string> DefaultResearchCaptureOverlayIds { get; } =
+        Array.AsReadOnly(["ema-20", "rsi-14", "atr-14"]);
 }
 
 /// <summary>

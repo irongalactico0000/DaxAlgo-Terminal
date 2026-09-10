@@ -44,10 +44,12 @@ public sealed partial class ChartsViewModel
             return;
         }
 
+        DraftPlacementMode = ChartInteractionMode.Pan;
         ResearchObservationRange = null;
         ResearchOutcomeRange = null;
         ResearchSelectionStep = ChartResearchSelectionStep.Observation;
         Status = "Research capture: drag the observation window.";
+        NotifyResearchShellStateChanged();
     }
 
     /// <summary>

@@ -141,30 +141,56 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
     /// Applies host chat-catalog overlay ids (see <c>AuthoredChartChoiceCatalogV1</c>) onto the
     /// native chart toggles so famous indicators render immediately without waiting for authored
     /// visualizer codegen. Unknown ids are ignored; candles-only clears indicator overlays.
+    /// Existing toggles stay on (additive OR); <see cref="EmaPeriod"/> is only written when EMA
+    /// was previously off so capture does not retune an operator's period.
     /// </summary>
     public void ApplyHostOverlayIds(IEnumerable<string> overlayIds)
     {
-        var state = TradingTerminal.Core.Strategies.Generation.NativeChartOverlaySelectionV1
-            .FromHostOverlayIds(overlayIds);
-        ShowSma = state.ShowSma;
-        ShowEma = state.ShowEma;
-        ShowRsi = state.ShowRsi;
-        ShowMacd = state.ShowMacd;
-        ShowBollinger = state.ShowBollinger;
-        ShowStochastic = state.ShowStochastic;
-        ShowAtr = state.ShowAtr;
-        ShowVwap = state.ShowVwap;
-        ShowAdx = state.ShowAdx;
-        if (state.EmaPeriod > 0)
-            EmaPeriod = state.EmaPeriod;
-
-        var idSet = overlayIds
+        var idList = overlayIds as IList<string> ?? overlayIds.ToList();
+        var idSet = idList
             .Where(static id => !string.IsNullOrWhiteSpace(id))
             .Select(static id => id.Trim())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (idSet.Count == 0 || (idSet.Count == 1 && idSet.Contains("candles")))
+        {
+            ShowSma = false;
+            ShowEma = false;
+            ShowRsi = false;
+            ShowMacd = false;
+            ShowBollinger = false;
+            ShowStochastic = false;
+            ShowAtr = false;
+            ShowVwap = false;
+            ShowAdx = false;
+            foreach (var user in UserIndicators)
+                user.IsEnabled = false;
+            return;
+        }
+
+        var state = TradingTerminal.Core.Strategies.Generation.NativeChartOverlaySelectionV1
+            .FromHostOverlayIds(idList);
+        var emaWasOff = !ShowEma;
+        ShowSma = ShowSma || state.ShowSma;
+        ShowEma = ShowEma || state.ShowEma;
+        ShowRsi = ShowRsi || state.ShowRsi;
+        ShowMacd = ShowMacd || state.ShowMacd;
+        ShowBollinger = ShowBollinger || state.ShowBollinger;
+        ShowStochastic = ShowStochastic || state.ShowStochastic;
+        ShowAtr = ShowAtr || state.ShowAtr;
+        ShowVwap = ShowVwap || state.ShowVwap;
+        ShowAdx = ShowAdx || state.ShowAdx;
+        if (emaWasOff && state.ShowEma && state.EmaPeriod > 0)
+            EmaPeriod = state.EmaPeriod;
+
         foreach (var user in UserIndicators)
-            user.IsEnabled = idSet.Contains(user.Definition.Id) ||
-                             (user.Definition.Alias is { } alias && idSet.Contains(alias));
+        {
+            if (idSet.Contains(user.Definition.Id) ||
+                (user.Definition.Alias is { } alias && idSet.Contains(alias)))
+            {
+                user.IsEnabled = true;
+            }
+        }
     }
 
     private string? _pendingHostPreferredSymbol;
@@ -275,12 +301,22 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
     partial void OnSelectedInstrumentChanged(TradableInstrument? value)
     {
         ResetResearchSelection();
+        ClearExplicitHistoryWindow();
+        DraftSentToBuilder = false;
+        DraftPlacementMode = ChartInteractionMode.Pan;
+        NotifyStrategyDraftStateChanged();
+        NotifyResearchShellStateChanged();
         QueueReload();
     }
 
     partial void OnSelectedTimeframeChanged(ChartTimeframe? value)
     {
         ResetResearchSelection();
+        ClearExplicitHistoryWindow();
+        DraftSentToBuilder = false;
+        DraftPlacementMode = ChartInteractionMode.Pan;
+        NotifyStrategyDraftStateChanged();
+        NotifyResearchShellStateChanged();
         QueueReload();
     }
     partial void OnSelectedChartTypeChanged(string value) => QueueReload();
@@ -401,11 +437,32 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
         try { broker = ResolveBroker(instrument); }
         catch (InvalidOperationException ex) { Status = ex.Message; return; }
 
-        Status = $"Loading {instrument.DisplayName} ({tf.Label})…";
+        Status = HasExplicitHistoryRange
+            ? $"Loading {instrument.DisplayName} ({tf.Label}) {_explicitHistoryFromUtc:u} → {_explicitHistoryToUtc:u}…"
+            : $"Loading {instrument.DisplayName} ({tf.Label})…";
         try
         {
-            var bars = await _repository.GetHistoricalBarsAsync(instrument.Contract, broker, tf.BarSize, tf.Lookback, ct)
+            IReadOnlyList<Bar> bars;
+            if (HasExplicitHistoryRange &&
+                _explicitHistoryFromUtc is { } from &&
+                _explicitHistoryToUtc is { } to)
+            {
+                bars = await _repository.GetHistoricalBarsAsync(
+                           instrument.Contract,
+                           broker,
+                           tf.BarSize,
+                           from.UtcDateTime,
+                           to.UtcDateTime,
+                           ct)
                        ?? Array.Empty<Bar>();
+            }
+            else
+            {
+                var lookback = ResolveHistoryLookback(tf);
+                bars = await _repository.GetHistoricalBarsAsync(
+                           instrument.Contract, broker, tf.BarSize, lookback, ct)
+                       ?? Array.Empty<Bar>();
+            }
 
             var candles = new ChartCandle[bars.Count];
             var volume = new ChartVolume[bars.Count];
@@ -450,8 +507,11 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
             TryApplyPendingHostResearchRanges();
             Status = bars.Count == 0
                 ? $"No history for {instrument.DisplayName} — is the broker connected and streaming?"
-                : $"{instrument.DisplayName} · {tf.Label} · {bars.Count} bars";
+                : HasExplicitHistoryRange
+                    ? $"{instrument.DisplayName} · {tf.Label} · {bars.Count} bars · explicit range"
+                    : $"{instrument.DisplayName} · {tf.Label} · {bars.Count} bars";
 
+            NotifyResearchShellStateChanged();
             StartLive(instrument, broker, tf.BarSize);
         }
         catch (OperationCanceledException) { }

@@ -66,6 +66,14 @@ public sealed class NativeChartSurface : Control
     private ChartInteractionMode _interactionMode;
     private ChartTimeRange? _observationRange;
     private ChartTimeRange? _outcomeRange;
+    private Rect _lastPricePane;
+    private double _lastPriceMin;
+    private double _lastPriceMax = 1;
+    private double? _draftStopPrice;
+    private double? _draftTargetPrice;
+
+    private static readonly IPen DraftStopPen = new Pen(new SolidColorBrush(Color.Parse("#EF5350")), 1.2);
+    private static readonly IPen DraftTargetPen = new Pen(new SolidColorBrush(Color.Parse("#26A69A")), 1.2);
 
     public NativeChartSurface()
     {
@@ -100,6 +108,19 @@ public sealed class NativeChartSurface : Control
     }
 
     public event EventHandler<ChartRangeSelectedEventArgs>? ResearchRangeSelected;
+    public event EventHandler<ChartPriceClickedEventArgs>? PriceClicked;
+
+    public double? DraftStopPrice
+    {
+        get => _draftStopPrice;
+        set { _draftStopPrice = value; InvalidateVisual(); }
+    }
+
+    public double? DraftTargetPrice
+    {
+        get => _draftTargetPrice;
+        set { _draftTargetPrice = value; InvalidateVisual(); }
+    }
 
     public ChartSnapshot? Snapshot
     {
@@ -183,6 +204,9 @@ public sealed class NativeChartSurface : Control
         var nextTop = pricePane.Bottom;
 
         var (priceMin, priceMax) = PriceRange(snapshot, start, end);
+        _lastPricePane = pricePane;
+        _lastPriceMin = priceMin;
+        _lastPriceMax = priceMax;
         DrawGrid(context, pricePane, priceMin, priceMax, candles, start, end, drawTimeLabels: indicatorCount == 0);
         DrawVolume(context, snapshot, pricePane, start, end);
         DrawPrice(context, snapshot, pricePane, priceMin, priceMax, start, end);
@@ -253,6 +277,7 @@ public sealed class NativeChartSurface : Control
         }
 
         DrawResearchRanges(context, snapshot, start, end, lastPaneBottom);
+        DrawDraftLevels(context, pricePane, priceMin, priceMax);
 
         DrawCrosshairAndLegend(context, snapshot, candles, pricePane, rsiPane, macdPane,
             priceMin, priceMax, start, end);
@@ -295,6 +320,14 @@ public sealed class NativeChartSurface : Control
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             return;
         var point = e.GetPosition(this);
+        if ((InteractionMode is ChartInteractionMode.PlaceStop or ChartInteractionMode.PlaceTarget) &&
+            TryMapPrice(point, out var price))
+        {
+            PriceClicked?.Invoke(this, new ChartPriceClickedEventArgs(price));
+            e.Handled = true;
+            return;
+        }
+
         if (InteractionMode == ChartInteractionMode.SelectResearchRange &&
             _snapshot is { Candles.Length: > 0 })
         {
@@ -362,6 +395,47 @@ public sealed class NativeChartSurface : Control
         var offset = Math.Clamp(_rightOffset, 0, Math.Max(0, total - count));
         var end = total - offset;
         return (Math.Max(0, end - count), end);
+    }
+
+    private void DrawDraftLevels(DrawingContext context, Rect pricePane, double min, double max)
+    {
+        DrawLevel(_draftStopPrice, DraftStopPen, "STOP");
+        DrawLevel(_draftTargetPrice, DraftTargetPen, "TARGET");
+
+        void DrawLevel(double? price, IPen pen, string label)
+        {
+            if (price is not { } value || value < min || value > max || pricePane.Height <= 0)
+                return;
+            var y = Y(value, pricePane, min, max);
+            context.DrawLine(pen, new Point(pricePane.Left, y), new Point(pricePane.Right, y));
+            context.DrawText(
+                new FormattedText(
+                    label,
+                    CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight,
+                    Typeface.Default,
+                    10,
+                    TextBrush),
+                new Point(pricePane.Left + 4, Math.Clamp(y - 12, pricePane.Top, pricePane.Bottom - 12)));
+        }
+    }
+
+    private bool TryMapPrice(Point point, out decimal price)
+    {
+        price = 0m;
+        if (_lastPricePane.Width <= 0 || _lastPricePane.Height <= 0)
+            return false;
+        if (point.Y < _lastPricePane.Top || point.Y > _lastPricePane.Bottom ||
+            point.X < _lastPricePane.Left || point.X > _lastPricePane.Right)
+            return false;
+
+        var mapped = _lastPriceMax -
+                     (point.Y - _lastPricePane.Top) / Math.Max(1, _lastPricePane.Height) *
+                     (_lastPriceMax - _lastPriceMin);
+        if (!double.IsFinite(mapped) || mapped <= 0)
+            return false;
+        price = (decimal)mapped;
+        return price > 0m;
     }
 
     private void DrawResearchRanges(
