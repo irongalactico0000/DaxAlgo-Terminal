@@ -161,6 +161,38 @@ public sealed class AuthoredUnitSpecificationV1Tests
             issue => issue.Code == "unit.instrument.unresolved");
     }
 
+    [Fact]
+    public void Required_parameter_may_be_empty_structurally_but_unset_blocks_confirm()
+    {
+        var specification = Visualizer() with
+        {
+            Parameters =
+            [
+                new AuthoredUnitParameterV1(
+                    "fast", "Fast EMA", ParameterKind.Integer, "",
+                    Presence: AuthoredUnitParameterPresenceV1.Required),
+                new AuthoredUnitParameterV1("slow", "Slow EMA", ParameterKind.Integer, "21", "2", "1000"),
+            ],
+        };
+
+        Assert.Empty(AuthoredUnitSpecificationValidatorV1.Validate(specification));
+        Assert.True(AuthoredUnitParameterPresenceRulesV1.TryDescribeUnsetRequired(
+            specification.Parameters, out var message));
+        Assert.Contains("fast", message, StringComparison.Ordinal);
+
+        var set = specification with
+        {
+            Parameters =
+            [
+                new AuthoredUnitParameterV1(
+                    "fast", "Fast EMA", ParameterKind.Integer, "9",
+                    Presence: AuthoredUnitParameterPresenceV1.Required),
+                new AuthoredUnitParameterV1("slow", "Slow EMA", ParameterKind.Integer, "21", "2", "1000"),
+            ],
+        };
+        Assert.False(AuthoredUnitParameterPresenceRulesV1.TryDescribeUnsetRequired(set.Parameters, out _));
+    }
+
     private static AuthoredUnitSpecificationV1 Visualizer() => new(
         AuthoredUnitSpecificationV1.CurrentSchemaVersion,
         "btc-ema-chart",

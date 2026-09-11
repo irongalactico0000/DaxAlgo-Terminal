@@ -422,6 +422,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         GenerateCanonicalPaperStrategyCommand.NotifyCanExecuteChanged();
         RegenerateFourCandidatesCommand.NotifyCanExecuteChanged();
         CompileCommand.NotifyCanExecuteChanged();
+        RefreshInteractionBindingsInspector();
     }
 
     partial void OnIsInspectingChartReferencesChanged(bool value)
@@ -4237,6 +4238,14 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         {
             CloseReview();
             Status = "The reviewed specification changed after compilation. Nothing was registered.";
+            return;
+        }
+
+        if (AuthoredUnitParameterPresenceRulesV1.TryDescribeUnsetRequired(specification.Parameters, out var requiredMessage))
+        {
+            CloseReview();
+            Status = requiredMessage;
+            AiStatus = requiredMessage;
             return;
         }
 

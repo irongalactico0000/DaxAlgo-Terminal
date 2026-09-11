@@ -123,6 +123,17 @@ public sealed record AuthoredInstrumentRequestV1(
 public sealed record AuthoredUnitTimeframeV1(string UserText, TimeSpan? BarSize);
 
 /// <summary>
+/// Whether Hyperion/chat may keep the catalog default or must obtain an explicit value before Confirm.
+/// </summary>
+public enum AuthoredUnitParameterPresenceV1
+{
+    /// <summary>Catalog / generated default is acceptable until the user edits it.</summary>
+    Defaultable = 0,
+    /// <summary>Must be set explicitly (non-empty canonical value) before Confirm / register.</summary>
+    Required = 1,
+}
+
+/// <summary>
 /// Portable parameter declaration. Values remain canonical strings here; the compiler lowers them
 /// into the SDK's typed <see cref="StrategyParameterSchema"/> only after validation.
 /// </summary>
@@ -135,7 +146,8 @@ public sealed record AuthoredUnitParameterV1(
     string? CanonicalMaximum = null,
     IReadOnlyList<string>? Choices = null,
     string? Unit = null,
-    string? Description = null);
+    string? Description = null,
+    AuthoredUnitParameterPresenceV1 Presence = AuthoredUnitParameterPresenceV1.Defaultable);
 
 public sealed record AuthoredChartPaneV1(
     string PaneId,
@@ -509,7 +521,11 @@ public static class AuthoredUnitSpecificationValidatorV1
             }
             Required(item.Key, $"{path}.key", "unit.parameter.key.required", issues);
             Required(item.DisplayName, $"{path}.displayName", "unit.parameter.name.required", issues);
-            Required(item.CanonicalDefault, $"{path}.canonicalDefault", "unit.parameter.default.required", issues);
+            ValidEnum(item.Presence, $"{path}.presence", issues);
+            // Defaultable must ship a catalog default. Required may be empty until the user sets it;
+            // Confirm/register fails closed via AuthoredUnitParameterPresenceRulesV1.
+            if (item.Presence == AuthoredUnitParameterPresenceV1.Defaultable)
+                Required(item.CanonicalDefault, $"{path}.canonicalDefault", "unit.parameter.default.required", issues);
             ValidEnum(item.Kind, $"{path}.kind", issues);
             if (item.Kind == ParameterKind.Choice && (item.Choices is null || item.Choices.Count == 0))
                 issues.Add(Issue("unit.parameter.choices.required", $"{path}.choices",
@@ -767,6 +783,45 @@ public static class AuthoredUnitSpecificationValidatorV1
 
     private static AuthoredUnitSpecificationIssueV1 Issue(string code, string path, string message) =>
         new(code, path, message);
+}
+
+/// <summary>
+/// Confirm/register gates for <see cref="AuthoredUnitParameterPresenceV1"/>.
+/// Structural validate allows empty Required defaults; Confirm must not.
+/// </summary>
+public static class AuthoredUnitParameterPresenceRulesV1
+{
+    public static IReadOnlyList<AuthoredUnitParameterV1> UnsetRequired(
+        IEnumerable<AuthoredUnitParameterV1>? parameters)
+    {
+        if (parameters is null)
+            return Array.Empty<AuthoredUnitParameterV1>();
+
+        return parameters
+            .Where(static item =>
+                item.Presence == AuthoredUnitParameterPresenceV1.Required &&
+                string.IsNullOrWhiteSpace(item.CanonicalDefault))
+            .OrderBy(static item => item.Key, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public static bool TryDescribeUnsetRequired(
+        IEnumerable<AuthoredUnitParameterV1>? parameters,
+        out string message)
+    {
+        var unset = UnsetRequired(parameters);
+        if (unset.Count == 0)
+        {
+            message = string.Empty;
+            return false;
+        }
+
+        message =
+            "Set required parameters before Confirm: " +
+            string.Join(", ", unset.Select(static item => item.Key)) +
+            ". Defaultable catalog values may stay as-is.";
+        return true;
+    }
 }
 
 public static class AuthoredUnitSpecificationCanonicalJsonV1
