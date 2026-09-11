@@ -38,12 +38,12 @@ Status: **Done** / **Partial** / **Gap** / **Deferred**.
 | ID | Requirement | Status |
 |----|-------------|--------|
 | R1.1 | Essential: instrument + bar size before draft/send. | **Done** (Charts toolbar) |
-| R1.2 | Essential (ideal): explicit history range (from–to), not only TF lookback. | **Done** — Charts Load History uses `GetHistoricalBarsAsync(from,to)`; Alpaca/cTrader/Upstox/IB/Binance/Simulated + metered wrapper implement range; other venues use cover+filter default |
-| R1.3 | Authoring gestures produce structured **StrategyDraft** DTO. | **Partial** — Place STOP/TARGET click + fields → draft |
-| R1.4 | Draft edits keep chart objects ↔ draft panel in sync. | **Partial** — stop/target lines on chart |
-| R1.5 | Lock / Confirm materializes TradeIR; unlocked draft not runnable. | **Partial** — Lock binds draft to active TradeIR hash |
+| R1.2 | Essential (ideal): explicit history range (from–to), not only TF lookback. | **Done** — Charts **Load history** uses `GetHistoricalBarsAsync(from,to)`; shell step ② checks only after Load (not date text alone). Primary venues override; others may cover+filter |
+| R1.3 | Authoring gestures produce structured **StrategyDraft** DTO. | **Done** — Place STOP/TARGET → fields + horizontal lines → Send → Builder `CHART STRATEGY DRAFT`; evidence `tmp/draft-audit/10–12` (`--preview-draft-e2e`) |
+| R1.4 | Draft edits keep chart objects ↔ draft panel in sync. | **Partial (lite)** — typed stop/target ↔ chart lines; richer object edits still Gap |
+| R1.5 | Lock / Confirm materializes TradeIR; unlocked draft not runnable. | **Partial** — Charts Lock + Builder **Lock draft** bind to active TradeIR hash; Confirm/generate still creates the hash; historical BT requires registered unit |
 | R1.6 | Research samples are optional evidence; not a locked strategy. | **Done** |
-| R6.1 | Instrument → range → draft → lock → historical BT in one shell. | **Partial** — opens BT when registered; else auto-Compile→review assist (Register consent remains) |
+| R6.1 | Instrument → range → draft → lock → historical BT in one shell. | **Partial** — shell steps ①–⑤ truthful (Range only after Load history; ⑤ only after Validate/Studio opens on runnable hash; else clear compile-first message). Full one-window polish still stretch |
 
 Contract note: `StrategyDraftV1` lives under Core `Strategies/Generation`. Capture/`ResearchChartSelectionV1` remains the **sample** path (R1.6), not the strategy draft path (R1.3).
 
@@ -125,10 +125,18 @@ Contract note: `StrategyDraftV1` lives under Core `Strategies/Generation`. Captu
 
 | Layer | Backend | Frontend |
 |-------|---------|----------|
-| R1 Chart draft | `StrategyDraftV1` schema, validator, gesture applier, canonical JSON/hash; session field `StrategyDraftJson` | Charts stop/target fields + Send draft; Builder `CHART STRATEGY DRAFT` summary; click-to-place lines still Gap |
+| R1 Chart draft | `StrategyDraftV1` schema, validator, gesture applier, canonical JSON/hash; session field `StrategyDraftJson` | Charts Place STOP/TARGET + lines + Send; Builder summary + Lock draft; evidence `tmp/draft-audit/10–12` |
 | R1.6 Research | `ResearchChartSelectionV1` / dataset leakage gates | Brush + B/C/N + gallery (unchanged; not a locked strategy) |
 | R4–R5 Admit / buy | TradeIR hash → Prepare → Runner/Console intake; LIVE Keychain gate | Runner book picker; Execution Console LIVE arming |
-| W4 Bindings | `StrategyInteractionBindingsV1` fail-closed graph | Builder inspector not built yet |
+| W4 Bindings | `StrategyInteractionBindingsV1` fail-closed graph + `ApplyCanonicalParameter` | Builder **Bindings** tab (params/features/layers/rules) |
+
+### Core vs optional parameters (P1.4)
+
+- Schema: `AuthoredUnitParameterV1.Presence` = `Defaultable` (default) | `Required`.
+- Structural validate: Defaultable needs `CanonicalDefault`; Required may be empty until set.
+- Confirm/register: `AuthoredUnitParameterPresenceRulesV1` fails closed on unset Required.
+- Bindings tab shows Presence next to each parameter id.
+- Chat: catalog presets stay Defaultable until a generator marks Required.
 
 See also: `docs/mac-backend-frontend-status.docx`, `docs/mac-product-backlog-status.md` (includes **Gaps vs Hyperion and LuxAlgo**).
 

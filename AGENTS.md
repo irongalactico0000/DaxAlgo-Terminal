@@ -21,6 +21,7 @@ mirror, or coordinate with a Windows repository unless the user explicitly place
 - Ingest is tick-primary and non-blocking; view models consume hub/ingest/store seams.
 - MVVM remains strict; streaming UI is bounded and deterministically disposable.
 - Sidecars bind to `127.0.0.1`. Live order execution is allowed only for **Alpaca / Interactive Brokers / cTrader** when composed with Keychain-backed `ILiveExecutionConfirmationStore`, per-broker `AllowLiveExecution`, and typed **LIVE** confirmation. **Binance stays market-data only** (no order adapter). Strategy → OMS only via `SandboxExecutionReplicator` (never kernel `PlaceOrder`).
+- **Product lanes** (keep separate — see `docs/product-lanes-and-regulated-fences.md`): (1) Research → Paper, (2) Operator API-key Console, (3) Marketplace strategy-as-software on the user’s own keys. Do **not** ship follow / pool / ETF-share UX until counsel clears a regulated entity model.
 
 ## Verification
 

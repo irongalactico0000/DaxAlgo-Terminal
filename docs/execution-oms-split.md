@@ -53,3 +53,4 @@ Goal product split:
 - UI avg/PnL polish not required for this handoff.
 - Optional later: host gate + PaperExecutionBookManager in one Avalonia process so Prepare opens a live session without a second app.
 - Optional later: Strategy Runner UI bind Real books to `InProcessExecutionClient` intake — **Done** (broker-Paper Real books; LIVE blocked in Runner). See Execution Console for LIVE arming.
+- Product lanes / follow-pool-ETF fences: `docs/product-lanes-and-regulated-fences.md` (follow/pool/ETF parked pending counsel).
