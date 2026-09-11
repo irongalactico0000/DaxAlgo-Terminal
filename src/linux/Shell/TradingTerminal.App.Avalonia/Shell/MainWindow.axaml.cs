@@ -3,7 +3,10 @@ using System.IO;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using TradingTerminal.Core.Brokers;
 using TradingTerminal.Core.MarketData;
@@ -198,7 +201,7 @@ public partial class MainWindow : Window
             window.Closed += (_, _) => _liveExecutionConsoleWindow = null;
             ShowDisposing(window, viewModel);
             Vm?.ActivityLog.Append("Execution", "INFO",
-                "Opened the Execution Console. Every venue starts PAPER; LIVE is armed per venue.");
+                "Lane 2 · Opened Execution Console. Paste your API keys; every venue starts PAPER; LIVE is armed per venue with Keychain confirmation. Not a pooled/ETF book.");
         }
         catch (Exception exception)
         {
@@ -258,24 +261,23 @@ public partial class MainWindow : Window
         {
             var books = services.GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperExecutionBookManager>();
             bookLease = books.AcquireSelectedSession();
-            var session = bookLease.Session;
-            var viewModel = new TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerViewModel(
+            var window = services.GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerWindow>();
+            TradingTerminal.App.Avalonia.Harness.AuthoredUnitHarnessSession.OpenStrategy(
+                initialStrategy,
                 services.GetRequiredService<TradingTerminal.Infrastructure.Backtest.IBacktestStrategyRegistry>(),
                 services.GetRequiredService<TradingTerminal.Core.MarketData.IMarketDataHub>(),
                 services.GetRequiredService<TradingTerminal.Core.Time.IClock>(),
                 services.GetRequiredService<TradingTerminal.UI.Logging.InMemoryLogSink>(),
-                session,
+                bookLease,
                 services.GetRequiredService<TradingTerminal.Core.MarketData.IInstrumentRegistry>(),
-                bookLease.Book,
                 services.GetRequiredService<TradingTerminal.UI.Strategies.IStrategyKernelRegistry>(),
                 services.GetRequiredService<TradingTerminal.Core.MarketData.IMarketDataIngest>(),
                 services.GetRequiredService<TradingTerminal.Core.Brokers.IBrokerSelector>(),
-                initialStrategy,
-                initialParameters,
-                services.GetService<TradingTerminal.ExecutionUi.IExecutionClient>());
-            var window = services.GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerWindow>();
-            window.Title = $"Harness · Strategy · {bookLease.Book.Name}";
-            window.DataContext = viewModel;
+                testedParameters: initialParameters,
+                executionClient: services.GetService<TradingTerminal.ExecutionUi.IExecutionClient>(),
+                owner: this,
+                window: window);
+            var viewModel = (TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerViewModel)window.DataContext!;
             _paperStrategyRunnerWindow = window;
             var ownedLease = bookLease;
             bookLease = null;
@@ -286,7 +288,7 @@ public partial class MainWindow : Window
             };
             ShowDisposing(window, viewModel);
             Vm?.ActivityLog.Append("Execution", "INFO",
-                $"Opened Paper Strategy Runner for {ownedLease.Book.Name}/{ownedLease.Book.AccountId}.");
+                $"Harness · opened Strategy Runner for {ownedLease.Book.Name}/{ownedLease.Book.AccountId}.");
             if (autoStart)
                 await TryAutoStartPaperStrategyAsync(viewModel);
         }
@@ -447,6 +449,135 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Dev/smoke: stage Place STOP/TARGET fields+lines, Send draft to Builder, write PNG evidence under
+    /// <paramref name="outputDirectory"/>. Does not place orders. Used by <c>--preview-draft-e2e</c>.
+    /// </summary>
+    public async Task PreviewDraftPlaceE2EAsync(string? outputDirectory = null)
+    {
+        var outDir = string.IsNullOrWhiteSpace(outputDirectory)
+            ? "/Users/kimsunghyun/DaxAlgo-Terminal-Mac-Integrated/tmp/draft-audit"
+            : outputDirectory.Trim();
+        Directory.CreateDirectory(outDir);
+
+        void Log(string message)
+        {
+            try
+            {
+                File.AppendAllText(
+                    Path.Combine(outDir, "preview-draft-e2e.log"),
+                    $"{DateTime.UtcNow:O} {message}\n");
+            }
+            catch { /* diagnostics */ }
+        }
+
+        try
+        {
+            PreviewHostChartOverlays(["ema-20", "rsi-14"]);
+            var chartVm = _researchChartViewModel
+                ?? throw new InvalidOperationException("Charts view-model was not created.");
+            var chartWindow = _researchChartWindow
+                ?? throw new InvalidOperationException("Charts window was not created.");
+
+            var deadline = DateTime.UtcNow.AddSeconds(20);
+            while (DateTime.UtcNow < deadline && !chartVm.HasData)
+            {
+                await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+                await Task.Delay(200);
+            }
+
+            if (!chartVm.HasData)
+                throw new InvalidOperationException("Charts did not load bars in time for draft E2E preview.");
+
+            chartVm.ArmPlaceStopCommand.Execute(null);
+            await PumpUiAsync();
+            await SaveWindowPngAsync(chartWindow, Path.Combine(outDir, "10-armed-place-stop.png"));
+            Log("saved 10-armed-place-stop.png");
+
+            var mid = chartVm.LastLoadedClosePrice
+                ?? throw new InvalidOperationException("No last close available to place draft levels.");
+            var stop = decimal.Round(mid * 0.985m, 4, MidpointRounding.AwayFromZero);
+            var target = decimal.Round(mid * 1.015m, 4, MidpointRounding.AwayFromZero);
+            if (stop <= 0m || target <= 0m || stop >= target)
+                throw new InvalidOperationException($"Invalid derived stop/target from mid={mid}.");
+
+            chartVm.ApplyClickedDraftPrice(stop);
+            await PumpUiAsync();
+            chartVm.ArmPlaceTargetCommand.Execute(null);
+            chartVm.ApplyClickedDraftPrice(target);
+            await PumpUiAsync();
+            await SaveWindowPngAsync(chartWindow, Path.Combine(outDir, "11-placed-stop-target-lines.png"));
+            Log($"saved 11-placed-stop-target-lines.png stop={chartVm.DraftStopPriceText} target={chartVm.DraftTargetPriceText}");
+
+            if (!chartVm.CanSendStrategyDraft)
+                throw new InvalidOperationException("Draft was not ready to send after placing stop/target.");
+
+            chartVm.SendStrategyDraftCommand.Execute(null);
+            await PumpUiAsync();
+            await Task.Delay(400);
+            await PumpUiAsync();
+
+            Window? builder = null;
+            foreach (var window in ((Application.Current as App)?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Windows
+                     ?? Array.Empty<Window>())
+            {
+                if (window is Settings.StrategyAuthoringWindow)
+                {
+                    builder = window;
+                    break;
+                }
+            }
+
+            if (builder is null)
+                throw new InvalidOperationException("Strategy Builder did not open after Send draft.");
+
+            builder.Activate();
+            await PumpUiAsync();
+            await SaveWindowPngAsync(builder, Path.Combine(outDir, "12-builder-chart-strategy-draft.png"));
+            Log("saved 12-builder-chart-strategy-draft.png");
+
+            File.WriteAllText(
+                Path.Combine(outDir, "RESULT.txt"),
+                "PASS draft E2E preview: armed → placed stop/target → Builder PNG evidence written.\n");
+            Vm?.ActivityLog.Append("Charts", "INFO", $"Draft E2E preview evidence → {outDir}");
+        }
+        catch (Exception ex)
+        {
+            Log($"FAIL {ex}");
+            try
+            {
+                File.WriteAllText(Path.Combine(outDir, "RESULT.txt"), $"FAIL {ex.GetType().Name}: {ex.Message}\n");
+            }
+            catch { /* diagnostics */ }
+            Vm?.ActivityLog.Append("Charts", "ERROR", $"Draft E2E preview failed: {ex.Message}");
+            throw;
+        }
+    }
+
+    private static async Task PumpUiAsync()
+    {
+        await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Loaded);
+        await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Render);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private static async Task SaveWindowPngAsync(Window window, string path)
+    {
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            window.UpdateLayout();
+            var scale = window.RenderScaling;
+            var width = Math.Max(1, (int)Math.Ceiling(window.Bounds.Width * scale));
+            var height = Math.Max(1, (int)Math.Ceiling(window.Bounds.Height * scale));
+            using var bitmap = new RenderTargetBitmap(
+                new PixelSize(width, height),
+                new Vector(96 * scale, 96 * scale));
+            bitmap.Render(window);
+            bitmap.Save(path);
+        });
+        await Task.Yield();
+    }
+
     private void OpenResearchChart(
         TradingTerminal.App.Authoring.StrategyAuthoringViewModel? targetViewModel = null,
         Settings.StrategyAuthoringWindow? targetWindow = null,
@@ -578,17 +709,20 @@ public partial class MainWindow : Window
                         ? authoringViewModel.DescribeHistoricalValidationBlocker()
                         : blocker)
                     : authoringViewModel.Status;
+                if (string.IsNullOrWhiteSpace(message))
+                    message = "Compile and register a TradeIR hash before Historical BT (Validate/Studio).";
                 authoringViewModel.Status = message;
-                chartViewModel.Status = message;
+                chartViewModel.MarkHistoricalBacktestBlocked(message);
                 authoringWindow.Activate();
                 return;
             }
 
             OpenAuthoringHistoricalValidation(authoringViewModel);
-            chartViewModel.Status =
+            var opened =
                 string.IsNullOrWhiteSpace(authoringViewModel.Status)
                     ? "Historical validation opened from Charts research shell."
                     : authoringViewModel.Status;
+            chartViewModel.MarkHistoricalBacktestRoomOpened(opened);
         };
         chartViewModel.HistoricalBacktestRequested += historicalHandler;
 
@@ -787,9 +921,29 @@ public partial class MainWindow : Window
 
         try
         {
-            var book = services
-                .GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperExecutionBookManager>()
-                .SelectedBook;
+            var books = services
+                .GetRequiredService<TradingTerminal.App.Avalonia.Execution.PaperExecutionBookManager>();
+            var primarySymbol =
+                registration.AuthoredSpecification.Instruments.FirstOrDefault()?.UserText
+                ?? books.SelectedBook.PrimarySymbol;
+            if (string.IsNullOrWhiteSpace(primarySymbol))
+            {
+                authoring.Status =
+                    "Admit→Paper needs a primary symbol on the authored unit or a selected Paper book.";
+                return;
+            }
+
+            var handoff = TradingTerminal.App.Avalonia.Execution.ValidatedPaperBookHandoff.EnsureAdmittedBook(
+                books,
+                registration,
+                primarySymbol);
+            if (!handoff.IsSuccess)
+            {
+                authoring.Status = handoff.Message;
+                return;
+            }
+
+            var book = books.SelectedBook;
             if (!authoring.BindValidatedPaperBook(book.Id, book.AccountId, out var reason))
             {
                 authoring.Status = reason;
@@ -797,11 +951,11 @@ public partial class MainWindow : Window
             }
             await OpenPaperStrategyRunnerAsync(registration, testedParameters, book.Id, autoStart: true);
             authoring.Status =
-                $"Bound Paper book {book.Name}. Strategy Runner auto-started; watch BOOK POSITION for OMS qty after fills.";
+                $"Bound Paper book {book.Name} (in-process admit). Strategy Runner auto-started; watch BOOK POSITION for OMS qty after fills.";
         }
         catch (Exception exception)
         {
-            authoring.Status = $"The selected Paper book could not be opened: {exception.Message}";
+            authoring.Status = $"The admitted Paper book could not be opened: {exception.Message}";
         }
     }
 
@@ -1089,7 +1243,7 @@ public partial class MainWindow : Window
         Vm?.ActivityLog.Append(
             "Marketplace",
             "INFO",
-            "Opened marketplace site. To install a package URL into the Terminal catalog: Strategy Manager → Install from URL (or --install-open-package=https://…). Live broker order execution is not part of this path.");
+            "Lane 3 · Opened marketplace site (strategy as software). Install via Strategy Manager → Install from URL or --install-open-package=. Not follow/pool/ETF execution; your keys and books only after install.");
     }
 
     private async void OnCopySelectedLogs(object? sender, RoutedEventArgs e)

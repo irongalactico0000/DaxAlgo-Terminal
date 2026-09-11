@@ -4,6 +4,7 @@ using TradingTerminal.Core.Brokers;
 using TradingTerminal.Core.MarketData;
 using TradingTerminal.Core.Strategies.Generation;
 using TradingTerminal.Core.Time;
+using TradingTerminal.ExecutionUi;
 using TradingTerminal.Infrastructure.Backtest;
 using TradingTerminal.UI.Avalonia.Controls.Render;
 using TradingTerminal.UI.Logging;
@@ -44,7 +45,55 @@ public static class AuthoredUnitHarnessSession
     }
 
     /// <summary>
-    /// Opens the strategy harness: Paper Strategy Runner bound to the frozen kernel registration.
+    /// Opens the strategy harness on a leased Paper (or broker-Paper) book session.
+    /// Caller owns lease disposal when the window closes.
+    /// </summary>
+    public static PaperStrategyRunnerWindow OpenStrategy(
+        StrategyKernelRegistration? initialStrategy,
+        IBacktestStrategyRegistry strategyRegistry,
+        IMarketDataHub hub,
+        IClock clock,
+        InMemoryLogSink log,
+        PaperExecutionBookSessionLease bookLease,
+        IInstrumentRegistry instruments,
+        IStrategyKernelRegistry? strategyKernelRegistry = null,
+        IMarketDataIngest? marketDataIngest = null,
+        IBrokerSelector? brokerSelector = null,
+        IReadOnlyDictionary<string, object?>? testedParameters = null,
+        IExecutionClient? executionClient = null,
+        bool autoStart = false,
+        Window? owner = null,
+        PaperStrategyRunnerWindow? window = null)
+    {
+        ArgumentNullException.ThrowIfNull(bookLease);
+
+        var viewModel = new PaperStrategyRunnerViewModel(
+            strategyRegistry,
+            hub,
+            clock,
+            log,
+            bookLease.Session,
+            instruments,
+            bookLease.Book,
+            strategyKernelRegistry,
+            marketDataIngest,
+            brokerSelector,
+            initialStrategy,
+            testedParameters,
+            executionClient);
+
+        window ??= new PaperStrategyRunnerWindow();
+        window.Title = FormatPaperTitle(bookLease.Book.Name, initialStrategy?.DisplayName);
+        window.DataContext = viewModel;
+        if (owner is not null)
+            window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+        return window;
+    }
+
+    /// <summary>
+    /// Opens the strategy harness: Paper Strategy Runner bound to the frozen kernel registration
+    /// on a desktop Paper session (no book lease).
     /// </summary>
     public static PaperStrategyRunnerWindow OpenStrategy(
         StrategyKernelRegistration registration,
@@ -79,7 +128,7 @@ public static class AuthoredUnitHarnessSession
 
         var window = new PaperStrategyRunnerWindow
         {
-            Title = $"Harness · {registration.DisplayName}",
+            Title = FormatPaperTitle(bookName: null, registration.DisplayName),
             DataContext = viewModel,
         };
         if (owner is not null)
@@ -93,5 +142,14 @@ public static class AuthoredUnitHarnessSession
             _ = viewModel.StartCommand.ExecuteAsync(null);
 
         return window;
+    }
+
+    /// <summary>One titled continuous session: Gate/Validate → Paper Runner.</summary>
+    public static string FormatPaperTitle(string? bookName, string? strategyDisplayName)
+    {
+        var strategy = string.IsNullOrWhiteSpace(strategyDisplayName) ? "Strategy" : strategyDisplayName.Trim();
+        return string.IsNullOrWhiteSpace(bookName)
+            ? $"Harness · Paper · {strategy}"
+            : $"Harness · Paper · {bookName.Trim()} · {strategy}";
     }
 }
