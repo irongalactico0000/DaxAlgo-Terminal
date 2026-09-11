@@ -418,6 +418,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         OnPropertyChanged(nameof(CanGenerateCanonicalPaperStrategy));
         OnPropertyChanged(nameof(HasAuthoredUnitCSharpFiles));
         OnPropertyChanged(nameof(CanCompileCurrentSource));
+        OnPropertyChanged(nameof(CanExportOpenPackage));
         GenerateFourCandidatesCommand.NotifyCanExecuteChanged();
         GenerateCanonicalPaperStrategyCommand.NotifyCanExecuteChanged();
         RegenerateFourCandidatesCommand.NotifyCanExecuteChanged();
@@ -1537,6 +1538,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         OnPropertyChanged(nameof(IsGeneratingCandidates));
         OnPropertyChanged(nameof(HasRetainedCandidateBatchDuringGeneration));
         OnPropertyChanged(nameof(CanCompileCurrentSource));
+        OnPropertyChanged(nameof(CanExportOpenPackage));
         CompileCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(CanChooseGeneratedCandidate));
         OnPropertyChanged(nameof(CanRevalidateGeneratedCandidate));

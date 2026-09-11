@@ -277,8 +277,8 @@
         <Separator />
         <MenuItem Header="_Paper Execution Console&#x2026;" Click="OnExecutionConsole"
                   ToolTip.Tip="Lane 1 · Durable local Paper OMS. No live broker order route is loaded." />
-        <MenuItem Header="Paper _Strategy Runner&#x2026;" Click="OnPaperStrategyRunner"
-                  ToolTip.Tip="Lane 1/2 · Your admitted unit on your Paper or broker-Paper Real book. LIVE is blocked here." />
+        <MenuItem Header="_Harness · Paper…" Click="OnPaperStrategyRunner"
+                  ToolTip.Tip="Lane 1 · Your admitted unit on your Paper or broker-Paper Real book. LIVE is blocked here." />
         <Separator />
         <MenuItem Header="_Execution Console (live-capable)&#x2026;" Click="OnLiveExecutionConsole"
                   ToolTip.Tip="Lane 2 · Operator execution: paste API keys, Paper default, Real books, manual ticket. LIVE only with typed Keychain confirmation per venue. Not a pooled/ETF book." />

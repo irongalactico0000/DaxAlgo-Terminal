@@ -41,7 +41,7 @@
       <Grid ColumnDefinitions="*,Auto">
         <StackPanel Spacing="4">
           <StackPanel Orientation="Horizontal" Spacing="10">
-            <TextBlock Text="STRATEGY RUNNER" FontSize="18" FontWeight="Bold"
+            <TextBlock Text="HARNESS" FontSize="18" FontWeight="Bold"
                        Foreground="{DynamicResource Text.Header}" />
             <Border Background="{DynamicResource Warning.Soft}" BorderBrush="{DynamicResource Warning.Brush}"
                     BorderThickness="1" CornerRadius="10" Padding="9,2">
@@ -49,8 +49,10 @@
                          FontSize="10" FontWeight="Bold" />
             </Border>
           </StackPanel>
-          <TextBlock Text="IStrategyKernel → private virtual book → target replicator → Paper OMS or broker-Paper Real book (LIVE blocked in Runner)"
-                     Foreground="{DynamicResource Text.Secondary}" />
+          <TextBlock Text="{Binding HarnessContextStrip}"
+                     Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" />
+          <TextBlock Text="IStrategyKernel → private virtual book → target replicator → Paper OMS or broker-Paper Real book (LIVE blocked in Harness)"
+                     Foreground="{DynamicResource Text.Muted}" FontSize="10" TextWrapping="Wrap" />
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <Button Content="Run" Command="{Binding StartCommand}" Classes="accent" />

@@ -63,7 +63,8 @@ public static class AuthoredUnitHarnessSession
         IExecutionClient? executionClient = null,
         bool autoStart = false,
         Window? owner = null,
-        PaperStrategyRunnerWindow? window = null)
+        PaperStrategyRunnerWindow? window = null,
+        bool openedFromValidatePaper = false)
     {
         ArgumentNullException.ThrowIfNull(bookLease);
 
@@ -81,6 +82,9 @@ public static class AuthoredUnitHarnessSession
             initialStrategy,
             testedParameters,
             executionClient);
+
+        if (openedFromValidatePaper)
+            viewModel.MarkOpenedFromValidatePaper();
 
         window ??= new PaperStrategyRunnerWindow();
         window.Title = FormatPaperTitle(bookLease.Book.Name, initialStrategy?.DisplayName);
@@ -144,12 +148,34 @@ public static class AuthoredUnitHarnessSession
         return window;
     }
 
-    /// <summary>One titled continuous session: Gate/Validate → Paper Runner.</summary>
+    /// <summary>One titled continuous session: Validate → Paper Harness.</summary>
     public static string FormatPaperTitle(string? bookName, string? strategyDisplayName)
     {
         var strategy = string.IsNullOrWhiteSpace(strategyDisplayName) ? "Strategy" : strategyDisplayName.Trim();
         return string.IsNullOrWhiteSpace(bookName)
-            ? $"Harness · Paper · {strategy}"
-            : $"Harness · Paper · {bookName.Trim()} · {strategy}";
+            ? $"Harness · {strategy}"
+            : $"Harness · {strategy} · {bookName.Trim()}";
+    }
+
+    /// <summary>Header strip: unit · book · mode · LIVE blocked (+ Validate cue).</summary>
+    public static string FormatContextStrip(
+        string? unitDisplayName,
+        string? unitId,
+        string? bookDisplayName,
+        string? modeBadge,
+        bool openedFromValidatePaper)
+    {
+        var unit = string.IsNullOrWhiteSpace(unitDisplayName) ? "—" : unitDisplayName.Trim();
+        if (!string.IsNullOrWhiteSpace(unitId))
+        {
+            var id = unitId.Trim();
+            var shortId = id.Length <= 12 ? id : id[..8] + "…";
+            unit = $"{unit} · {shortId}";
+        }
+
+        var book = string.IsNullOrWhiteSpace(bookDisplayName) ? "—" : bookDisplayName.Trim();
+        var mode = string.IsNullOrWhiteSpace(modeBadge) ? "Paper" : modeBadge.Trim();
+        var opened = openedFromValidatePaper ? " · Opened from Validate → Paper" : string.Empty;
+        return $"{unit} · {book} · {mode} · LIVE blocked{opened}";
     }
 }

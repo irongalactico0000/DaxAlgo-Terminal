@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using TradingTerminal.Core.Strategies.Authoring;
 using TradingTerminal.Core.Strategies.Generation;
 
 namespace TradingTerminal.App.Authoring;
@@ -19,6 +20,18 @@ public sealed partial class StrategyAuthoringViewModel
         IsRegistered &&
         AuthoredUnitSpecification is not null &&
         StrategyWorkspace.Bindings.BuildArtifactHashSha256 is not null &&
+        !IsGenerating;
+
+    /// <summary>
+    /// Lane 3 · export registered authored unit as installable <c>.daxalgostrategy</c>.
+    /// Same gate family as Historical BT (registered + spec + C#), without requiring validation evidence.
+    /// </summary>
+    public bool CanExportOpenPackage =>
+        IsRegistered &&
+        AuthoredUnitSpecification is not null &&
+        Files.Any(static file =>
+            file.Name.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(file.Content)) &&
         !IsGenerating;
     public string HistoricalValidationStatusText => !HasHistoricalValidationEvidence
         ? "No exact historical replay is bound to this compiled revision."
@@ -223,8 +236,54 @@ public sealed partial class StrategyAuthoringViewModel
             StrategyWorkspace.Bindings with { PaperBindingHashSha256 = paperHash },
             StrategyWorkspaceStageV1.Paper,
             revisionReason: "Validated strategy approved for selected Paper book");
-        Status = "The validated revision is bound to the selected Paper book. Real-money routing remains unavailable.";
+        Status = "The validated revision is bound to the selected Paper book. Open Harness to run Paper. Real-money routing remains unavailable.";
         Save();
+        reason = string.Empty;
+        return true;
+    }
+
+    /// <summary>
+    /// Snapshot for Lane 3 open-package export. Caller writes via shell exporter + file picker.
+    /// </summary>
+    public bool TryGetOpenPackageExport(
+        out AuthoredUnitSpecificationV1 specification,
+        out IReadOnlyList<StrategyFile> sources,
+        out string reason)
+    {
+        specification = null!;
+        sources = Array.Empty<StrategyFile>();
+        if (!IsRegistered)
+        {
+            reason = "Compile and Confirm Register before exporting an open package.";
+            return false;
+        }
+
+        if (AuthoredUnitSpecification is not { } spec)
+        {
+            reason = "An authored unit specification is required to export an open package.";
+            return false;
+        }
+
+        if (IsGenerating)
+        {
+            reason = "Wait for generation to finish before exporting.";
+            return false;
+        }
+
+        var cs = Files
+            .Where(static file =>
+                file.Name.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(file.Content))
+            .Select(static file => new StrategyFile(file.Name, file.Content))
+            .ToArray();
+        if (cs.Length == 0)
+        {
+            reason = "Export needs at least one C# source file in the Builder workspace.";
+            return false;
+        }
+
+        specification = spec;
+        sources = cs;
         reason = string.Empty;
         return true;
     }
@@ -235,6 +294,12 @@ public sealed partial class StrategyAuthoringViewModel
         OnPropertyChanged(nameof(HistoricalValidationStatusText));
         OnPropertyChanged(nameof(CanRunHistoricalValidation));
         NotifyAuthoringScreenStateChanged();
+    }
+
+    partial void OnIsRegisteredChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanExportOpenPackage));
+        OnPropertyChanged(nameof(CanRunHistoricalValidation));
     }
 
     private sealed record PaperBindingV1(string ValidationEvidenceHashSha256, string BookId, string AccountId);

@@ -199,11 +199,17 @@
             <TextBlock Text="EXACT HISTORICAL VALIDATION" Classes="eyebrow" />
             <TextBlock Text="{Binding HistoricalValidationStatusText}" Classes="caption" TextWrapping="Wrap" />
           </StackPanel>
-          <Button Grid.Column="1" Classes="aiAction" Content="Run historical validation"
-                  Margin="12,0,0,0"
-                  IsEnabled="{Binding CanRunHistoricalValidation}"
-                  Click="OnHistoricalValidationRequested"
-                  AutomationProperties.Name="Run exact historical validation" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0">
+            <Button Classes="ghost" Content="Export open package…"
+                    IsEnabled="{Binding CanExportOpenPackage}"
+                    Click="OnExportOpenPackage"
+                    ToolTip.Tip="Lane 3 · Write a .daxalgostrategy (spec + C#) for install on their registry/keys. Not follow/pool/ETF."
+                    AutomationProperties.Name="Export open package" />
+            <Button Classes="aiAction" Content="Run historical validation"
+                    IsEnabled="{Binding CanRunHistoricalValidation}"
+                    Click="OnHistoricalValidationRequested"
+                    AutomationProperties.Name="Run exact historical validation" />
+          </StackPanel>
         </Grid>
       </Border>
       <Border IsVisible="{Binding IsPaperStage}"
@@ -844,11 +850,26 @@
                 </StackPanel>
               </Grid>
 
-              <Button Classes="aiAction" Content="⚡  Compile &amp; Register"
-                      Command="{Binding CompileCommand}"
-                      IsEnabled="{Binding CanCompileCurrentSource}"
-                      IsVisible="{Binding HasExpertCSharpFiles}"
-                      ToolTip.Tip="Compile every file, then review before registration" />
+              <StackPanel Orientation="Horizontal" Spacing="8"
+                          IsVisible="{Binding HasExpertCSharpFiles}">
+                <Button Classes="aiAction" Content="⚡  Compile &amp; Register"
+                        Command="{Binding CompileCommand}"
+                        IsEnabled="{Binding CanCompileCurrentSource}"
+                        ToolTip.Tip="Compile every file, then review before registration" />
+                <Button Classes="ghost" Content="Export open package…"
+                        IsEnabled="{Binding CanExportOpenPackage}"
+                        Click="OnExportOpenPackage"
+                        ToolTip.Tip="Lane 3 · Write a .daxalgostrategy (spec + C#) for install on their registry/keys."
+                        AutomationProperties.Name="Export open package from Build" />
+              </StackPanel>
+
+              <Button Classes="ghost" Content="Export open package…"
+                      IsEnabled="{Binding CanExportOpenPackage}"
+                      IsVisible="{Binding HasAuthoredUnitCSharpFiles}"
+                      Click="OnExportOpenPackage"
+                      HorizontalAlignment="Left"
+                      ToolTip.Tip="Lane 3 · Write a .daxalgostrategy (spec + C#) for install on their registry/keys."
+                      AutomationProperties.Name="Export open package from authored Build" />
 
               <Border Background="{StaticResource Warning.Soft}"
                       BorderBrush="{StaticResource Warning.Brush}" BorderThickness="1"

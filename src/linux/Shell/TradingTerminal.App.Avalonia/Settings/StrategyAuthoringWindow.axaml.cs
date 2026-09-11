@@ -5,8 +5,11 @@ using Avalonia.Data.Converters;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using DaxAlgo.Package;
 using TradingTerminal.App.Authoring;
+using TradingTerminal.App.Plugins;
 using TradingTerminal.Core.Strategies.Parameters;
+using TradingTerminal.UI;
 
 namespace TradingTerminal.App.Avalonia.Settings;
 
@@ -101,6 +104,26 @@ public partial class StrategyAuthoringWindow : Window
 
     private void OnPaperHandoffRequested(object? sender, RoutedEventArgs e) =>
         PaperHandoffRequested?.Invoke(this, EventArgs.Empty);
+
+    private async void OnExportOpenPackage(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not StrategyAuthoringViewModel viewModel) return;
+        if (!viewModel.TryGetOpenPackageExport(out var specification, out var sources, out var reason))
+        {
+            viewModel.Status = reason;
+            return;
+        }
+
+        var suggested = $"{specification.UnitId}{DaxPackage.StrategyExtension}";
+        var path = await UiFile.SaveAsync(
+            "DaxAlgo strategy package",
+            [DaxPackage.StrategyExtension.TrimStart('.')],
+            suggested);
+        if (path is null) return;
+
+        _ = AuthoredUnitOpenPackageExporter.TryWrite(path, specification, sources, out var message);
+        viewModel.Status = message;
+    }
 
     private async void OnCopyChat(object? sender, RoutedEventArgs e)
     {

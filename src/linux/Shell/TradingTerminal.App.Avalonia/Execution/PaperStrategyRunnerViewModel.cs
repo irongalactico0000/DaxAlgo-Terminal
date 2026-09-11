@@ -4,6 +4,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DaxAlgo.Sdk;
+using TradingTerminal.App.Avalonia.Harness;
 using TradingTerminal.Core.Backtest;
 using TradingTerminal.Core.Brokers;
 using TradingTerminal.Core.Domain;
@@ -228,6 +229,24 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
         : string.Empty;
     public bool HasBookBlockReason => BookBlockReason.Length > 0;
 
+    /// <summary>True when opened via Validate → Paper admit path.</summary>
+    public bool OpenedFromValidatePaper { get; private set; }
+
+    public string HarnessContextStrip =>
+        AuthoredUnitHarnessSession.FormatContextStrip(
+            SelectedStrategy?.Name,
+            SelectedStrategy?.Id,
+            SelectedBook?.DisplayName,
+            ModeBadgeText,
+            OpenedFromValidatePaper);
+
+    public void MarkOpenedFromValidatePaper()
+    {
+        OpenedFromValidatePaper = true;
+        OnPropertyChanged(nameof(OpenedFromValidatePaper));
+        OnPropertyChanged(nameof(HarnessContextStrip));
+    }
+
     public event EventHandler? FrameRequested;
 
     /// <summary>
@@ -319,6 +338,7 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
             UpdateAssetSummary();
         }
         OnPropertyChanged(nameof(CanSelectInstrument));
+        OnPropertyChanged(nameof(HarnessContextStrip));
         RefreshCommandState();
     }
 
@@ -335,6 +355,7 @@ public sealed partial class PaperStrategyRunnerViewModel : ObservableObject, IDi
         OnPropertyChanged(nameof(BookBlockReason));
         OnPropertyChanged(nameof(HasBookBlockReason));
         OnPropertyChanged(nameof(BookId));
+        OnPropertyChanged(nameof(HarnessContextStrip));
         if (IsStopped)
         {
             StatusText = value is null

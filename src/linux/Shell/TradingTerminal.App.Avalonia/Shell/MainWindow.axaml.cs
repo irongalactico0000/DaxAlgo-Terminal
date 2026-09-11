@@ -251,7 +251,10 @@ public partial class MainWindow : Window
                 }
                 existing.Activate();
                 if (autoStart && existingViewModel is not null)
+                {
+                    existingViewModel.MarkOpenedFromValidatePaper();
                     await TryAutoStartPaperStrategyAsync(existingViewModel);
+                }
                 return;
             }
         }
@@ -276,7 +279,8 @@ public partial class MainWindow : Window
                 testedParameters: initialParameters,
                 executionClient: services.GetService<TradingTerminal.ExecutionUi.IExecutionClient>(),
                 owner: this,
-                window: window);
+                window: window,
+                openedFromValidatePaper: autoStart);
             var viewModel = (TradingTerminal.App.Avalonia.Execution.PaperStrategyRunnerViewModel)window.DataContext!;
             _paperStrategyRunnerWindow = window;
             var ownedLease = bookLease;
@@ -287,16 +291,16 @@ public partial class MainWindow : Window
                 ownedLease.Dispose();
             };
             ShowDisposing(window, viewModel);
-            Vm?.ActivityLog.Append("Execution", "INFO",
-                $"Harness · opened Strategy Runner for {ownedLease.Book.Name}/{ownedLease.Book.AccountId}.");
+            Vm?.ActivityLog.Append("Harness", "INFO",
+                $"Opened for {ownedLease.Book.Name}/{ownedLease.Book.AccountId}.");
             if (autoStart)
                 await TryAutoStartPaperStrategyAsync(viewModel);
         }
         catch (Exception exception)
         {
             bookLease?.Dispose();
-            Vm?.ActivityLog.Append("Execution", "ERROR",
-                $"Paper strategy execution remained unavailable: {exception.Message}");
+            Vm?.ActivityLog.Append("Harness", "ERROR",
+                $"Paper harness remained unavailable: {exception.Message}");
             await new TradingTerminal.App.Avalonia.Execution.PaperExecutionUnavailableWindow(exception.Message)
                 .ShowDialog(this);
         }
@@ -307,21 +311,21 @@ public partial class MainWindow : Window
     {
         if (!viewModel.StartCommand.CanExecute(null))
         {
-            Vm?.ActivityLog.Append("Execution", "WARN",
-                "Paper Strategy Runner opened with tested parameters, but Start was not ready (feed/book/strategy gate).");
+            Vm?.ActivityLog.Append("Harness", "WARN",
+                "Harness opened with tested parameters, but Start was not ready (feed/book/strategy gate).");
             return;
         }
 
         try
         {
             await viewModel.StartCommand.ExecuteAsync(null);
-            Vm?.ActivityLog.Append("Execution", "INFO",
-                "Auto-started Paper Strategy Runner after Validate → Paper handoff.");
+            Vm?.ActivityLog.Append("Harness", "INFO",
+                "Auto-started Harness after Validate → Paper handoff.");
         }
         catch (Exception exception)
         {
-            Vm?.ActivityLog.Append("Execution", "ERROR",
-                $"Paper Strategy Runner auto-start failed: {exception.Message}");
+            Vm?.ActivityLog.Append("Harness", "ERROR",
+                $"Harness auto-start failed: {exception.Message}");
         }
     }
 
@@ -951,7 +955,7 @@ public partial class MainWindow : Window
             }
             await OpenPaperStrategyRunnerAsync(registration, testedParameters, book.Id, autoStart: true);
             authoring.Status =
-                $"Bound Paper book {book.Name} (in-process admit). Strategy Runner auto-started; watch BOOK POSITION for OMS qty after fills.";
+                $"Bound Paper book {book.Name} (in-process admit). Open Harness auto-started; watch BOOK POSITION for OMS qty after fills.";
         }
         catch (Exception exception)
         {
