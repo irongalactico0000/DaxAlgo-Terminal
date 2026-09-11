@@ -420,23 +420,17 @@ public sealed class NativeChartSurface : Control
         }
     }
 
-    private bool TryMapPrice(Point point, out decimal price)
-    {
-        price = 0m;
-        if (_lastPricePane.Width <= 0 || _lastPricePane.Height <= 0)
-            return false;
-        if (point.Y < _lastPricePane.Top || point.Y > _lastPricePane.Bottom ||
-            point.X < _lastPricePane.Left || point.X > _lastPricePane.Right)
-            return false;
-
-        var mapped = _lastPriceMax -
-                     (point.Y - _lastPricePane.Top) / Math.Max(1, _lastPricePane.Height) *
-                     (_lastPriceMax - _lastPriceMin);
-        if (!double.IsFinite(mapped) || mapped <= 0)
-            return false;
-        price = (decimal)mapped;
-        return price > 0m;
-    }
+    private bool TryMapPrice(Point point, out decimal price) =>
+        ChartPriceMapper.TryMap(
+            point.X,
+            point.Y,
+            _lastPricePane.Left,
+            _lastPricePane.Top,
+            _lastPricePane.Width,
+            _lastPricePane.Height,
+            _lastPriceMin,
+            _lastPriceMax,
+            out price);
 
     private void DrawResearchRanges(
         DrawingContext context,

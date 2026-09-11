@@ -48,6 +48,40 @@ public sealed class ChartPriceClickedEventArgs(decimal price) : EventArgs
     public decimal Price { get; } = price;
 }
 
+/// <summary>
+/// Maps a pointer position onto the host price pane. Oscillator panes are rejected so Place STOP/TARGET
+/// cannot latch RSI/MACD Y coordinates as prices.
+/// </summary>
+public static class ChartPriceMapper
+{
+    public static bool TryMap(
+        double pointX,
+        double pointY,
+        double paneLeft,
+        double paneTop,
+        double paneWidth,
+        double paneHeight,
+        double priceMin,
+        double priceMax,
+        out decimal price)
+    {
+        price = 0m;
+        if (paneWidth <= 0 || paneHeight <= 0)
+            return false;
+        if (pointY < paneTop || pointY > paneTop + paneHeight ||
+            pointX < paneLeft || pointX > paneLeft + paneWidth)
+            return false;
+        if (!double.IsFinite(priceMin) || !double.IsFinite(priceMax) || priceMax <= priceMin)
+            return false;
+
+        var mapped = priceMax - (pointY - paneTop) / paneHeight * (priceMax - priceMin);
+        if (!double.IsFinite(mapped) || mapped <= 0)
+            return false;
+        price = (decimal)mapped;
+        return price > 0m;
+    }
+}
+
 /// <summary>Maps a horizontal drag over the visible candle window to a half-open range.</summary>
 public static class ChartRangeSelectionMapper
 {

@@ -290,7 +290,9 @@ public partial class App : Application
                             string.Equals(argument, "--preview-research-capture", StringComparison.OrdinalIgnoreCase));
                         var previewResearchAuto = args.FirstOrDefault(argument =>
                             argument.StartsWith("--preview-research-auto", StringComparison.OrdinalIgnoreCase));
-                        if (previewArg is not null || previewResearchCapture || previewResearchAuto is not null)
+                        var previewDraftE2e = args.FirstOrDefault(argument =>
+                            argument.StartsWith("--preview-draft-e2e", StringComparison.OrdinalIgnoreCase));
+                        if (previewArg is not null || previewResearchCapture || previewResearchAuto is not null || previewDraftE2e is not null)
                         {
                             var overlayIds = previewArg is null
                                 ? Array.Empty<string>()
@@ -306,17 +308,33 @@ public partial class App : Application
                             // Empty value after '=' still means "use the default S&P +5% scan".
                             if (previewResearchAuto is not null && string.IsNullOrWhiteSpace(autoScanId))
                                 autoScanId = "next-day-plus-5";
-                            if (overlayIds.Length > 0 || previewResearchCapture || autoScanId is not null)
+                            var draftE2eOutDir = previewDraftE2e is null
+                                ? null
+                                : previewDraftE2e.Contains('=', StringComparison.Ordinal)
+                                    ? previewDraftE2e.Split('=', 2, StringSplitOptions.TrimEntries)[1]
+                                    : null;
+                            if (overlayIds.Length > 0 || previewResearchCapture || autoScanId is not null || previewDraftE2e is not null)
                             {
                                 File.WriteAllText(
                                     "/tmp/daxalgo-preview-overlays.log",
-                                    $"scheduled overlays=[{string.Join(',', overlayIds)}] researchCapture={previewResearchCapture} researchAuto={autoScanId} at {DateTime.UtcNow:O}\n");
+                                    $"scheduled overlays=[{string.Join(',', overlayIds)}] researchCapture={previewResearchCapture} researchAuto={autoScanId} draftE2e={previewDraftE2e is not null} at {DateTime.UtcNow:O}\n");
                                 _ = Dispatcher.UIThread.InvokeAsync(async () =>
                                 {
                                     try
                                     {
                                         await Task.Delay(750);
-                                        if (autoScanId is not null)
+                                        if (previewDraftE2e is not null)
+                                        {
+                                            File.AppendAllText(
+                                                "/tmp/daxalgo-preview-overlays.log",
+                                                $"invoking PreviewDraftPlaceE2EAsync at {DateTime.UtcNow:O}\n");
+                                            await main.PreviewDraftPlaceE2EAsync(
+                                                string.IsNullOrWhiteSpace(draftE2eOutDir) ? null : draftE2eOutDir);
+                                            File.AppendAllText(
+                                                "/tmp/daxalgo-preview-overlays.log",
+                                                $"completed PreviewDraftPlaceE2EAsync at {DateTime.UtcNow:O}\n");
+                                        }
+                                        else if (autoScanId is not null)
                                         {
                                             File.AppendAllText(
                                                 "/tmp/daxalgo-preview-overlays.log",
@@ -361,7 +379,8 @@ public partial class App : Application
                     var isOverlayPreview = args.Any(argument =>
                         argument.StartsWith("--preview-overlays=", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(argument, "--preview-research-capture", StringComparison.OrdinalIgnoreCase) ||
-                        argument.StartsWith("--preview-research-auto", StringComparison.OrdinalIgnoreCase));
+                        argument.StartsWith("--preview-research-auto", StringComparison.OrdinalIgnoreCase) ||
+                        argument.StartsWith("--preview-draft-e2e", StringComparison.OrdinalIgnoreCase));
                     var skipSupportPrompt = isOverlayPreview || bypassLoginRequested || bypassAccountLoginRequested;
                     if (!skipSupportPrompt)
                     {

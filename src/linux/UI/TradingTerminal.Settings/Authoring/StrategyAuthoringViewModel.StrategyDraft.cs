@@ -81,6 +81,23 @@ public sealed partial class StrategyAuthoringViewModel
         return TryLockPendingStrategyDraft(hash, out message);
     }
 
+    [RelayCommand(CanExecute = nameof(CanLockPendingStrategyDraft))]
+    private void LockPendingStrategyDraft()
+    {
+        if (!TryLockPendingStrategyDraftToActiveTradeIr(out var message))
+        {
+            Status = message;
+            AiStatus = message;
+            return;
+        }
+
+        AiStatus = Status;
+        LockPendingStrategyDraftCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool CanLockPendingStrategyDraft() =>
+        PendingStrategyDraft is { IsLocked: false } && !IsGenerating;
+
     [RelayCommand]
     private void ClearStrategyDraft()
     {
@@ -109,6 +126,7 @@ public sealed partial class StrategyAuthoringViewModel
     {
         OnPropertyChanged(nameof(HasStrategyDraft));
         OnPropertyChanged(nameof(StrategyDraftSummaryText));
+        LockPendingStrategyDraftCommand.NotifyCanExecuteChanged();
     }
 
     private static string FormatDraftPrice(decimal? price) =>

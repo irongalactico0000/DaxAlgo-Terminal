@@ -59,7 +59,8 @@ public sealed partial class ChartsViewModel
 
         StrategyDraftRequested?.Invoke(this, new StrategyDraftRequestedEventArgs(draft));
         DraftSentToBuilder = true;
-        Status = "Strategy draft (stop/target) sent to Strategy Builder. No orders placed.";
+            Status =
+                "Strategy draft (stop/target) sent to Strategy Builder. Next: Lock draft when TradeIR exists, then Historical BT. No orders placed.";
         NotifyResearchShellStateChanged();
     }
 

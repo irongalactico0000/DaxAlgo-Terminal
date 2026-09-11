@@ -14,21 +14,25 @@ public sealed partial class ChartsViewModel
     [ObservableProperty] private string _historyToText = string.Empty;
     [ObservableProperty] private bool _hasExplicitHistoryRange;
     [ObservableProperty] private bool _draftSentToBuilder;
+    [ObservableProperty] private bool _historicalBacktestRoomOpened;
     [ObservableProperty] private ChartInteractionMode _draftPlacementMode = ChartInteractionMode.Pan;
 
     private DateTimeOffset? _explicitHistoryFromUtc;
     private DateTimeOffset? _explicitHistoryToUtc;
 
     public bool ShellStep1Done => SelectedInstrument is not null && SelectedTimeframe is not null;
+    /// <summary>True only after Load history applied an explicit From–To window (not TF lookback alone).</summary>
     public bool ShellStep2Done => HasExplicitHistoryRange;
     public bool ShellStep3Done => CanSendStrategyDraft;
     public bool ShellStep4Done => DraftSentToBuilder;
+    /// <summary>True only after Charts opened Validate/Studio for a runnable locked hash — not on “compile first” assist.</summary>
+    public bool ShellStep5Done => HistoricalBacktestRoomOpened;
     public string ResearchShellProgressText =>
         $"① Instrument {(ShellStep1Done ? "✓" : "·")}  " +
         $"② Range {(ShellStep2Done ? "✓" : "·")}  " +
         $"③ Draft {(ShellStep3Done ? "✓" : "·")}  " +
         $"④ Sent {(ShellStep4Done ? "✓" : "·")}  " +
-        "⑤ Historical BT";
+        $"⑤ Historical BT {(ShellStep5Done ? "✓" : "·")}";
 
     public bool IsPlaceStopMode => DraftPlacementMode == ChartInteractionMode.PlaceStop;
     public bool IsPlaceTargetMode => DraftPlacementMode == ChartInteractionMode.PlaceTarget;
@@ -46,6 +50,12 @@ public sealed partial class ChartsViewModel
 
     public double? DraftTargetPrice =>
         TryParseDraftPrice(DraftTargetPriceText, out var price) ? (double)price : null;
+
+    /// <summary>Last loaded close for draft preview / click-price smoke (not a live tick).</summary>
+    public decimal? LastLoadedClosePrice =>
+        _lastBars.Count > 0 && double.IsFinite(_lastBars[^1].Close) && _lastBars[^1].Close > 0
+            ? (decimal)_lastBars[^1].Close
+            : null;
 
     [RelayCommand(CanExecute = nameof(CanLoadExplicitHistoryAction))]
     private void LoadExplicitHistory()
@@ -133,7 +143,28 @@ public sealed partial class ChartsViewModel
     private void RequestHistoricalBacktest()
     {
         HistoricalBacktestRequested?.Invoke(this, EventArgs.Empty);
-        Status = "Opening historical validation (same-kernel). Synthetic smoke stays on the Builder Build tab.";
+        if (!HistoricalBacktestRoomOpened)
+            Status = "Historical BT requested — opening Validate/Studio when a locked TradeIR hash is ready.";
+    }
+
+    /// <summary>Called by shell when Validate/Studio actually opened on a runnable locked hash.</summary>
+    public void MarkHistoricalBacktestRoomOpened(string? status = null)
+    {
+        HistoricalBacktestRoomOpened = true;
+        Status = string.IsNullOrWhiteSpace(status)
+            ? "Historical validation opened from Charts research shell."
+            : status;
+        NotifyResearchShellStateChanged();
+    }
+
+    /// <summary>Compile-first / locked-hash missing — do not checkmark step ⑤.</summary>
+    public void MarkHistoricalBacktestBlocked(string message)
+    {
+        HistoricalBacktestRoomOpened = false;
+        Status = string.IsNullOrWhiteSpace(message)
+            ? "Compile and register a TradeIR hash before Historical BT."
+            : message;
+        NotifyResearchShellStateChanged();
     }
 
     partial void OnHistoryFromTextChanged(string value)
@@ -154,12 +185,15 @@ public sealed partial class ChartsViewModel
 
     partial void OnDraftSentToBuilderChanged(bool value) => NotifyResearchShellStateChanged();
 
+    partial void OnHistoricalBacktestRoomOpenedChanged(bool value) => NotifyResearchShellStateChanged();
+
     private void NotifyResearchShellStateChanged()
     {
         OnPropertyChanged(nameof(ShellStep1Done));
         OnPropertyChanged(nameof(ShellStep2Done));
         OnPropertyChanged(nameof(ShellStep3Done));
         OnPropertyChanged(nameof(ShellStep4Done));
+        OnPropertyChanged(nameof(ShellStep5Done));
         OnPropertyChanged(nameof(ResearchShellProgressText));
         OnPropertyChanged(nameof(IsPlaceStopMode));
         OnPropertyChanged(nameof(IsPlaceTargetMode));

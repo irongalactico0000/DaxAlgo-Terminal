@@ -303,6 +303,7 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
         ResetResearchSelection();
         ClearExplicitHistoryWindow();
         DraftSentToBuilder = false;
+        HistoricalBacktestRoomOpened = false;
         DraftPlacementMode = ChartInteractionMode.Pan;
         NotifyStrategyDraftStateChanged();
         NotifyResearchShellStateChanged();
@@ -314,6 +315,7 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
         ResetResearchSelection();
         ClearExplicitHistoryWindow();
         DraftSentToBuilder = false;
+        HistoricalBacktestRoomOpened = false;
         DraftPlacementMode = ChartInteractionMode.Pan;
         NotifyStrategyDraftStateChanged();
         NotifyResearchShellStateChanged();
