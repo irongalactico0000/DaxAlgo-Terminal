@@ -95,14 +95,11 @@ public static class OpenPackageHostRegistrar
         }
 
         var contentRoot = Path.Combine(entry.InstallDirectory, OpenPackageDurableInstaller.ContentDirectoryName);
-        var specificationPath = Path.Combine(
-            contentRoot,
-            SpecificationRelativePath.Replace('/', Path.DirectorySeparatorChar));
-        if (!File.Exists(specificationPath))
+        if (!TryResolveSpecificationPath(contentRoot, out var specificationPath))
         {
             return new Result(false, entry.PackageId, entry.DisplayName,
-                $"'{entry.DisplayName}' is installed durably but missing '{SpecificationRelativePath}' — " +
-                "host registry open/run requires the authored unit specification payload.");
+                $"'{entry.DisplayName}' is installed durably but missing '{SpecificationRelativePath}' " +
+                $"(also checked under payload/) — host registry open/run requires the authored unit specification payload.");
         }
 
         AuthoredUnitSpecificationV1 specification;
@@ -201,5 +198,30 @@ public static class OpenPackageHostRegistrar
             entry.DisplayName,
             $"'{entry.DisplayName}' registered for open/run as '{specification.UnitId}'.",
             registration);
+    }
+
+    /// <summary>
+    /// Spec may live at <c>content/authored/…</c> (hand-laid) or
+    /// <c>content/payload/authored/…</c> (<see cref="DaxPackage.Extract"/> layout).
+    /// </summary>
+    internal static bool TryResolveSpecificationPath(string contentRoot, out string specificationPath)
+    {
+        var relative = SpecificationRelativePath.Replace('/', Path.DirectorySeparatorChar);
+        var direct = Path.Combine(contentRoot, relative);
+        if (File.Exists(direct))
+        {
+            specificationPath = direct;
+            return true;
+        }
+
+        var underPayload = Path.Combine(contentRoot, "payload", relative);
+        if (File.Exists(underPayload))
+        {
+            specificationPath = underPayload;
+            return true;
+        }
+
+        specificationPath = direct;
+        return false;
     }
 }
