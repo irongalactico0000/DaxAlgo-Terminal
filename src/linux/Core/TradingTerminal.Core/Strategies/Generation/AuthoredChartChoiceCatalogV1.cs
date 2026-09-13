@@ -52,7 +52,10 @@ public sealed class HostChartOverlayPreviewRequestedEventArgs : EventArgs
         IReadOnlyList<string> overlayIds,
         bool startResearchCapture = false,
         string? preferredSymbol = null,
-        ResearchOutcomeGalleryMatchV1? galleryMatch = null)
+        ResearchOutcomeGalleryMatchV1? galleryMatch = null,
+        DateTime? historyFromUtc = null,
+        DateTime? historyToUtc = null,
+        BarSize? historyBarSize = null)
     {
         OverlayIds = overlayIds ?? Array.Empty<string>();
         StartResearchCapture = startResearchCapture;
@@ -60,6 +63,9 @@ public sealed class HostChartOverlayPreviewRequestedEventArgs : EventArgs
             ? galleryMatch?.CanonicalSymbol
             : preferredSymbol.Trim();
         GalleryMatch = galleryMatch;
+        HistoryFromUtc = historyFromUtc;
+        HistoryToUtc = historyToUtc;
+        HistoryBarSize = historyBarSize;
     }
 
     public IReadOnlyList<string> OverlayIds { get; }
@@ -74,6 +80,13 @@ public sealed class HostChartOverlayPreviewRequestedEventArgs : EventArgs
 
     /// <summary>When set, Charts loads this gallery event's windows for capture review/send.</summary>
     public ResearchOutcomeGalleryMatchV1? GalleryMatch { get; }
+
+    /// <summary>Optional explicit history window for similar-history A→B open.</summary>
+    public DateTime? HistoryFromUtc { get; }
+
+    public DateTime? HistoryToUtc { get; }
+
+    public BarSize? HistoryBarSize { get; }
 }
 
 /// <summary>

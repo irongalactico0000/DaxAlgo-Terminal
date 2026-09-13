@@ -34,6 +34,16 @@ public sealed partial class ChartsViewModel
         $"④ Sent {(ShellStep4Done ? "✓" : "·")}  " +
         $"⑤ Historical BT {(ShellStep5Done ? "✓" : "·")}";
 
+    /// <summary>One-shell next action cue (R6.1 lite) — never places orders.</summary>
+    public string ResearchShellNextHint =>
+        !ShellStep1Done ? "Pick instrument + timeframe."
+        : !ShellStep2Done ? "Optional: set From–To and Load history for an explicit past window."
+        : !ShellStep3Done ? "Place STOP + TARGET (click or type), then Send draft."
+        : !ShellStep4Done ? "Send draft to Builder (Path A — no orders)."
+        : !ShellStep5Done
+            ? "Lock draft when TradeIR exists, then Historical BT (Validate/Studio)."
+            : "Shell complete for this draft — refine in Builder or run another range.";
+
     public bool IsPlaceStopMode => DraftPlacementMode == ChartInteractionMode.PlaceStop;
     public bool IsPlaceTargetMode => DraftPlacementMode == ChartInteractionMode.PlaceTarget;
     public bool CanLoadExplicitHistory =>
@@ -195,6 +205,7 @@ public sealed partial class ChartsViewModel
         OnPropertyChanged(nameof(ShellStep4Done));
         OnPropertyChanged(nameof(ShellStep5Done));
         OnPropertyChanged(nameof(ResearchShellProgressText));
+        OnPropertyChanged(nameof(ResearchShellNextHint));
         OnPropertyChanged(nameof(IsPlaceStopMode));
         OnPropertyChanged(nameof(IsPlaceTargetMode));
         OnPropertyChanged(nameof(DraftStopPrice));

@@ -424,6 +424,43 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         RegenerateFourCandidatesCommand.NotifyCanExecuteChanged();
         CompileCommand.NotifyCanExecuteChanged();
         RefreshInteractionBindingsInspector();
+        PromptRequiredParameterPresence();
+    }
+
+    /// <summary>
+    /// Hyperion chat: list Required parameters that still need a value; Defaultable stay as catalog defaults.
+    /// </summary>
+    private void PromptRequiredParameterPresence()
+    {
+        if (AuthoredUnitSpecification is not { } specification)
+            return;
+
+        if (AuthoredUnitParameterPresenceRulesV1.TryDescribeUnsetRequired(specification.Parameters, out var requiredMessage))
+        {
+            AiStatus = requiredMessage + " Open the Bindings tab and Apply each Required value.";
+            Append(AuthoringMessage.Tool(
+                "Ask",
+                "Required parameters",
+                requiredMessage + " Defaultable parameters keep their catalog defaults until you edit them."));
+            WorkbenchTab = 4; // Bindings
+            return;
+        }
+
+        var defaultable = specification.Parameters
+            .Where(static item => item.Presence == AuthoredUnitParameterPresenceV1.Defaultable)
+            .Select(static item => item.Key)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (defaultable.Length == 0)
+            return;
+
+        if (AiStatus is null || !AiStatus.Contains("Required parameters", StringComparison.Ordinal))
+        {
+            var summary = defaultable.Length <= 6
+                ? string.Join(", ", defaultable)
+                : string.Join(", ", defaultable.Take(6)) + $" (+{defaultable.Length - 6} more)";
+            AiStatus = $"Defaultable parameters using catalog defaults: {summary}.";
+        }
     }
 
     partial void OnIsInspectingChartReferencesChanged(bool value)
@@ -608,6 +645,32 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
                  "The selection describes similarity, not expected future return.";
         AuthoredUnitSpecification = null;
         Save();
+    }
+
+    /// <summary>
+    /// A→B slice: use the similar-history match and open host Charts on that symbol/window (draft only).
+    /// </summary>
+    [RelayCommand]
+    private void OpenChartPatternMatch(ChartPatternMatchV1? match)
+    {
+        if (match is null || ChartPatternSearchResult is null ||
+            !ChartPatternSearchResult.Matches.Contains(match))
+            return;
+
+        UseChartPatternMatch(match);
+        HostChartOverlayPreviewRequested?.Invoke(
+            this,
+            new HostChartOverlayPreviewRequestedEventArgs(
+                Array.Empty<string>(),
+                startResearchCapture: false,
+                preferredSymbol: match.CanonicalSymbol,
+                galleryMatch: null,
+                historyFromUtc: match.FromUtc,
+                historyToUtc: match.ToUtc,
+                historyBarSize: match.Timeframe));
+        Status =
+            $"Opening Charts for {match.CanonicalSymbol} · {match.Timeframe.ToDisplayString()} " +
+            $"({match.FromUtc:u} → {match.ToUtc:u}). Similarity only — not predicted return. No orders.";
     }
 
     private void RemoveChartPatternSelections(string referenceId)

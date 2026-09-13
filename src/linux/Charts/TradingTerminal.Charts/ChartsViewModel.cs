@@ -209,6 +209,27 @@ public sealed partial class ChartsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
+    /// Host similar-history A→B: select symbol/TF and load an explicit From–To window (no orders).
+    /// </summary>
+    public void ApplyHostHistoryWindow(
+        string? symbol,
+        BarSize timeframe,
+        DateTime fromUtc,
+        DateTime toUtc)
+    {
+        _pendingHostPreferredSymbol = string.IsNullOrWhiteSpace(symbol) ? _pendingHostPreferredSymbol : symbol.Trim();
+        _pendingHostBarSize = timeframe;
+        HistoryFromText = DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        HistoryToText = DateTime.SpecifyKind(toUtc, DateTimeKind.Utc).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        TryApplyPendingHostInstrument();
+        TryApplyPendingHostTimeframe();
+        if (CanLoadExplicitHistory)
+            LoadExplicitHistoryCommand.Execute(null);
+        else
+            QueueReload();
+    }
+
+    /// <summary>
     /// Host gallery handoff: switch symbol/timeframe and pre-fill observation→outcome ranges for capture.
     /// </summary>
     public void ApplyHostResearchCapture(

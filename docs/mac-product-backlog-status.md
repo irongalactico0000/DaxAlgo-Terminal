@@ -15,9 +15,9 @@ Updated: 2026-09-11
 | Avg / PnL Execution Console parity | **Done** — POSITIONS: AVG / LAST / UNREAL. / REAL. / TARGET / DRIFT + daily realized P&L list |
 | Interaction bindings (W4) inspector | **Done (UI)** — Builder **Bindings** tab lists parameters/features/layers/rules; Apply uses `ApplyCanonicalParameter` (invalidates register). Core vs optional params still Gap |
 | Core vs optional parameters | **Modeled** — `AuthoredUnitParameterPresenceV1` Required/Defaultable; Confirm fails on unset Required; Bindings shows Presence |
-| Similar-history / A→B | **Deferred** |
+| Similar-history / A→B | **Partial** — search + Use selection existed; **Open chart** opens host Charts on match window (`ApplyHostHistoryWindow`) |
+| Alpaca real-vendor Paper proof | **Blocked** — `~/.config/alpaca/profiles/financex-sandbox.yaml` returns **401** on paper-api; regenerate Paper keys at alpaca.markets → paste in Execution Console Brokers (or refresh CLI profile) → Connect → book → Limit |
 | Product lanes / regulated fences | **Done (docs + menu cues)** — `docs/product-lanes-and-regulated-fences.md`; follow/pool/ETF parked |
-| Alpaca real-vendor Paper proof | **Blocked** — CLI profile keys 401; refresh Paper keys then Connect→book→Limit |
 
 ## Product lanes (do not blur)
 

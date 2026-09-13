@@ -675,9 +675,15 @@
                             <Run Text="{Binding Source}" /><Run Text=" · " />
                             <Run Text="{Binding BarCount}" /><Run Text=" bars" />
                           </TextBlock>
-                          <Button Grid.Column="4" Classes="ghost" Content="Use"
-                                  Command="{Binding DataContext.UseChartPatternMatchCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                  CommandParameter="{Binding}" />
+                          <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4">
+                            <Button Classes="ghost" Content="Use"
+                                    Command="{Binding DataContext.UseChartPatternMatchCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}" />
+                            <Button Classes="ghost" Content="Open chart"
+                                    Command="{Binding DataContext.OpenChartPatternMatchCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}"
+                                    ToolTip.Tip="A→B: open host Charts on this similar-history window (no orders)." />
+                          </StackPanel>
                         </Grid>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>

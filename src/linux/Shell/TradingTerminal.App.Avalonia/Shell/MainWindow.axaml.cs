@@ -588,7 +588,10 @@ public partial class MainWindow : Window
         IReadOnlyList<string>? hostOverlayIds = null,
         bool startResearchCapture = false,
         string? preferredSymbol = null,
-        TradingTerminal.Core.Strategies.Generation.ResearchOutcomeGalleryMatchV1? galleryMatch = null)
+        TradingTerminal.Core.Strategies.Generation.ResearchOutcomeGalleryMatchV1? galleryMatch = null,
+        DateTime? historyFromUtc = null,
+        DateTime? historyToUtc = null,
+        TradingTerminal.Core.Domain.BarSize? historyBarSize = null)
     {
         static void PreviewLog(string message)
         {
@@ -641,6 +644,17 @@ public partial class MainWindow : Window
                 galleryMatch.OutcomeFromUtc,
                 galleryMatch.OutcomeToUtcExclusive);
             PreviewLog($"gallery capture applied: {galleryMatch.CanonicalSymbol} return={galleryMatch.OutcomeReturn:P1}");
+        }
+        else if (historyFromUtc is { } fromUtc &&
+                 historyToUtc is { } toUtc &&
+                 historyBarSize is { } barSize)
+        {
+            chartViewModel.ApplyHostHistoryWindow(
+                preferredSymbol,
+                barSize,
+                fromUtc,
+                toUtc);
+            PreviewLog($"similar-history window applied: {preferredSymbol} {fromUtc:u}→{toUtc:u}");
         }
         else if (!string.IsNullOrWhiteSpace(preferredSymbol))
         {
@@ -827,7 +841,10 @@ public partial class MainWindow : Window
                 args.OverlayIds,
                 startResearchCapture: args.StartResearchCapture && args.GalleryMatch is null,
                 preferredSymbol: args.PreferredSymbol,
-                galleryMatch: args.GalleryMatch);
+                galleryMatch: args.GalleryMatch,
+                historyFromUtc: args.HistoryFromUtc,
+                historyToUtc: args.HistoryToUtc,
+                historyBarSize: args.HistoryBarSize);
             Vm?.ActivityLog.Append(
                 "Charts",
                 "INFO",
