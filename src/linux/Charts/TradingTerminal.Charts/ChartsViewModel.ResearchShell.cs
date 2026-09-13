@@ -14,6 +14,7 @@ public sealed partial class ChartsViewModel
     [ObservableProperty] private string _historyToText = string.Empty;
     [ObservableProperty] private bool _hasExplicitHistoryRange;
     [ObservableProperty] private bool _draftSentToBuilder;
+    [ObservableProperty] private bool _draftLockedOnBuilder;
     [ObservableProperty] private bool _historicalBacktestRoomOpened;
     [ObservableProperty] private ChartInteractionMode _draftPlacementMode = ChartInteractionMode.Pan;
 
@@ -23,25 +24,27 @@ public sealed partial class ChartsViewModel
     public bool ShellStep1Done => SelectedInstrument is not null && SelectedTimeframe is not null;
     /// <summary>True only after Load history applied an explicit From–To window (not TF lookback alone).</summary>
     public bool ShellStep2Done => HasExplicitHistoryRange;
-    public bool ShellStep3Done => CanSendStrategyDraft;
-    public bool ShellStep4Done => DraftSentToBuilder;
+    public bool ShellStep3Done => CanSendStrategyDraft || DraftSentToBuilder;
+    /// <summary>True only after Builder locked the chart draft to a TradeIR hash (R1.5).</summary>
+    public bool ShellStep4Done => DraftLockedOnBuilder;
     /// <summary>True only after Charts opened Validate/Studio for a runnable locked hash — not on “compile first” assist.</summary>
     public bool ShellStep5Done => HistoricalBacktestRoomOpened;
     public string ResearchShellProgressText =>
         $"① Instrument {(ShellStep1Done ? "✓" : "·")}  " +
         $"② Range {(ShellStep2Done ? "✓" : "·")}  " +
         $"③ Draft {(ShellStep3Done ? "✓" : "·")}  " +
-        $"④ Sent {(ShellStep4Done ? "✓" : "·")}  " +
+        $"④ Lock {(ShellStep4Done ? "✓" : "·")}  " +
         $"⑤ Historical BT {(ShellStep5Done ? "✓" : "·")}";
 
     /// <summary>One-shell next action cue (R6.1 lite) — never places orders.</summary>
     public string ResearchShellNextHint =>
         !ShellStep1Done ? "Pick instrument + timeframe."
         : !ShellStep2Done ? "Optional: set From–To and Load history for an explicit past window."
-        : !ShellStep3Done ? "Place STOP + TARGET (click or type), then Send draft."
-        : !ShellStep4Done ? "Send draft to Builder (Path A — no orders)."
+        : !DraftSentToBuilder && !CanSendStrategyDraft ? "Place STOP + TARGET (click or type), then Send draft."
+        : !DraftSentToBuilder ? "Send draft to Builder (Path A — no orders)."
+        : !ShellStep4Done ? "Lock draft to active TradeIR (Charts Lock or Builder Lock draft)."
         : !ShellStep5Done
-            ? "Lock draft when TradeIR exists, then Historical BT (Validate/Studio)."
+            ? "Historical BT opens Validate/Studio on the locked hash (or compile first)."
             : "Shell complete for this draft — refine in Builder or run another range.";
 
     public bool IsPlaceStopMode => DraftPlacementMode == ChartInteractionMode.PlaceStop;
@@ -157,6 +160,16 @@ public sealed partial class ChartsViewModel
             Status = "Historical BT requested — opening Validate/Studio when a locked TradeIR hash is ready.";
     }
 
+    /// <summary>Called by shell when Builder locked the pending chart draft to a TradeIR hash.</summary>
+    public void MarkStrategyDraftLocked(string? status = null)
+    {
+        DraftLockedOnBuilder = true;
+        Status = string.IsNullOrWhiteSpace(status)
+            ? "Draft locked to TradeIR. Next: Historical BT (Validate/Studio)."
+            : status.Trim();
+        NotifyResearchShellStateChanged();
+    }
+
     /// <summary>Called by shell when Validate/Studio actually opened on a runnable locked hash.</summary>
     public void MarkHistoricalBacktestRoomOpened(string? status = null)
     {
@@ -193,7 +206,14 @@ public sealed partial class ChartsViewModel
 
     partial void OnHasExplicitHistoryRangeChanged(bool value) => NotifyResearchShellStateChanged();
 
-    partial void OnDraftSentToBuilderChanged(bool value) => NotifyResearchShellStateChanged();
+    partial void OnDraftSentToBuilderChanged(bool value)
+    {
+        if (!value)
+            DraftLockedOnBuilder = false;
+        NotifyResearchShellStateChanged();
+    }
+
+    partial void OnDraftLockedOnBuilderChanged(bool value) => NotifyResearchShellStateChanged();
 
     partial void OnHistoricalBacktestRoomOpenedChanged(bool value) => NotifyResearchShellStateChanged();
 

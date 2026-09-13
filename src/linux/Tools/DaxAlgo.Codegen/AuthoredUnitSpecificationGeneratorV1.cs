@@ -452,6 +452,14 @@ public sealed class AuthoredUnitSpecificationGeneratorV1 : IAuthoredUnitSpecific
         "00:01:00") or null. dataRequirement is a comma-separated enum string such as "bars" or
         "bars, l1". Arrays must always be present.
 
+        Each parameters[] entry is
+        {"key","displayName","kind","canonicalDefault","canonicalMinimum","canonicalMaximum",
+        "choices","unit","description","presence"}. presence is "defaultable" (catalog default OK)
+        or "required" (user must set an explicit value before Confirm). Use "required" with an empty
+        canonicalDefault when the user did not specify that value. Use "defaultable" with a concrete
+        canonicalDefault for ordinary tunables the catalog may keep. Omit presence only when
+        defaultable is intended.
+
         Drawing must be one JSON object in this exact shape (never a string or array):
         "drawing":{"panes":[{"paneId":"price","role":"price","order":0,"title":"Price"}],
         "layers":[{"layerId":"candles","paneId":"price","kind":"candles",

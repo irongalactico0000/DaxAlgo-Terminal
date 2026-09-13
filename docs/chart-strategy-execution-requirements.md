@@ -41,9 +41,9 @@ Status: **Done** / **Partial** / **Gap** / **Deferred**.
 | R1.2 | Essential (ideal): explicit history range (from–to), not only TF lookback. | **Done** — Charts **Load history** uses `GetHistoricalBarsAsync(from,to)`; shell step ② checks only after Load (not date text alone). Primary venues override; others may cover+filter |
 | R1.3 | Authoring gestures produce structured **StrategyDraft** DTO. | **Done** — Place STOP/TARGET → fields + horizontal lines → Send → Builder `CHART STRATEGY DRAFT`; evidence `tmp/draft-audit/10–12` (`--preview-draft-e2e`) |
 | R1.4 | Draft edits keep chart objects ↔ draft panel in sync. | **Partial (lite)** — typed stop/target ↔ chart lines; richer object edits still Gap |
-| R1.5 | Lock / Confirm materializes TradeIR; unlocked draft not runnable. | **Partial** — Charts Lock + Builder **Lock draft** bind to active TradeIR hash; Confirm/generate still creates the hash; historical BT requires registered unit |
+| R1.5 | Lock / Confirm materializes TradeIR; unlocked draft not runnable. | **Partial** — Charts shell ④ Lock + Builder Lock draft; Confirm/generate still creates the hash |
 | R1.6 | Research samples are optional evidence; not a locked strategy. | **Done** |
-| R6.1 | Instrument → range → draft → lock → historical BT in one shell. | **Partial** — shell steps ①–⑤ truthful (Range only after Load history; ⑤ only after Validate/Studio opens on runnable hash; else clear compile-first message). Full one-window polish still stretch |
+| R6.1 | Instrument → range → draft → lock → historical BT in one shell. | **Partial** — steps ①–⑤ include Lock; next-hint + Charts focus after lock; full one-window Validate still stretch |
 
 Contract note: `StrategyDraftV1` lives under Core `Strategies/Generation`. Capture/`ResearchChartSelectionV1` remains the **sample** path (R1.6), not the strategy draft path (R1.3).
 

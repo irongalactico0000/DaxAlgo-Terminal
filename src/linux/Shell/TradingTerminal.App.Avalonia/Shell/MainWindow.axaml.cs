@@ -704,11 +704,17 @@ public partial class MainWindow : Window
         {
             (authoringViewModel, authoringWindow) = EnsureAuthoringForResearchChart(services, authoringViewModel, authoringWindow);
             if (!authoringViewModel.TryLockPendingStrategyDraftToActiveTradeIr(out var message))
-                chartViewModel.Status = message;
-            else
             {
                 chartViewModel.Status = message;
                 authoringWindow.Activate();
+            }
+            else
+            {
+                chartViewModel.MarkStrategyDraftLocked(
+                    string.IsNullOrWhiteSpace(message)
+                        ? "Draft locked to TradeIR. Next: Historical BT."
+                        : $"{message} Next: Historical BT.");
+                _researchChartWindow?.Activate();
             }
         };
         chartViewModel.StrategyDraftLockRequested += lockHandler;
