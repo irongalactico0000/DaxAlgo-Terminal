@@ -1,20 +1,18 @@
 # How: Builder export of packages + Harness UI polish
 
-**Status: implemented** (Builder export + Harness chrome). Push separately when you ask.
+**Status: implemented** (+ install UX polish 2026-09-13).
 
----
+## A) Builder export — done
+- Export → status: `Saved X → Strategy Manager → Install open package…`
+- Fence: software on your machine, not follow-book
 
-## A) Builder export of packages — done
+## B) Harness polish — done
+- Title / menu / strip / log as Harness
 
-- `AuthoredUnitOpenPackageExporter` → `.daxalgostrategy` (spec + `.cs`)
-- Builder **Export open package…** on Build + Validate (`CanExportOpenPackage`)
-- Tests: `AuthoredUnitOpenPackageExporterTests` (export → install → register)
+## C) Install discoverability — done
+- Strategy Manager button **Install open package…**
+- Header + footer Lane 3 fence copy
+- `--install-open-package=` accepts **local file path** or HTTPS URL
+- Builder Validate/Paper/Build next-step captions
 
-## B) Harness UI polish — done
-
-- Title: `Harness · {unit} · {book}`
-- Menu: **Harness · Paper…**; activity log source `Harness`
-- Header: **HARNESS** + context strip (unit · book · mode · LIVE blocked · Validate cue)
-- Validate→Paper status copy mentions Open Harness
-
-Out of scope still: Marketplace upload, signing, merging Validate into Runner AXAML.
+Out of scope: Marketplace website upload/signing; Validate+Harness mega-merge; follow/pool/ETF.

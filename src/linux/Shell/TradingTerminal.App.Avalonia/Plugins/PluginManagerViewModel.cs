@@ -160,17 +160,21 @@ public sealed partial class PluginManagerViewModel : ViewModelBase
         Status = await InstallOpenPackageFromUrlAsync(PackageUrl).ConfigureAwait(true);
     }
 
-    /// <summary>CLI / deep-link entry: download URL → durable install → host registry.</summary>
+    /// <summary>CLI / deep-link entry: local path or HTTPS URL → durable install → host registry.</summary>
     public async Task<string> InstallOpenPackageFromUrlAsync(
         string packageUrl,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(packageUrl))
-            return "Paste an https URL to a .daxalgostrategy or .daxalgovisualizer package.";
+            return "Paste an https URL or a local .daxalgostrategy / .daxalgovisualizer path.";
+
+        var trimmed = packageUrl.Trim().Trim('"');
+        if (LooksLikeLocalOpenPackagePath(trimmed))
+            return InstallLocalOpenPackage(trimmed);
 
         var http = _httpFactory.CreateClient(
             TradingTerminal.Infrastructure.Plugins.Feed.PluginFeedServiceCollectionExtensions.FeedHttpClientName);
-        var downloaded = await OpenPackageRemoteInstaller.DownloadAsync(http, packageUrl, cancellationToken)
+        var downloaded = await OpenPackageRemoteInstaller.DownloadAsync(http, trimmed, cancellationToken)
             .ConfigureAwait(false);
         if (!downloaded.Success || string.IsNullOrWhiteSpace(downloaded.LocalPath))
             return downloaded.Message;
@@ -199,9 +203,29 @@ public sealed partial class PluginManagerViewModel : ViewModelBase
             _visualizerRegistry);
         if (!registered.Registered)
             RestartRequired = true;
-        return registered.Registered
-            ? $"{installed.Message} {registered.Message}"
-            : $"{installed.Message} Open/run not registered: {registered.Message}";
+
+        var name = installed.Handoff?.DisplayName ?? registered.DisplayName;
+        var version = installed.Handoff?.Version ?? "";
+        var label = string.IsNullOrWhiteSpace(version) ? name : $"{name} {version}";
+        if (registered.Registered)
+        {
+            return $"Installed {label} — registered for open/run on this Mac. " +
+                   "Next: Harness / Paper with your book. Installs software locally — not following someone else’s book. " +
+                   registered.Message;
+        }
+
+        return $"{installed.Message} Open/run not registered: {registered.Message}";
+    }
+
+    private static bool LooksLikeLocalOpenPackagePath(string value)
+    {
+        if (value.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (!File.Exists(value))
+            return false;
+        return value.EndsWith(".daxalgostrategy", StringComparison.OrdinalIgnoreCase) ||
+               value.EndsWith(".daxalgovisualizer", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Re-enable a disabled or quarantined plugin — it loads again on the next start.</summary>

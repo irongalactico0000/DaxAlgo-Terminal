@@ -11,6 +11,8 @@
       <TextBlock Text="Strategy Manager" FontSize="18" FontWeight="Bold" />
       <TextBlock Text="{Binding TrustPolicySummary}" Opacity="0.8" Margin="0,4,0,0"
                  TextWrapping="Wrap" />
+      <TextBlock Margin="0,6,0,0" Opacity="0.75" FontSize="11" TextWrapping="Wrap"
+                 Text="Installs strategy software into your local registry. You run it with your Paper book / your keys — not following someone else’s live book." />
     </StackPanel>
 
     <!-- Loaded assemblies cannot be replaced in place; every lifecycle mutation is explicit. -->
@@ -28,10 +30,12 @@
       <TabItem Header="Installed">
         <Grid Margin="0,12,0,0" RowDefinitions="Auto,Auto,*,Auto,Auto">
           <StackPanel Grid.Row="0" Orientation="Horizontal">
-            <Button Content="Install Strategies" Command="{Binding InstallPluginCommand}"
-                    Padding="14,6" Margin="0,0,8,0" />
+            <Button Content="Install open package…" Command="{Binding InstallPluginCommand}"
+                    Padding="14,6" Margin="0,0,8,0"
+                    ToolTip.Tip="Choose a .daxalgostrategy / .daxalgovisualizer exported from Builder (or a .daxq). Installs on this Mac only." />
             <Button Content="Install from URL" Command="{Binding InstallFromUrlCommand}"
-                    Padding="14,6" Margin="0,0,8,0" />
+                    Padding="14,6" Margin="0,0,8,0"
+                    ToolTip.Tip="HTTPS download of a .daxalgostrategy, then install into your open-packages registry." />
             <Button Content="Open Strategies folder" Command="{Binding OpenPluginsFolderCommand}"
                     Padding="14,6" />
           </StackPanel>
@@ -124,7 +128,7 @@
 
           <TextBlock Grid.Row="4" Margin="0,10,0,0" Opacity="0.6"
                      TextWrapping="Wrap" FontSize="11"
-                     Text="Developing a strategy? Reference DaxAlgo.Sdk, implement IStrategyPlugin, build, then install it here or drop its folder into the plugins directory and restart. See docs/plugins.md." />
+                     Text="Builder export → Install open package… registers the unit here. Then open Harness / Paper with your book. Developing from scratch? See docs/plugins.md (IStrategyPlugin / DaxAlgo.Sdk)." />
         </Grid>
       </TabItem>
 

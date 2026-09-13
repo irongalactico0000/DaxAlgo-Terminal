@@ -74,8 +74,8 @@ public static class AuthoredUnitOpenPackageExporter
                 Payloads = payloads,
             });
             message =
-                $"Exported open package to {write.Path ?? outputPath}. " +
-                "Lane 3 · Install via Strategy Manager or --install-open-package= (your registry/keys only).";
+                $"Saved {Path.GetFileName(write.Path ?? outputPath)} → Strategy Manager → Install open package…. " +
+                $"({specification.Name} · 1.0.0) Installs software on your machine — not following someone else’s book.";
             return true;
         }
         catch (Exception exception)

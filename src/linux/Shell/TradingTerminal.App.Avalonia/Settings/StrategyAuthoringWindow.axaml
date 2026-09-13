@@ -198,12 +198,14 @@
           <StackPanel Grid.Column="0" Spacing="2">
             <TextBlock Text="EXACT HISTORICAL VALIDATION" Classes="eyebrow" />
             <TextBlock Text="{Binding HistoricalValidationStatusText}" Classes="caption" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Status}" Classes="caption" TextWrapping="Wrap"
+                       Opacity="0.9" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
           </StackPanel>
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0">
             <Button Classes="ghost" Content="Export open package…"
                     IsEnabled="{Binding CanExportOpenPackage}"
                     Click="OnExportOpenPackage"
-                    ToolTip.Tip="Lane 3 · Write a .daxalgostrategy (spec + C#) for install on their registry/keys. Not follow/pool/ETF."
+                    ToolTip.Tip="Save a .daxalgostrategy → Strategy Manager → Install open package…. Software on their machine — not follow/pool/ETF."
                     AutomationProperties.Name="Export open package" />
             <Button Classes="aiAction" Content="Run historical validation"
                     IsEnabled="{Binding CanRunHistoricalValidation}"
@@ -219,10 +221,10 @@
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel Grid.Column="0" Spacing="2">
             <TextBlock Text="PAPER-ONLY HANDOFF" Classes="eyebrow" />
-            <TextBlock Text="Select the current Paper book, bind this validated revision, and review it in the runner. No real-money route is available."
+            <TextBlock Text="Next: Bind the selected Paper book → Harness runs this validated revision on your book. No real-money route. Not a pooled or follow book."
                        Classes="caption" TextWrapping="Wrap" />
           </StackPanel>
-          <Button Grid.Column="1" Classes="aiAction" Content="Bind selected Paper book"
+          <Button Grid.Column="1" Classes="aiAction" Content="Bind selected Paper book → Harness"
                   Margin="12,0,0,0"
                   Click="OnPaperHandoffRequested"
                   AutomationProperties.Name="Bind validated strategy to selected Paper book" />
@@ -859,7 +861,7 @@
                 <Button Classes="ghost" Content="Export open package…"
                         IsEnabled="{Binding CanExportOpenPackage}"
                         Click="OnExportOpenPackage"
-                        ToolTip.Tip="Lane 3 · Write a .daxalgostrategy (spec + C#) for install on their registry/keys."
+                        ToolTip.Tip="Save a .daxalgostrategy → Strategy Manager → Install open package…. Software on their machine — not follow/pool/ETF."
                         AutomationProperties.Name="Export open package from Build" />
               </StackPanel>
 
@@ -868,7 +870,7 @@
                       IsVisible="{Binding HasAuthoredUnitCSharpFiles}"
                       Click="OnExportOpenPackage"
                       HorizontalAlignment="Left"
-                      ToolTip.Tip="Lane 3 · Write a .daxalgostrategy (spec + C#) for install on their registry/keys."
+                      ToolTip.Tip="Save a .daxalgostrategy → Strategy Manager → Install open package…. Software on their machine — not follow/pool/ETF."
                       AutomationProperties.Name="Export open package from authored Build" />
 
               <Border Background="{StaticResource Warning.Soft}"

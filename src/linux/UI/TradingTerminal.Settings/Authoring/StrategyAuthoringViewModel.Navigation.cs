@@ -128,11 +128,11 @@ public sealed partial class StrategyAuthoringViewModel
             StrategyAuthoringScreen.Build when ShowNativeStrategyRunPanel =>
                 "Load one confirmed native run and inspect its retained Research, VibeQuant/AKQuant, CSP, and comparison evidence.",
             StrategyAuthoringScreen.Build =>
-                "Generate, verify, compile, review, and install the exact typed unit.",
+                "Generate, verify, compile, and register. Optional next: Export open package… → Strategy Manager → Install.",
             StrategyAuthoringScreen.Validate =>
-                "Inspect only evidence bound to this exact workspace revision; synthetic smoke is not historical performance.",
+                "Next: Run historical validation for this exact revision, then Paper. Optional: Export open package… for another Mac.",
             StrategyAuthoringScreen.Paper =>
-                "Select a Paper book only after exact validation evidence exists. Real-money routing remains unavailable.",
+                "Next: Bind the selected Paper book → Harness. Real-money routing remains unavailable.",
             _ => "Define and confirm the request before implementation.",
         };
 
@@ -203,7 +203,7 @@ public sealed partial class StrategyAuthoringViewModel
     {
         if (!CanOpenValidateScreen) return;
         OpenStage(StrategyAuthoringScreen.Validate,
-            "Validate is open. Only exact-revision evidence may be promoted; synthetic smoke is labeled separately.");
+            "Validate is open. Next: Run historical validation (exact revision only). Then Paper → Harness.");
     }
 
     private bool CanOpenValidateScreenAction() => CanOpenValidateScreen;
@@ -213,7 +213,7 @@ public sealed partial class StrategyAuthoringViewModel
     {
         if (!CanOpenPaperScreen) return;
         OpenStage(StrategyAuthoringScreen.Paper,
-            "Paper is open for the validated revision. Real-money routing remains unavailable.");
+            "Paper is open. Next: Bind selected Paper book → Harness. Real-money routing remains unavailable.");
     }
 
     private bool CanOpenPaperScreenAction() => CanOpenPaperScreen;

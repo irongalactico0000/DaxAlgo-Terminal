@@ -34,6 +34,8 @@ public sealed class AuthoredUnitOpenPackageExporterTests
                 AuthoredUnitOpenPackageExporter.TryWrite(packagePath, specification, sources, out var message),
                 message);
             Assert.True(File.Exists(packagePath));
+            Assert.Contains("Strategy Manager", message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Install", message, StringComparison.OrdinalIgnoreCase);
 
             var installRoot = Path.Combine(root, "open-packages");
             var installed = OpenPackageDurableInstaller.Install(packagePath, installRoot);

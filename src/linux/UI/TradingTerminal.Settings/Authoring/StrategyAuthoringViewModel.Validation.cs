@@ -34,9 +34,10 @@ public sealed partial class StrategyAuthoringViewModel
             !string.IsNullOrWhiteSpace(file.Content)) &&
         !IsGenerating;
     public string HistoricalValidationStatusText => !HasHistoricalValidationEvidence
-        ? "No exact historical replay is bound to this compiled revision."
+        ? "Next: Run historical validation for this exact compiled revision. Optional: Export open package… (Lane 3 · install on another Mac)."
         : $"Validated {HistoricalValidationEvidence!.FromUtc:u} → {HistoricalValidationEvidence.ToUtc:u} · " +
-          $"{HistoricalValidationEvidence.TradeCount} trades · {HistoricalValidationEvidence.DataMode}.";
+          $"{HistoricalValidationEvidence.TradeCount} trades · {HistoricalValidationEvidence.DataMode}. " +
+          "Next: Paper → Bind selected book → Harness.";
 
     /// <summary>
     /// Actionable blocker for Charts shell ⑤ / Validate. Lock draft ≠ historical-ready.
@@ -202,7 +203,7 @@ public sealed partial class StrategyAuthoringViewModel
             StrategyWorkspace.Bindings with { ValidationEvidenceHashSha256 = evidenceHash },
             StrategyWorkspaceStageV1.Validate,
             revisionReason: "Exact historical validation completed");
-        Status = "Historical validation is bound to this exact compiled revision. Review the selected Paper book before handoff.";
+        Status = "Historical validation is bound to this exact compiled revision. Next: Paper → Bind selected book → Harness.";
         Save();
         reason = string.Empty;
         return true;
@@ -236,7 +237,7 @@ public sealed partial class StrategyAuthoringViewModel
             StrategyWorkspace.Bindings with { PaperBindingHashSha256 = paperHash },
             StrategyWorkspaceStageV1.Paper,
             revisionReason: "Validated strategy approved for selected Paper book");
-        Status = "The validated revision is bound to the selected Paper book. Open Harness to run Paper. Real-money routing remains unavailable.";
+        Status = "The validated revision is bound to the selected Paper book. Next: Harness opens to run Paper. Real-money routing remains unavailable.";
         Save();
         reason = string.Empty;
         return true;

@@ -5,7 +5,7 @@ Updated: 2026-09-11
 | Item | Status |
 |------|--------|
 | Real Mac UI smoke Validate → Paper → visible book qty | **Done** — `--smoke-paper-handoff` PASS (`BOOK POSITION` qty=2); shutdown dispose hardened |
-| Marketplace → registry open/run | **Wired + sample + Builder export** — `OpenPackageBuyOnceSample` + **Export open package…** writes installable `.daxalgostrategy`; install→register tests green. Site browse ≠ Terminal install |
+| Marketplace → registry open/run | **Done (Terminal path)** — Export → **Install open package…** in Strategy Manager; CLI accepts local path or URL; fence copy (your registry/keys). Site browse/upload still out of Terminal |
 | Harness as one shell | **Done (MVP)** — title `Harness · {unit} · {book}`; menu **Harness · Paper…**; header strip + Validate cue; log source `Harness` |
 | Capture → indicator overlays | **Done** — after B/C/N label, additive `ema-20` / `rsi-14` / `atr-14` (no period retune) |
 | Live adapters / LIVE gate | **Done** — Mac live OMS full parity: ported `TradingTerminal.Execution` + Keychain LIVE + Avalonia Execution Console (Alpaca / IB / cTrader). Binance data-only. See `docs/live-execution-macos.md`. |
