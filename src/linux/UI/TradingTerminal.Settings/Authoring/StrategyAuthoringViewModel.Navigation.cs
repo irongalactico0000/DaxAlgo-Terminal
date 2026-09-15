@@ -111,7 +111,7 @@ public sealed partial class StrategyAuthoringViewModel
             StrategyAuthoringScreen.Design => "Chart Design",
             StrategyAuthoringScreen.Build => "Build",
             StrategyAuthoringScreen.Validate => "Validate",
-            StrategyAuthoringScreen.Paper => "Paper",
+            StrategyAuthoringScreen.Paper => "Paper · Harness",
             _ => "Brief",
         };
 
@@ -287,6 +287,7 @@ public sealed partial class StrategyAuthoringViewModel
         OnPropertyChanged(nameof(ActiveScreenDescription));
         OnPropertyChanged(nameof(CandidateTabHeader));
         OnPropertyChanged(nameof(CandidateEmptyTitle));
+        NotifyWorkingFlowMapChanged();
         OnPropertyChanged(nameof(CandidateEmptyText));
         OpenDesignScreenCommand.NotifyCanExecuteChanged();
         OpenBuildScreenCommand.NotifyCanExecuteChanged();

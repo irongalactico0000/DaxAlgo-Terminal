@@ -131,6 +131,24 @@
             <TextBlock Text="{Binding ActiveScreenTitle}" FontWeight="SemiBold" FontSize="13" />
             <TextBlock Text="{Binding ActiveScreenDescription}" Classes="caption" TextWrapping="Wrap" />
             <TextBlock Text="{Binding WorkspaceRevisionText}" Classes="eyebrow" Margin="0,3,0,0" />
+            <Border IsVisible="{Binding ShowWorkingFlowMap}"
+                    Margin="0,8,0,0" Padding="10,7"
+                    Background="{StaticResource Background.Elevated}"
+                    BorderBrush="{StaticResource Border.Brush}" BorderThickness="1"
+                    CornerRadius="5">
+              <StackPanel Spacing="3">
+                <TextBlock Text="HOW A STRATEGY GETS IN (make vs run)" Classes="eyebrow" />
+                <TextBlock Text="{Binding HowStrategyGetsInText}" Classes="caption" TextWrapping="Wrap" />
+                <TextBlock Text="THEN CHECK + RUN ON YOUR BOOK" Classes="eyebrow" Margin="0,4,0,0" />
+                <TextBlock Text="{Binding WorkingFlowMapText}" FontWeight="SemiBold" FontSize="11"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="{Binding WorkingFlowYouAreHereText}" Classes="caption" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding WorkingFlowNextActionText}" Classes="caption" TextWrapping="Wrap"
+                           Foreground="{StaticResource Text.Header}" />
+                <TextBlock Text="OMS / Harness do not write the strategy. They only run a registered unit on your Paper book. Export is how you give the file to someone else."
+                           Classes="eyebrow" TextWrapping="Wrap" Margin="0,2,0,0" />
+              </StackPanel>
+            </Border>
           </StackPanel>
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
                       HorizontalAlignment="Right"
@@ -180,11 +198,11 @@
             </StackPanel>
             <TextBlock Text="→" Classes="caption" VerticalAlignment="Center" />
             <StackPanel Spacing="2">
-              <Button Classes="pill" Content="6  Paper"
+              <Button Classes="pill" Content="6  Paper·Harness"
                       Command="{Binding OpenPaperScreenCommand}"
                       IsEnabled="{Binding CanOpenPaperScreen}"
-                      AutomationProperties.Name="Open Paper screen"
-                      ToolTip.Tip="Requires exact-revision validation and a selected Paper book. Real-money routing is unavailable." />
+                      AutomationProperties.Name="Open Paper and Harness screen"
+                      ToolTip.Tip="Bind your Paper book, then open Harness. Requires historical validation. Not live money." />
               <TextBlock Text="{Binding PaperStageState}" Classes="eyebrow" HorizontalAlignment="Center" />
             </StackPanel>
           </StackPanel>

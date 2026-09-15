@@ -295,12 +295,14 @@ public sealed partial class StrategyAuthoringViewModel
         OnPropertyChanged(nameof(HistoricalValidationStatusText));
         OnPropertyChanged(nameof(CanRunHistoricalValidation));
         NotifyAuthoringScreenStateChanged();
+        NotifyWorkingFlowMapChanged();
     }
 
     partial void OnIsRegisteredChanged(bool value)
     {
         OnPropertyChanged(nameof(CanExportOpenPackage));
         OnPropertyChanged(nameof(CanRunHistoricalValidation));
+        NotifyWorkingFlowMapChanged();
     }
 
     private sealed record PaperBindingV1(string ValidationEvidenceHashSha256, string BookId, string AccountId);

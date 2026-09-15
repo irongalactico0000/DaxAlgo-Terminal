@@ -200,7 +200,9 @@ internal static class ResearchToPaperE2ESmoke
                 bookLease.Book,
                 kernelRegistry,
                 services.GetRequiredService<IMarketDataIngest>(),
-                services.GetRequiredService<IBrokerSelector>(),
+                // Headless E2E: treat Simulated as already connected (same as paper-handoff smoke).
+                // The live IBrokerSelector may stay disconnected under --bypass-login.
+                new SmokeConnectedBrokerSelector(BrokerKind.Simulated),
                 registration,
                 launch.TestedParameters);
             paperWindow = services.GetRequiredService<PaperStrategyRunnerWindow>();
@@ -209,14 +211,7 @@ internal static class ResearchToPaperE2ESmoke
             paperWindow.Show();
             await PumpAsync().ConfigureAwait(true);
 
-            var brokerSelector = services.GetRequiredService<IBrokerSelector>();
-            if (!brokerSelector.IsConnected(BrokerKind.Simulated) &&
-                brokerSelector.IsAvailable(BrokerKind.Simulated))
-            {
-                await brokerSelector.ConnectAsync(BrokerKind.Simulated).ConfigureAwait(true);
-                await PumpAsync().ConfigureAwait(true);
-                lines.Add("PASS  connected Simulated for Paper start");
-            }
+            lines.Add("PASS  Paper Harness opened with Simulated connected for smoke");
 
             await paperVm.StartCommand.ExecuteAsync(null).ConfigureAwait(true);
             await PumpAsync().ConfigureAwait(true);

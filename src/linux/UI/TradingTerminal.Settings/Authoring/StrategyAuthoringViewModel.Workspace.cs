@@ -194,6 +194,7 @@ public sealed partial class StrategyAuthoringViewModel
         OnPropertyChanged(nameof(HistoricalValidationStatusText));
         OnPropertyChanged(nameof(CanRunHistoricalValidation));
         NotifyAuthoringScreenStateChanged();
+        NotifyWorkingFlowMapChanged();
     }
 
     private sealed record StrategyWorkspaceBriefBinding(

@@ -12,7 +12,7 @@
       <TextBlock Text="{Binding TrustPolicySummary}" Opacity="0.8" Margin="0,4,0,0"
                  TextWrapping="Wrap" />
       <TextBlock Margin="0,6,0,0" Opacity="0.75" FontSize="11" TextWrapping="Wrap"
-                 Text="Installs strategy software into your local registry. You run it with your Paper book / your keys — not following someone else’s live book." />
+                 Text="Someone gave you a strategy? Click Install open package… and pick their .daxalgostrategy file. That puts it in YOUR registry. Then Harness / Paper with YOUR book — we do not follow their live trades." />
     </StackPanel>
 
     <!-- Loaded assemblies cannot be replaced in place; every lifecycle mutation is explicit. -->

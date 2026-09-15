@@ -1602,6 +1602,7 @@ public sealed partial class StrategyAuthoringViewModel : ViewModelBase, IDisposa
         OnPropertyChanged(nameof(HasRetainedCandidateBatchDuringGeneration));
         OnPropertyChanged(nameof(CanCompileCurrentSource));
         OnPropertyChanged(nameof(CanExportOpenPackage));
+        NotifyWorkingFlowMapChanged();
         CompileCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(CanChooseGeneratedCandidate));
         OnPropertyChanged(nameof(CanRevalidateGeneratedCandidate));

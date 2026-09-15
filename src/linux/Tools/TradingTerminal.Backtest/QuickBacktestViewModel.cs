@@ -304,10 +304,28 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
             return false;
         }
 
+        ClampLookbackForSimulatedHistory(barSize);
         Status = HasStrategyParameters
             ? $"Review parameters and risk, then replay {ReviewedInstrumentSummary} on one UTC clock."
             : $"Review risk, then replay {ReviewedInstrumentSummary} on one UTC clock.";
         return true;
+    }
+
+    /// <summary>
+    /// Simulated history refuses windows that would synthesize more than 5000 bars
+    /// (1 year of 1-minute bars is 525600). Historical Validate must pick a fitting lookback.
+    /// </summary>
+    private void ClampLookbackForSimulatedHistory(BarSize barSize)
+    {
+        if (SelectedBroker != BrokerKind.Simulated) return;
+        const int maxSyntheticBars = 5000;
+        var stepTicks = Math.Max(1, barSize.ToTimeSpan().Ticks);
+        var fit = Lookbacks
+            .OrderByDescending(static option => option.Duration)
+            .FirstOrDefault(option => option.Duration.Ticks / stepTicks <= maxSyntheticBars)
+            ?? Lookbacks.First(static option => option.Duration == TimeSpan.FromHours(1));
+        if (SelectedLookback.Duration > fit.Duration)
+            SelectedLookback = fit;
     }
 
     /// <summary>Prefer Binance (real tape) → any other connected real broker → Simulated synthetic.</summary>
@@ -431,6 +449,8 @@ public sealed partial class QuickBacktestViewModel : ViewModelBase, IDisposable
             Status = $"Strategy parameters are invalid: {string.Join(" ", parameterErrors)}";
             return;
         }
+
+        ClampLookbackForSimulatedHistory(SelectedBarSize);
 
         ClearPaperLaunchRequest();
         var testedParameters = Parameters?.Parameters.ToDictionary()
