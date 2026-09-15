@@ -125,3 +125,9 @@ Report: `~/Library/Application Support/DaxAlgoTerminal/diagnostics/smoke-live-om
   `SandboxExecutionReplicator`, which submits target positions to the same gated OMS path.
 - Paper books and Real books do not share a runtime. A Paper book is simulated end to end and
   cannot emit a broker order even when a live adapter is connected in the same session.
+
+## Product setup (operators)
+
+Plain-language order setup for Alpaca / IB Gateway / cTrader (and Binance data-only):
+[`broker-orders-setup.md`](broker-orders-setup.md).
+IB Paper operator checklist: [`ib-paper-proof-checklist.md`](ib-paper-proof-checklist.md).

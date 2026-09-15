@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,6 +12,8 @@ namespace TradingTerminal.App.Login.Forms;
 
 public sealed class CTraderLoginFormViewModel : BrokerLoginFormBase
 {
+    public const string SpotwareAppsUrl = "https://connect.spotware.com/apps";
+
     private readonly CTraderOptions _options;
     private readonly CredentialStore _credentialStore;
     private readonly ICTraderAccountDiscovery _discovery;
@@ -28,10 +31,13 @@ public sealed class CTraderLoginFormViewModel : BrokerLoginFormBase
         _discovery = discovery;
 
         DiscoverAccountsCommand = new AsyncRelayCommand(DiscoverAccountsAsync, CanDiscover);
+        OpenSpotwareAppsCommand = new RelayCommand(OpenSpotwareApps);
     }
 
     public override BrokerKind Broker => BrokerKind.CTrader;
     public override string DisplayName => "cTrader";
+
+    public IRelayCommand OpenSpotwareAppsCommand { get; }
 
     private string _username = string.Empty;
     public string Username { get => _username; set => SetProperty(ref _username, value); }
@@ -139,6 +145,22 @@ public sealed class CTraderLoginFormViewModel : BrokerLoginFormBase
     {
         RaiseCanSubmit();
         DiscoverAccountsCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OpenSpotwareApps()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(SpotwareAppsUrl) { UseShellExecute = true });
+            DiscoveryMessage =
+                "Browser opened at Spotware apps. Create/authorize an app, then paste Client ID, Secret, and access token here.";
+        }
+        catch (Exception ex)
+        {
+            DiscoveryMessage =
+                $"Couldn't open the browser: {ex.Message}. Open {SpotwareAppsUrl} manually.";
+            Logger.LogWarning(ex, "cTrader: failed to open Spotware apps URL");
+        }
     }
 
     private async Task DiscoverAccountsAsync()

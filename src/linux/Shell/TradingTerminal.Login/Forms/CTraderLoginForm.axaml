@@ -2,12 +2,26 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="TradingTerminal.App.Login.Forms.CTraderLoginForm">
   <StackPanel Spacing="8">
+    <Border Classes="formNote">
+      <StackPanel Spacing="6">
+        <TextBlock Text="cTrader Open API setup" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock TextWrapping="Wrap"
+                   Text="DaxAlgo places orders through Spotware’s Open API. You create an app once, authorize it, then paste the client id / secret / access token here. Demo (Paper) is the default — leave “Use live endpoint” unchecked until you intentionally arm LIVE." />
+        <TextBlock TextWrapping="Wrap" Classes="fieldLabel"
+                   Text="1) Open Spotware apps → create an app → copy Client ID &amp; Secret.  2) Authorize the app and copy the access token.  3) Paste them below → Discover to fill ctidTraderAccountId.  4) Connect in Execution Console for orders." />
+        <Button Content="Open Spotware apps"
+                Command="{Binding OpenSpotwareAppsCommand}"
+                HorizontalAlignment="Left"
+                Padding="10,4" />
+      </StackPanel>
+    </Border>
+
     <TextBlock Text="Display name (optional)" Classes="fieldLabel" />
     <TextBox Text="{Binding Username}" Watermark="Trader or desk name" />
     <Grid ColumnDefinitions="*,*">
       <StackPanel Grid.Column="0" Spacing="5">
         <TextBlock Text="OAuth client id" Classes="fieldLabel" />
-        <TextBox Text="{Binding ClientId}" />
+        <TextBox Text="{Binding ClientId}" Watermark="From connect.spotware.com/apps" />
       </StackPanel>
       <StackPanel Grid.Column="1" Spacing="5">
         <TextBlock Text="OAuth client secret" Classes="fieldLabel" />
@@ -15,11 +29,11 @@
       </StackPanel>
     </Grid>
     <TextBlock Text="Access token" Classes="fieldLabel" />
-    <TextBox Text="{Binding AccessToken}" PasswordChar="●" Watermark="OAuth access token" />
+    <TextBox Text="{Binding AccessToken}" PasswordChar="●" Watermark="OAuth access token (expires — refresh when Connect fails)" />
     <Grid ColumnDefinitions="*,Auto">
       <StackPanel Grid.Column="0" Spacing="5">
         <TextBlock Text="ctidTraderAccountId" Classes="fieldLabel" />
-        <TextBox Text="{Binding AccountId}" />
+        <TextBox Text="{Binding AccountId}" Watermark="Numeric account — use Discover" />
       </StackPanel>
       <Button Grid.Column="1" Content="Discover" Command="{Binding DiscoverAccountsCommand}"
               VerticalAlignment="Bottom" MinWidth="92" />
@@ -38,9 +52,9 @@
         </DataTemplate>
       </ComboBox.ItemTemplate>
     </ComboBox>
-    <CheckBox IsChecked="{Binding IsLive}" Content="Use live endpoint (uncheck for demo)" />
+    <CheckBox IsChecked="{Binding IsLive}" Content="Use live endpoint (uncheck for demo / Paper)" />
     <Border Classes="formNote">
-      <TextBlock Text="Access tokens expire. When a token expires, refresh the OAuth authorization and save the new token here."
+      <TextBlock Text="Access tokens expire. When Connect fails after a while, re-authorize at Spotware and paste the new token — Client ID/Secret usually stay the same."
                  TextWrapping="Wrap" />
     </Border>
   </StackPanel>

@@ -102,7 +102,20 @@
       <StackPanel Spacing="10">
         <TextBlock Text="BROKERS" Classes="eyebrow" />
         <TextBlock Classes="fieldLabel" TextWrapping="Wrap"
-                   Text="Paper is the shipped mode for every venue. Switching one to LIVE needs its own owner flag, real credentials, the exact account ID, and a typed LIVE confirmation stored in the login Keychain. Binance is market data only and never appears here." />
+                   Text="Paper is the shipped mode for every venue. Switching one to LIVE needs its own owner flag, real credentials, the exact account ID, and a typed LIVE confirmation stored in the login Keychain." />
+        <Border Classes="formNote">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Orders by venue" FontWeight="SemiBold" />
+            <TextBlock Classes="fieldLabel" TextWrapping="Wrap"
+                       Text="Alpaca — paste Paper API key/secret in the row below, then Connect." />
+            <TextBlock Classes="fieldLabel" TextWrapping="Wrap"
+                       Text="Interactive Brokers — install IB Gateway (or TWS), Paper login, tap a port preset on the IB form, enter your DU… account id, Connect. Gateway is IB’s local desktop app; DaxAlgo talks to it on this Mac." />
+            <TextBlock Classes="fieldLabel" TextWrapping="Wrap"
+                       Text="cTrader — Open Spotware apps → OAuth client + access token → Discover account → Connect." />
+            <TextBlock Classes="fieldLabel" TextWrapping="Wrap"
+                       Text="Binance — charts/market data only. There is no Binance order adapter in this product (by design)." />
+          </StackPanel>
+        </Border>
         <ItemsControl ItemsSource="{Binding ManagedAdapters}">
           <ItemsControl.ItemTemplate>
             <DataTemplate>
@@ -123,6 +136,23 @@
                       </Border>
                     </StackPanel>
                   </Grid>
+                  <Border IsVisible="{Binding LoginForm.HasPrerequisite}" Classes="formNote"
+                          DataContext="{Binding LoginForm.Prerequisite}">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Purpose}" Classes="fieldLabel" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding HowTo}" Classes="fieldLabel" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding StatusText}" Classes="fieldLabel" />
+                      </StackPanel>
+                      <Button Grid.Column="1" Content="Re-check"
+                              Command="{Binding RecheckCommand}"
+                              IsVisible="{Binding CanProbe}"
+                              VerticalAlignment="Top"
+                              Margin="8,0,0,0"
+                              Padding="8,3" />
+                    </Grid>
+                  </Border>
                   <ContentControl Content="{Binding LoginForm}" IsVisible="{Binding HasLoginForm}" />
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="Connect" IsEnabled="{Binding CanConnect}"
@@ -152,7 +182,7 @@
           </StackPanel>
           <StackPanel Grid.Column="2" Spacing="4">
             <TextBlock Text="Interactive Brokers account ID" Classes="fieldLabel" />
-            <TextBox Text="{Binding InteractiveBrokersAccountId}" Watermark="e.g. DU123456" />
+            <TextBox Text="{Binding InteractiveBrokersAccountId}" Watermark="Paper: DU123456 — required for IB orders" />
           </StackPanel>
         </Grid>
       </StackPanel>
